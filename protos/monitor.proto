@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package monitor;
+
+service MonitorService {
+  rpc registerRequest(Empty) returns (RegisterRequestResponse);
+  rpc registerBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
+  rpc registerBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
+  rpc closeBranch(CloseBranchMessage) returns (Empty);
+  rpc waitRequest(WaitRequestMessage) returns (Empty);
+  rpc checkRequest(CheckRequestMessage) returns (CheckRequestResponse);
+  rpc checkRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
+}
+
+enum RequestStatus {
+  OPENED = 0;
+  CLOSED = 1;
+}
+
+message RegionStatus {
+  string region = 1;
+  RequestStatus status = 2;
+}
+
+/* Register Request */
+
+message Empty {
+
+}
+
+message RegisterRequestResponse {
+  int64 rid = 1;
+}
+
+/* Register Branch */
+
+message RegisterBranchMessage {
+  optional int64 rid = 1;
+  optional string region = 2;
+  optional string service = 3;
+}
+
+message RegisterBranchResponse {
+  int64 bid = 1;
+  optional int64 rid = 2; // if request was only registered now
+}
+
+/* Registers Branches */
+
+message RegisterBranchesMessage {
+  optional int64 rid = 1;
+  optional string region = 2;
+  optional string service = 3;
+  int32 num = 4;
+}
+
+message RegisterBranchesResponse {
+  repeated int64 bid = 1;
+  optional int64 rid = 2; // if request was only registered now
+}
+
+/* Close Branch */
+
+message CloseBranchMessage {
+  int64 rid = 1;
+  int64 bid = 2;
+}
+
+/* Wait Request */
+
+message WaitRequestMessage {
+  int64 rid = 1;
+  optional string region = 2;
+  optional string service = 3;
+}
+
+/* Check Request */
+
+message CheckRequestMessage {
+  int64 rid = 1;
+  optional string region = 2;
+  optional string service = 3;
+}
+
+message CheckRequestResponse {
+  RequestStatus status = 1;
+}
+
+/* Check Request by Regions */
+
+message CheckRequestByRegionsMessage {
+  int64 rid = 1;
+  optional string service = 2;
+}
+
+message CheckRequestByRegionsResponse {
+  repeated RegionStatus regionStatus = 1;
+}
