@@ -14,10 +14,27 @@ namespace branch {
         std::string region;
 
     public:
-        Branch(long, std::string, std::string);
+        Branch(long bid, std::string service, std::string region);
 
+        /**
+         * Get identifier (bid) of the object
+         * 
+         * @return bid
+         */
         long getBid();
+
+        /**
+         * Get region of the object
+         * 
+         * @return region 
+         */
         std::string getRegion();
+
+        /**
+         * Get service of the object
+         * 
+         * @return service 
+         */
         std::string getService();
     };
     
