@@ -21,7 +21,8 @@ Available commands:
 
 ## Getting Started
 
-Install gRPC and its dependencies: [gRPC Quick Start](https://grpc.io/docs/languages/cpp/quickstart/#install-grpc)
+Install gRPC and its dependencies for C++: [gRPC Quick Start](https://grpc.io/docs/languages/cpp/quickstart/#install-grpc)
+Install gRPC and its dependencies for Python: [gRPC Quick Start](https://grpc.io/docs/languages/python/quickstart/)
 
 Install GoogleTest: [Generic Build Instructions: Standalone CMake Project](https://github.com/google/googletest/blob/main/googletest/README.md#standalone-cmake-project)
 

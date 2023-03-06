@@ -11,7 +11,7 @@ const std::string CLOSE_BRANCH = "cb";
 const std::string WAIT_REQUEST = "wr";
 const std::string CHECK_REQUEST = "cr";
 const std::string CHECK_REQUEST_BY_REGIONS = "crr";
-const std::string GET_INCONSISTENCIES = "gi";
+const std::string CHECK_PREVENTED_INCONSISTENCIES = "gi";
 const std::string SLEEP = "sleep";
 const std::string EXIT = "exit";
 

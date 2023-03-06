@@ -201,8 +201,8 @@ void showOptions() {
   std::cout << "- Wait request: \t \t " << WAIT_REQUEST << " <rid> [<service>] [<region>]" << std::endl;
   std::cout << "- Check request: \t \t " << CHECK_REQUEST << " <rid> [<service>] [<region>]" << std::endl;
   std::cout << "- Check request by regions: \t " << CHECK_REQUEST_BY_REGIONS << " <rid> [<service>]" << std::endl;
-  std::cout << "- Get inconsistencies: \t \t " << GET_INCONSISTENCIES << std::endl;
-  std::cout << "- Sleep: \t \t \t " << SLEEP << " <time in ms>" << std::endl;
+  std::cout << "- Get inconsistencies: \t \t " << CHECK_PREVENTED_INCONSISTENCIES << std::endl;
+  std::cout << "- Sleep: \t \t \t " << SLEEP << " <time in seconds>" << std::endl;
   std::cout << "- Exit: \t  \t \t " << EXIT << std::endl;
 }
 
@@ -236,7 +236,7 @@ void executeCommand(RendezvousClient* client, std::string cmd, std::string param
       else if (cmd == CHECK_REQUEST_BY_REGIONS) {
         client->checkRequestByRegions(param1, param2);
       }
-      else if (cmd == GET_INCONSISTENCIES) {
+      else if (cmd == CHECK_PREVENTED_INCONSISTENCIES) {
         client->getPreventedInconsistencies();
       }
       else if (cmd == SLEEP) {
@@ -249,11 +249,11 @@ void executeCommand(RendezvousClient* client, std::string cmd, std::string param
         exit(0);
       }
       else {
-        std::cout << "Invalid command " << cmd << " " << param1 << " " << param2 << " " << param3 << " " << param4 << std::endl;
+        std::cout << "ERROR: Invalid command " << cmd << " " << param1 << " " << param2 << " " << param3 << " " << param4 << std::endl;
       }
     }
     catch (std::exception& e) {
-      std::cout << "Invalid command: " << e.what() << std::endl;
+      std::cout << "ERROR: Invalid command - " << e.what() << std::endl;
     }
 }
 

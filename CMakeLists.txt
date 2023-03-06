@@ -9,5 +9,5 @@ include(cmake/CompileProtos.cmake)
 compile_protos(monitor)
 
 add_subdirectory(src)
-add_subdirectory(examples)
+add_subdirectory(examples/cpp)
 add_subdirectory(test)

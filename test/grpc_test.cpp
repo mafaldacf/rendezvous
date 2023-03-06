@@ -1,5 +1,5 @@
 #include "monitor.grpc.pb.h"
-#include "../examples/utils.h"
+#include "../examples/cpp/utils.h"
 #include "../src/server.h"
 #include "gtest/gtest.h"
 #include <grpcpp/grpcpp.h>
