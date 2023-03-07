@@ -7,190 +7,206 @@
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include "branch.h"
 #include <cstring>
+#include <vector>
+#include "branch.h"
 
-namespace request {
-
-    /* request status */
-    const int OPENED = 0;
-    const int CLOSED = 1;
+namespace metadata {
 
     class Request {
 
-    private:
-        std::atomic<long> nextRID;
-        std::string rid;
+        /* request status */
+        const int OPENED = 0;
+        const int CLOSED = 1;
 
-        // Open Branches
-        std::map<long, branch::Branch*> branches;
-        std::unordered_map<std::string, int> branchesPerRegion;
-        std::unordered_map<std::string, int> branchesPerService;
-        std::map<std::pair<std::string, std::string>, int> branchesPerServiceAndRegion;
+        private:
+            std::atomic<long> nextId;
+            std::string rid;
 
-        // Concurrency Control
-        std::mutex mutex_branches;
-        std::mutex mutex_branchesPerRegion;
-        std::mutex mutex_branchesPerService;
-        std::mutex mutex_branchesPerServiceAndRegion;
-        
-        std::condition_variable cond_branches;
-        std::condition_variable cond_branchesPerRegion;
-        std::condition_variable cond_branchesPerService;
-        std::condition_variable cond_branchesPerServiceAndRegion;
+            /* Branches */
+            // nested map: <service, <region, vector with branch pointers>>
+            using Branches = std::vector<metadata::Branch*>;
+            std::unordered_map<std::string, std::unordered_map<std::string, Branches>> branches;
 
-    public:
 
-        Request(std::string rid);
-        ~Request();
+            /* Opened Branches */
+            std::atomic<int> numBranches;
+            std::unordered_map<std::string, int> numBranchesPerRegion;
+            std::unordered_map<std::string, int> numBranchesPerService;
 
-        /**
-         * Get the identifier (rid) of the object
-         * 
-         * @return rid
-         */
-        std::string getRid();
+            /*  Concurrency Control */
+            std::mutex mutex_branches;
+            std::mutex mutex_numBranchesPerRegion;
+            std::mutex mutex_numBranchesPerService;
+            
+            std::condition_variable cond_branches;
+            std::condition_variable cond_numBranchesPerRegion;
+            std::condition_variable cond_numBranchesPerService;
 
-        /**
-         * Atomically get and incremented next branch identifier
-         * 
-         * @return new branch identifier
-         */
-        long computeNextBID();
+        public:
 
-        void addBranch(branch::Branch * branch);
+            Request(std::string rid);
+            ~Request();
 
-        /**
-         * Remove a branch from the request
-         * 
-         * @param bid Identifier of the branch to be removed
-         * 
-         * @return 0 if successfully removed, otherwise -1 if branch was not found by its identifier
-         */
-        int removeBranch(long bid);
+            /**
+             * Get the identifier (rid) of the object
+             * 
+             * @return rid
+             */
+            std::string getRid();
 
-        /**
-         * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps
-         *
-         * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
-         */
-        void trackBranchOnContext(branch::Branch * branch, long value);
+            /**
+             * Atomically get and incremented next identifier to be part of a new bid
+             * 
+             * @return new identifier
+             */
+            long computeNextId();
 
-        /**
-         * Wait until request is closed
-         *
-         * @return Possible return values:
-         *  - 0 if call did not block, 
-         *  - 1 if inconsistency was prevented
-         */
-        int wait();
+            void addBranch(metadata::Branch * branch);
 
-        /**
-         * Wait until request is closed for a given context (service)
-         *
-         * @param service The name of the service that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if call did not block, 
-         * - 1 if inconsistency was prevented
-         * - (-1) if no status was found for a given service
-         */
-        int waitOnService(std::string service);
+            /**
+             * Remove a branch from the request
+             * 
+             * @param service The service where the branch was registered
+             * @param region The region where the branch was registered
+             * @param bid The identifier of the set of branches where the current branch was registered
+             * 
+             * @return Possible return values:
+             * - 0 if successfully removed
+             * - (-2) if no branch was found for a given service
+             * - (-3) if no branch was found for a given region
+             * - (-4) if no branch was found with a given bid
+             */
+            int closeBranch(const std::string& service, const std::string& region, const std::string& bid);
 
-        /**
-         * Wait until request is closed for a given context (region)
-         *
-         * @param region The name of the region that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if call did not block, 
-         * - 1 if inconsistency was prevented
-         * - (-1) if no status was found for a given region
-         */
-        int waitOnRegion(std::string region);
+            /**
+             * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps
+             *
+             * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
+             */
+            void trackBranchOnContext(metadata::Branch * branch, long value);
 
-        /**
-         * Wait until request is closed for a given context (service and region)
-         *
-         * @param service The name of the service that defines the waiting context
-         * @param region The name of the region that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if call did not block, 
-         * - 1 if inconsistency was prevented
-         * - (-1) if no status was found for a given context (service or region)
-         */
-        int waitOnServiceAndRegion(std::string service, std::string region);
+            /**
+             * Wait until request is closed
+             *
+             * @return Possible return values:
+             *  - 0 if call did not block, 
+             *  - 1 if inconsistency was prevented
+             */
+            int wait();
 
-        /**
-         * Check status of request
-         *
-         * @return Possible return values:
-         * - 0 if request is OPENED 
-         * - 1 if request is CLOSED
-         */
-        int getStatus();
+            /**
+             * Wait until request is closed for a given context (service)
+             *
+             * @param service The name of the service that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if call did not block, 
+             * - 1 if inconsistency was prevented
+             * - (-2) if no status was found for a given service
+             */
+            int waitOnService(const std::string& service);
 
-        /**
-         * Check status of request for a given context (region)
-         *
-         * @param region The name of the region that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if request is OPENED 
-         * - 1 if request is CLOSED
-         * - (-1) if no status was found for the given region
-         */
-        int getStatusOnRegion(std::string region);
+            /**
+             * Wait until request is closed for a given context (region)
+             *
+             * @param region The name of the region that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if call did not block, 
+             * - 1 if inconsistency was prevented
+             * - (-3) if no status was found for a given region
+             */
+            int waitOnRegion(const std::string& region);
 
-        /**
-         * Check status of request for a given context (service)
-         *
-         * @param service The name of the service that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if request is OPENED 
-         * - 1 if request is CLOSED
-         * - (-1) if no status was found for the given service
-         */
-        int getStatusOnService(std::string service);
+            /**
+             * Wait until request is closed for a given context (service and region)
+             *
+             * @param service The name of the service that defines the waiting context
+             * @param region The name of the region that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if call did not block, 
+             * - 1 if inconsistency was prevented
+             * - (-2) if no status was found for a given service
+             * - (-3) if no status was found for a given region
+             */
+            int waitOnServiceAndRegion(const std::string& service, const std::string& region);
 
-        /**
-         * Check status of request for a given context (service and region)
-         *
-         * @param service The name of the service that defines the waiting context
-         * @param region The name of the region that defines the waiting context
-         *
-         * @return Possible return values:
-         * - 0 if request is OPENED 
-         * - 1 if request is CLOSED
-         * - (-1) if no status was found for a given context (service or region)
-         */
-        int getStatusOnServiceAndRegion(std::string service, std::string region);
+            /**
+             * Check if branches are opened for a given service and region
+             * 
+             * @param branches The vector containing branches for a given context
+             * @return true if at least one branch is opened and false otherwise 
+             */
+            bool hasOpenedBranches(std::vector<metadata::Branch*> branches);
 
-        /**
-         * Check status of request for each available region and for a given contex (service)
-         *
-         * @param status Sets value depending on the outcome:
-         * - (-1) if no status was found for a given service
-         *
-         * @return Map of status of the request (OPENED or CLOSED) for each region
-         */
-        std::map<std::string, int> getStatusByRegions(int * status);
+            /**
+             * Check status of request
+             *
+             * @return Possible return values:
+             * - 0 if request is OPENED 
+             * - 1 if request is CLOSED
+             */
+            int getStatus();
 
-        /**
-         * Check status of request for each available region and for a given contex (service)
-         *
-         * @param service The name of the service that defines the waiting context
-         * @param status Sets value depending on the outcome:
-         * - (-1) if no status was found for a given service
-         * - (-2) if no status was found for any region
-         *
-         * @return Map of status of the request (OPENED or CLOSED) for each region
-         */
-        std::map<std::string, int> getStatusByRegionsOnService(std::string service, int * status);
+            /**
+             * Check status of request for a given context (region)
+             *
+             * @param region The name of the region that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if request is OPENED 
+             * - 1 if request is CLOSED
+             * - (-3) if no status was found for a given region
+             */
+            int getStatusOnRegion(const std::string& region);
 
-    };
+            /**
+             * Check status of request for a given context (service)
+             *
+             * @param service The name of the service that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if request is OPENED 
+             * - 1 if request is CLOSED
+             * - (-2) if no status was found for a given service
+             */
+            int getStatusOnService(const std::string& service);
+
+            /**
+             * Check status of request for a given context (service and region)
+             *
+             * @param service The name of the service that defines the waiting context
+             * @param region The name of the region that defines the waiting context
+             *
+             * @return Possible return values:
+             * - 0 if request is OPENED 
+             * - 1 if request is CLOSED
+             * - (-2) if no status was found for a given service
+             * - (-3) if no status was found for a given region
+             */
+            int getStatusOnServiceAndRegion(const std::string& service, const std::string& region);
+
+            /**
+             * Check status of request for each available region and for a given contex (service)
+             *
+             * @return Map of status of the request (OPENED or CLOSED) for each region
+             */
+            std::map<std::string, int> getStatusByRegions();
+
+            /**
+             * Check status of request for each available region and for a given contex (service)
+             *
+             * @param service The name of the service that defines the waiting context
+             * @param status Sets value depending on the outcome:
+             * - (-2) if no status was found for a given service
+             *
+             * @return Map of status of the request (OPENED or CLOSED) for each region
+             */
+            std::map<std::string, int> getStatusByRegionsOnService(const std::string& service, int * status);
+
+        };
     
 }
 

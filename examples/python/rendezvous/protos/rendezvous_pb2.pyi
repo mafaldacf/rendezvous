@@ -30,7 +30,7 @@ class CheckRequestMessage(_message.Message):
     region: str
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., region: _Optional[str] = ..., service: _Optional[str] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ...) -> None: ...
 
 class CheckRequestResponse(_message.Message):
     __slots__ = ["status"]
@@ -39,12 +39,14 @@ class CheckRequestResponse(_message.Message):
     def __init__(self, status: _Optional[_Union[RequestStatus, str]] = ...) -> None: ...
 
 class CloseBranchMessage(_message.Message):
-    __slots__ = ["bid", "rid"]
-    BID_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["region", "rid", "service"]
+    REGION_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
-    bid: int
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    region: str
     rid: str
-    def __init__(self, rid: _Optional[str] = ..., bid: _Optional[int] = ...) -> None: ...
+    service: str
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ...) -> None: ...
 
 class Empty(_message.Message):
     __slots__ = []
@@ -72,35 +74,33 @@ class RegisterBranchMessage(_message.Message):
     region: str
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., region: _Optional[str] = ..., service: _Optional[str] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ...) -> None: ...
 
 class RegisterBranchResponse(_message.Message):
     __slots__ = ["bid", "rid"]
     BID_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
-    bid: int
+    bid: str
     rid: str
-    def __init__(self, bid: _Optional[int] = ..., rid: _Optional[str] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., bid: _Optional[str] = ...) -> None: ...
 
 class RegisterBranchesMessage(_message.Message):
-    __slots__ = ["num", "region", "rid", "service"]
-    NUM_FIELD_NUMBER: _ClassVar[int]
-    REGION_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["regions", "rid", "service"]
+    REGIONS_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
     SERVICE_FIELD_NUMBER: _ClassVar[int]
-    num: int
-    region: str
+    regions: _containers.RepeatedScalarFieldContainer[str]
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., region: _Optional[str] = ..., service: _Optional[str] = ..., num: _Optional[int] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., regions: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class RegisterBranchesResponse(_message.Message):
     __slots__ = ["bid", "rid"]
     BID_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
-    bid: _containers.RepeatedScalarFieldContainer[int]
+    bid: str
     rid: str
-    def __init__(self, bid: _Optional[_Iterable[int]] = ..., rid: _Optional[str] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., bid: _Optional[str] = ...) -> None: ...
 
 class RegisterRequestMessage(_message.Message):
     __slots__ = ["rid"]
@@ -122,7 +122,13 @@ class WaitRequestMessage(_message.Message):
     region: str
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., region: _Optional[str] = ..., service: _Optional[str] = ...) -> None: ...
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ...) -> None: ...
+
+class WaitRequestResponse(_message.Message):
+    __slots__ = ["preventedInconsistency"]
+    PREVENTEDINCONSISTENCY_FIELD_NUMBER: _ClassVar[int]
+    preventedInconsistency: bool
+    def __init__(self, preventedInconsistency: bool = ...) -> None: ...
 
 class RequestStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []

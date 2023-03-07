@@ -2,14 +2,14 @@
 
 if [ "$#" -eq 1 ] && [ $1 = "clean" ]
   then
-    # C++
+    # c++
     rm -r -f cmake/build
 
-    # Python
+    # python
     rm -r -f examples/python/__pycache__
-    rm -f examples/python/monitor*
+    rm -r -f examples/python/rendezvous/protos/__pycache__
 
-elif [ "$#" -eq 1 ] && [ $1 = "make" ]
+elif [ "$#" -eq 1 ] && [ $1 = "build" ]
   then
     mkdir -p cmake/build
     cd cmake/build
@@ -17,26 +17,42 @@ elif [ "$#" -eq 1 ] && [ $1 = "make" ]
     make clean
     make
 
-elif [ "$#" -eq 1 ] && [ $1 = "build" ]
+elif [ "$#" -eq 1 ] && [ $1 = "build-py" ]
   then
-    python3 -m grpc_tools.protoc -I protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python protos/monitor.proto
+    # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
+    # https://github.com/protocolbuffers/protobuf/issues/1491
+    # consequently, we have to remove part of the path from the output flags (the path will be complemented with the package name)
 
-elif [ "$#" -eq 2 ] && [ $1 = "run" ] && [ $2 = "server" ]
+    # UNCOMMENT to build from global proto file in /protos/
+    python3 -m grpc_tools.protoc -I rendezvous/protos=protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python protos/rendezvous.proto
+
+    # UNCOMMENT to build from proto file in /examples/python/rendezvous/protos
+    # python3 -m grpc_tools.protoc -I rendezvous/protos=examples/python/rendezvous/protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python examples/python/rendezvous/protos/rendezvous.proto
+
+elif [ "$#" -ge 2 ] && [ $1 = "run" ] && [ $2 = "server" ]
   then
     cd cmake/build/src
-    ./rendezvous
+    # Check if there are additional arguments starting from $3
+    if [ "$#" -gt 2 ]
+    then
+      # Pass all remaining arguments starting from $3 using "$@"
+      ./rendezvous "${@:3}"
+    else
+      # No additional arguments, run ./rendezvous without any extra arguments
+      ./rendezvous
+    fi
 
-elif [ "$#" -eq 2 ] && [ $1 = "run" ] && [ $2 = "client-cpp" ]
+elif [ "$#" -eq 2 ] && [ $1 = "run" ] && [ $2 = "client" ]
   then
     cd cmake/build/examples/cpp
     ./client
 
-elif [ "$#" -eq 3 ] && [ $1 = "run" ] && [ $2 = "client-cpp" ] && [ $3 = "--stress_test" ]
+elif [ "$#" -eq 3 ] && [ $1 = "run" ] && [ $2 = "client" ] && [ $3 = "--stress_test" ]
   then
     cd cmake/build/examples/cpp
     ./client $3
 
-elif [ "$#" -eq 4 ] && [ $1 = "run" ] && [ $2 = "client-cpp" ] && [ $3 = "--script" ]
+elif [ "$#" -eq 4 ] && [ $1 = "run" ] && [ $2 = "client" ] && [ $3 = "--script" ]
   then
     cd cmake/build/examples/cpp
     ./client $3 ../../../../scripts/$4
@@ -65,10 +81,10 @@ else
     echo "Invalid arguments!"
     echo "Usage:"
     echo "(1) ./run.sh clean"
-    echo "(2) ./run.sh make"
-    echo "(3) ./run.sh build"
+    echo "(2) ./run.sh build"
+    echo "(3) ./run.sh build-py"
     echo "(4) ./run.sh run server"
-    echo "(5) ./run.sh run client-cpp [--script <script name>] | [--stress_test]"
+    echo "(5) ./run.sh run client [--script <script name>] | [--stress_test]"
     echo "(6) ./run.sh run client-py [--script <script name>] | [--stress_test]"
     echo "(7) ./run.sh run tests"
     exit 1

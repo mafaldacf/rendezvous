@@ -1,10 +1,11 @@
 import argparse
 import sys
 import time
-import grpc
-import monitor_pb2 as pb
-import monitor_pb2_grpc as monitor
 import threading
+import grpc
+
+from rendezvous.protos import rendezvous_pb2_grpc as rendezvous_service
+from rendezvous.protos import rendezvous_pb2 as rendezvous
 
 # Input commands
 REGISTER_REQUEST = "rr";
@@ -20,73 +21,73 @@ EXIT = "exit";
 
 def registerRequest(stub, rid):
     try:
-        response = stub.registerRequest(pb.RegisterRequestMessage(rid=rid))
+        response = stub.registerRequest(rendezvous.RegisterRequestMessage(rid=rid))
         print(f"[Register Request] {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def registerBranch(stub, rid, service, region):
     try:
-        response = stub.registerBranch(pb.RegisterBranchMessage(rid=rid, service=service, region=region))
+        response = stub.registerBranch(rendezvous.RegisterBranchMessage(rid=rid, service=service, region=region))
         print(f"[Register Branch] {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def registerBranches(stub, rid, num, service, region):
+def registerBranches(stub, rid, service, regions):
     try:
-        response = stub.registerBranches(pb.RegisterBranchesMessage(rid=rid, num=num, service=service, region=region))
+        response = stub.registerBranches(rendezvous.RegisterBranchesMessage(rid=rid, service=service, regions=regions))
         print(f"[Register Branches] {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def closeBranch(stub, rid, bid):
+def closeBranch(stub, rid, service, region):
     try:
-        stub.closeBranch(pb.CloseBranchMessage(rid=rid, bid=bid))
+        stub.closeBranch(rendezvous.CloseBranchMessage(rid=rid, service=service, region=region))
         print(f"[Close Branch] done!\n")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def waitRequest(stub, rid, service, region):
     try:
-        request = pb.WaitRequestMessage(rid=rid, service=service, region=region)
+        request = rendezvous.WaitRequestMessage(rid=rid, region=region)
         print(f"[Wait Request] > waiting: {request}")
-        stub.waitRequest(request)
-        print(f"[Wait Request] < returning: {request}")
+        response = stub.waitRequest(rendezvous.WaitRequestMessage(rid=rid, region=region))
+        print(f"[Wait Request] < returning: prevented inconsistency = {response.preventedInconsistency}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def checkRequest(stub, rid, service, region):
     try:
-        response = stub.checkRequest(pb.CheckRequestMessage(rid=rid, service=service, region=region))
-        status = pb.RequestStatus.Name(response.status)
+        response = stub.checkRequest(rendezvous.CheckRequestMessage(rid=rid, service=service, region=region))
+        status = rendezvous.RequestStatus.Name(response.status)
         print(f"[Check Request] status:\"{status}\"")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def checkRequestByRegions(stub, rid, service):
     try:
-        response = stub.checkRequestByRegions(pb.CheckRequestByRegionsMessage(rid=rid, service=service))
+        response = stub.checkRequestByRegions(rendezvous.CheckRequestByRegionsMessage(rid=rid, service=service))
         print(f"[Check Request By Regions]:")
         for regionStatus in response.regionStatus:
-            status = pb.RequestStatus.Name(regionStatus.status)
+            status = rendezvous.RequestStatus.Name(regionStatus.status)
             print(f"\t{regionStatus.region} : {status}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def getPreventedInconsistencies(stub):
     try:
-        response = stub.getPreventedInconsistencies(pb.Empty())
+        response = stub.getPreventedInconsistencies(rendezvous.Empty())
         print(f"[Get Prevented Inconsistencies] {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
 def showOptions():
     print(f"- Register Request: \t \t \t {REGISTER_REQUEST} [<rid>]")
-    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> [<service>] [<region>]")
-    print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> <num> [<service>] [<region>]")
-    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <bid>")
-    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> [<service>] [<region>]")
-    print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> [<service>] [<region>]")
+    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> [<service>] <region>")
+    print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> [<service>] <regions>")
+    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <service> <region>")
+    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> [<service>] <region>")
+    print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> [<service>] <region>")
     print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> [<service>]")
     print(f"- Check Prevented Inconsistencies: \t {CHECK_PREVENTED_INCONSISTENCIES}")
     print(f"- Sleep: \t \t \t \t {SLEEP} <time in seconds>")
@@ -110,17 +111,20 @@ def readInput(stub):
             region = args[2] if len(args) >= 3 else None
             registerBranch(stub, rid, service, region)
 
-        elif command == REGISTER_BRANCHES and len(args) >= 2 and len(args) <= 4:
+        elif command == REGISTER_BRANCHES and len(args) >= 2:
             rid = args[0]
-            num = int(args[1])
-            service = args[2] if len(args) >= 3 else None
-            region = args[3] if len(args) >= 4 else None
-            registerBranches(stub, rid, num, service, region)
+            service = args[1] if len(args) >= 2 else None
 
-        elif command == CLOSE_BRANCH and len(args) == 2:
+            regions = []
+            for region in args[2:]:
+                regions.append(region)
+            registerBranches(stub, rid, service, regions)
+
+        elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
-            bid = int(args[1])
-            closeBranch(stub, rid, bid)
+            service = args[1] if len(args) >= 2 else None
+            region = args[2] if len(args) >= 3 else None
+            closeBranch(stub, rid, service, region)
             
         elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
@@ -170,16 +174,16 @@ def main():
     parser.add_argument('--script', type=str, help='Run script')
     args = parser.parse_args()
 
-    with grpc.insecure_channel('localhost:8000') as channel:
-        stub = monitor.MonitorServiceStub(channel)
+    channel = grpc.insecure_channel('localhost:8001')
+    stub = rendezvous_service.RendezvousServiceStub(channel)
 
-        if args.script:
-            runScript(stub, args.script)
-        elif args.stress_test:
-            runStressTest(stub)
-        else:
-            showOptions()
-            readInput(stub)
+    if args.script:
+        runScript(stub, args.script)
+    elif args.stress_test:
+        runStressTest(stub)
+    else:
+        showOptions()
+        readInput(stub)
         
     
 

@@ -1,166 +1,207 @@
 #include "serviceImpl.h"
-#include <iostream>
-#include <memory>
-#include <string>
-#include "request.h"
 
 using namespace service;
 
-grpc::Status MonitorServiceImpl::registerRequest(grpc::ServerContext* context, const monitor::RegisterRequestMessage* request, monitor::RegisterRequestResponse* response) {
+RendezvousServiceImpl::RendezvousServiceImpl(std::string sid)
+    : server(sid) {
+}
+
+grpc::Status RendezvousServiceImpl::registerRequest(grpc::ServerContext* context, const rendezvous::RegisterRequestMessage* request, rendezvous::RegisterRequestResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
   std::string rid = request->rid();
-  request::Request * req;
+  metadata::Request * req;
 
-  req = server.registerRequest(rid); // if rid is empty server generates a new one 'rendezvous-<id>'
+  log("> registering request '%s'", rid.c_str());
 
-  rid = req->getRid();
-  response->set_rid(rid);
+  req = server.registerRequest(rid);
+  if (req == nullptr) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, ERROR_MESSAGE_REQUEST_ALREADY_EXISTS);
+  }
+  
+  response->set_rid(req->getRid());
 
-  log("registered request '%s'", rid.c_str());
+  log("< registered request '%s'", req->getRid().c_str());
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::registerBranch(grpc::ServerContext* context, const monitor::RegisterBranchMessage* request, monitor::RegisterBranchResponse* response) {
+grpc::Status RendezvousServiceImpl::registerBranch(grpc::ServerContext* context, const rendezvous::RegisterBranchMessage* request, rendezvous::RegisterBranchResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+
   std::string rid = request->rid();
-  std::string service = request->service();
-  std::string region = request->region();
-  request::Request * req;
+  const std::string& service = request->service();
+  const std::string& region = request->region();
+  metadata::Request * req;
 
-  if (rid.empty()) {
-    req = server.registerRequest("");
-    rid = req->getRid();
+  log("> registering branch for request '%s' on service='%s' and region='%s'", rid.c_str(), service.c_str(), region.c_str());
+
+  if (region.empty()) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_EMPTY_REGION);
   }
 
-  else {
-    req = server.getRequest(rid);
-    if (req == nullptr) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
-    }
+  req = server.getOrRegisterRequest(rid);
+  if (req == nullptr) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, ERROR_MESSAGE_REQUEST_ALREADY_EXISTS);
   }
 
-  long bid = server.registerBranch(req, service, region);
+  std::string bid = server.registerBranch(req, service, region);
 
-  response->set_rid(rid);
+  response->set_rid(req->getRid());
   response->set_bid(bid);
 
-  log("registered branch %ld for request '%s' with context (serv=%s, reg=%s)", bid, rid.c_str(), service.c_str(), region.c_str());
+  log("< registered branch '%s' for request '%s' on service='%s' and region='%s'", bid.c_str(), req->getRid().c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::registerBranches(grpc::ServerContext* context, const monitor::RegisterBranchesMessage* request, monitor::RegisterBranchesResponse* response) {
+grpc::Status RendezvousServiceImpl::registerBranches(grpc::ServerContext* context, const rendezvous::RegisterBranchesMessage* request, rendezvous::RegisterBranchesResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+
   std::string service = request->service();
-  std::string region = request->region();
-  std::string rid = request->rid();
-  int num = request->num();
-  request::Request * req;
+  const std::string& rid = request->rid();
+  metadata::Request * req;
 
-  if (rid.empty()) {
-    req = server.registerRequest("");
-    rid = req->getRid();
-  }
+  int num = request->regions().size();
 
-  else {
-    req = server.getRequest(rid);
-    if (req == nullptr) {
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
+  // workaround of logging
+  if (DEBUG) {
+    std::cout << "[registerBranches] > registering " << num << " branches for request '" << rid << "' on service '" << service << "' and regions ";
+    for (const std::string& region : request->regions()) {
+      std::cout << "'" << region << "' ";
     }
+    std::cout << std::endl;
   }
 
-  while (num-- != 0) {
-    long bid = server.registerBranch(req, service, region);
-
-    response->add_bid(bid);
+  if (num == 0) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_EMPTY_REGION);
   }
-  response->set_rid(rid);
 
-  log("registered %d branches for request '%s' with context (serv=%s, reg=%s)", request->num(), rid.c_str(), service.c_str(), region.c_str());
+  req = server.getOrRegisterRequest(rid);
+
+  // this should never happen but we need to handle the error
+  if (req == nullptr) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, ERROR_MESSAGE_REQUEST_ALREADY_EXISTS);
+  }
+
+  response->set_rid(req->getRid());
+  const auto& regions = request->regions();
+  std::string bid = server.registerBranches(req, service, regions);
+  response->set_bid(bid);
+
+  // workaround of logging
+  if (DEBUG) {
+    std::cout << "[registerBranches] < registered " << num << " branches '" << bid << "' for request '" << req->getRid() << "' on service '" << service << "' and regions ";
+    for (const std::string& region : request->regions()) {
+      std::cout << "'" << region << "' ";
+    }
+    std::cout << std::endl;
+  }
+
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::closeBranch(grpc::ServerContext* context, const monitor::CloseBranchMessage* request, monitor::Empty* response) {
-  long bid = request->bid();
-  std::string rid = request->rid();
+grpc::Status RendezvousServiceImpl::closeBranch(grpc::ServerContext* context, const rendezvous::CloseBranchMessage* request, rendezvous::Empty* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
+  const std::string& rid = request->rid();
+  const std::string& service = request->service();
+  const std::string& region = request->region();
+  std::string bid = request->bid();
+  int result;
 
-  request::Request * req = server.getRequest(rid);
+  log("> closing branch for request '%s' on service=%s and region=%s", rid.c_str(), service.c_str(), region.c_str());
 
-  if (req == nullptr) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
+  if (region.empty()) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_EMPTY_REGION);
   }
 
-  int result = server.closeBranch(req, bid);
+  result = server.closeBranch(rid, service, region, bid);
 
   if (result == -1) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
+  }
+  else if (result == -2) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_BRANCH_SERVICE);
+  }
+  else if (result == -3) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_BRANCH_REGION);
+  }
+  else if (result == -4) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_BRANCH);
   }
 
-  log("closed branch %ld for request '%s'", bid, rid.c_str());
+  log("< closed branch '%s' for request '%s' on service=%s and region=%s", bid.c_str(), rid.c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::waitRequest(grpc::ServerContext* context, const monitor::WaitRequestMessage* request, monitor::Empty* response) {
-  std::string rid = request->rid();
-  std::string service = request->service();
-  std::string region = request->region();
+grpc::Status RendezvousServiceImpl::waitRequest(grpc::ServerContext* context, const rendezvous::WaitRequestMessage* request, rendezvous::WaitRequestResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
+  const std::string& rid = request->rid();
+  const std::string& service = request->service();
+  const std::string& region = request->region();
 
-  log("> wait request call for request '%s' on context (serv=%s, reg=%s)", rid.c_str(), service.c_str(), region.c_str());
+  log("> wait request call for request '%s' on service='%s' and region='%s'", rid.c_str(), service.c_str(), region.c_str());
 
-  request::Request * req = server.getRequest(rid);
+  int result = server.waitRequest(rid, service, region);
 
-  if (req == nullptr) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
+  if (result == -1) {
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_INVALID_REQUEST);
+  }
+  else if (result == -2) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_SERVICE_NOT_FOUND);
+  }
+  else if (result == -3) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_REGION_NOT_FOUND);
   }
 
-  int result = server.waitRequest(req, service, region);
-
-  if (result < 0) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_CONTEXT_NOT_FOUND);
+  // inconsistency was prevented
+  if (result == 1) {
+    response->set_preventedinconsistency(true);
   }
 
-  log("< returning wait request call for request '%s' on context (serv=%s, reg=%s)", rid.c_str(), service.c_str(), region.c_str());
+  log("< returning wait request call for request '%s' on service='%s' and region='%s'", rid.c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::checkRequest(grpc::ServerContext* context, const monitor::CheckRequestMessage* request, monitor::CheckRequestResponse* response) {
-  std::string rid = request->rid();
-  std::string service = request->service();
-  std::string region = request->region();
+grpc::Status RendezvousServiceImpl::checkRequest(grpc::ServerContext* context, const rendezvous::CheckRequestMessage* request, rendezvous::CheckRequestResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
+  const std::string& rid = request->rid();
+  const std::string& service = request->service();
+  const std::string& region = request->region();
 
-  request::Request * req = server.getRequest(rid);
+  int result = server.checkRequest(rid, service, region);
 
-  if (req == nullptr) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
+  if (result == -1) {
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_INVALID_REQUEST);
+  }
+  else if (result == -2) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_SERVICE_NOT_FOUND);
+  }
+  else if (result == -3) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_REGION_NOT_FOUND);
   }
 
-  int result = server.checkRequest(req, service, region);
+  response->set_status(static_cast<rendezvous::RequestStatus>(result));
 
-  if (result < 0) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_CONTEXT_NOT_FOUND);
-  }
-
-  response->set_status(static_cast<monitor::RequestStatus>(result));
-
-  log("checked request '%s' and got status %d on context (serv=%s, reg=%s)", rid.c_str(), result, service.c_str(), region.c_str());
+  log("checked request '%s' and got status %d on service='%s' and region='%s'", rid.c_str(), result, service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::checkRequestByRegions(grpc::ServerContext* context, const monitor::CheckRequestByRegionsMessage* request, monitor::CheckRequestByRegionsResponse* response) {
-  std::string rid = request->rid();
-  std::string service = request->service();
-
-  request::Request * req = server.getRequest(rid);
-
-  if (req == nullptr) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, ERROR_MESSAGE_INVALID_REQUEST);
-  }
+grpc::Status RendezvousServiceImpl::checkRequestByRegions(grpc::ServerContext* context, const rendezvous::CheckRequestByRegionsMessage* request, rendezvous::CheckRequestByRegionsResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
+  const std::string& rid = request->rid();
+  const std::string& service = request->service();
 
   int status = 0;
-  std::map<std::string, int> result = server.checkRequestByRegions(req, service, &status);
+  std::map<std::string, int> result = server.checkRequestByRegions(rid, service, &status);
 
   if (status == -1) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_SERVICE_NOT_FOUND);
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_INVALID_REQUEST);
   }
-
-  if (status == -2) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_REGIONS_NOT_FOUND);
+  else if (status == -2) {
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, ERROR_MESSAGE_SERVICE_NOT_FOUND);
   }
 
   auto last = result.end();
@@ -169,9 +210,9 @@ grpc::Status MonitorServiceImpl::checkRequestByRegions(grpc::ServerContext* cont
       std::string region = pair->first;
       int status = pair->second;
 
-      monitor::RegionStatus regionStatus;
+      rendezvous::RegionStatus regionStatus;
       regionStatus.set_region(region);
-      regionStatus.set_status(static_cast<monitor::RequestStatus>(status));
+      regionStatus.set_status(static_cast<rendezvous::RequestStatus>(status));
 
       response->add_regionstatus()->CopyFrom(regionStatus);
     }
@@ -180,10 +221,12 @@ grpc::Status MonitorServiceImpl::checkRequestByRegions(grpc::ServerContext* cont
   return grpc::Status::OK;
 }
 
-grpc::Status MonitorServiceImpl::getPreventedInconsistencies(grpc::ServerContext* context, const monitor::Empty* request, monitor::GetPreventedInconsistenciesResponse* response) {
+grpc::Status RendezvousServiceImpl::getPreventedInconsistencies(grpc::ServerContext* context, const rendezvous::Empty* request, rendezvous::GetPreventedInconsistenciesResponse* response) {
+  if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
   long value = server.getPreventedInconsistencies();
   response->set_inconsistencies(value);
 
-  log("get number of prevented inconsistencies: %ld", value);
+  log("num = %ld", value);
   return grpc::Status::OK;
 }

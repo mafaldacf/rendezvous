@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "monitor.grpc.pb.h"
+#include "rendezvous.grpc.pb.h"
 
 /* Input commands */
 const std::string REGISTER_REQUEST = "rr";
@@ -39,10 +39,10 @@ std::string StatusCodeToString(int code) {
 }
 
 // explicit workaround once again
-std::string RequestStatusToString(monitor::RequestStatus status) {
+std::string RequestStatusToString(rendezvous::RequestStatus status) {
     switch (status) {
-        case monitor::RequestStatus::OPENED: return "OPENED";
-        case monitor::RequestStatus::CLOSED: return "CLOSED";
+        case rendezvous::RequestStatus::OPENED: return "OPENED";
+        case rendezvous::RequestStatus::CLOSED: return "CLOSED";
         default: return "UNKNOWN STATUS!";
     }
 }

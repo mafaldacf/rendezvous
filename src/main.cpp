@@ -7,9 +7,9 @@
 
 #include "serviceImpl.h"
 #include "request.h"
-#include "monitor.grpc.pb.h"
+#include "rendezvous.grpc.pb.h"
 
-void shutdown(std::unique_ptr<grpc::Server> & server, service::MonitorServiceImpl * service) {
+void shutdown(std::unique_ptr<grpc::Server> & server, service::RendezvousServiceImpl * service) {
   std::cout << "Press any key to stop the server..." << std::endl << std::endl;
   getchar();
 
@@ -18,9 +18,9 @@ void shutdown(std::unique_ptr<grpc::Server> & server, service::MonitorServiceImp
 }
 
 
-void run() {
-  std::string server_address("localhost:8000");
-  service::MonitorServiceImpl service;
+void run(std::string id, std::string host, std::string port) {
+  std::string server_address(host + ':' + port);
+  service::RendezvousServiceImpl service(id);
 
   grpc::ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -37,10 +37,36 @@ void run() {
   t.join();
 }
 
-int main(int argc, char* argv[]){
-    std::cout << "** Rendezvous Server **" << std::endl << std::endl;
+void usage(char* argv[]) {
+  std::cout << "Usage: " << argv[0] << " <id> <host> <port>" << std::endl;
+  std::cout << "Example: " << argv[0] << " eu localhost 8000" << std::endl;
+  exit(-1);
+}
+
+int main(int argc, char* argv[]) {
+    std::string id("eu"); // eu -> europe
+    std::string host("0.0.0.0");
+    std::string port("8001");
+
+    if (argc > 1) {
+      if (argc == 2) {
+        id = argv[1];
+      }
+      if (argc == 3) {
+        host = argv[2];
+      }
+      if (argc == 4) {
+        port = argv[3];
+      }
+      if (argc > 4) {
+        std::cout << "[ERROR] Invalid arguments!" << std::endl;
+        usage(argv);
+      }
+    }
+
+    std::cout << "** Rendezvous Server '" << id << "' **" << std::endl << std::endl;
     
-    run();
+    run(id, host, port);
     
     return 0;
 }

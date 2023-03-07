@@ -38,12 +38,21 @@ RUN git clone --recurse-submodules -b v1.52.0 --depth 1 --shallow-submodules htt
     && make install \
     && cd ../..
 
+# Install GTest
+RUN git clone https://github.com/google/googletest.git -b v1.13.0 \
+    && cd googletest \
+    && mkdir build \
+    && cd build \
+    && cmake .. -DBUILD_GMOCK=OFF \
+    && make \
+    && make install
+
 WORKDIR /app
 COPY . .
 
-EXPOSE 8000
+#EXPOSE 8000
 
 # Build project
-RUN ./start.sh make
+RUN ./start.sh build
     
 CMD ["./start.sh", "run", "server"]

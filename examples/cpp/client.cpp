@@ -3,13 +3,13 @@
 #include <thread>
 #include <memory>
 #include <string>
-#include <grpcpp/grpcpp.h>
 #include <sstream>
 #include <exception>
 #include <fstream>
 
-#include "monitor.grpc.pb.h"
+#include "rendezvous.grpc.pb.h"
 #include "utils.h"
+#include <grpcpp/grpcpp.h>
 
 /* ------------------------------------
 
@@ -34,7 +34,7 @@ SIMPLE CLIENT CODE FOR TESTING PURPOSES
 class RendezvousClient {
 
   public:
-      RendezvousClient(std::shared_ptr<grpc::Channel> channel) : stub(monitor::MonitorService::NewStub(channel))  { }
+      RendezvousClient(std::shared_ptr<grpc::Channel> channel) : stub(rendezvous::RendezvousService::NewStub(channel))  { }
 
       void logError(grpc::Status status) {
         log("error: %s - %s", StatusCodeToString(status.error_code()).c_str(), status.error_message().c_str());
@@ -42,8 +42,8 @@ class RendezvousClient {
 
       void registerRequest(std::string rid) {
         grpc::ClientContext context;
-        monitor::RegisterRequestMessage request;
-        monitor::RegisterRequestResponse response;
+        rendezvous::RegisterRequestMessage request;
+        rendezvous::RegisterRequestResponse response;
 
         request.set_rid(rid);
 
@@ -59,8 +59,8 @@ class RendezvousClient {
 
       void registerBranch(std::string rid, std::string service, std::string region) {
         grpc::ClientContext context;
-        monitor::RegisterBranchMessage request;
-        monitor::RegisterBranchResponse response;
+        rendezvous::RegisterBranchMessage request;
+        rendezvous::RegisterBranchResponse response;
 
         request.set_rid(rid);
         request.set_service(service);
@@ -78,8 +78,8 @@ class RendezvousClient {
 
       void registerBranches(std::string rid, int num, std::string service, std::string region) {
         grpc::ClientContext context;
-        monitor::RegisterBranchesMessage request;
-        monitor::RegisterBranchesResponse response;
+        rendezvous::RegisterBranchesMessage request;
+        rendezvous::RegisterBranchesResponse response;
 
         request.set_rid(rid);
         request.set_num(num);
@@ -98,8 +98,8 @@ class RendezvousClient {
 
       void closeBranch(std::string rid, long bid) {
         grpc::ClientContext context;
-        monitor::CloseBranchMessage request;
-        monitor::Empty response;
+        rendezvous::CloseBranchMessage request;
+        rendezvous::Empty response;
 
         request.set_rid(rid);
         request.set_bid(bid);
@@ -116,8 +116,8 @@ class RendezvousClient {
 
       void waitRequest(std::string rid, std::string service, std::string region) {
         grpc::ClientContext context;
-        monitor::WaitRequestMessage request;
-        monitor::Empty response;
+        rendezvous::WaitRequestMessage request;
+        rendezvous::Empty response;
 
         request.set_rid(rid);
         request.set_service(service);
@@ -135,8 +135,8 @@ class RendezvousClient {
 
       void checkRequest(std::string rid, std::string service, std::string region) {
         grpc::ClientContext context;
-        monitor::CheckRequestMessage request;
-        monitor::CheckRequestResponse response;
+        rendezvous::CheckRequestMessage request;
+        rendezvous::CheckRequestResponse response;
 
         request.set_rid(rid);
         request.set_service(service);
@@ -154,8 +154,8 @@ class RendezvousClient {
 
       void checkRequestByRegions(std::string rid, std::string service) {
         grpc::ClientContext context;
-        monitor::CheckRequestByRegionsMessage request;
-        monitor::CheckRequestByRegionsResponse response;
+        rendezvous::CheckRequestByRegionsMessage request;
+        rendezvous::CheckRequestByRegionsResponse response;
 
         request.set_rid(rid);
         request.set_service(service);
@@ -164,7 +164,7 @@ class RendezvousClient {
 
         if (status.ok()) {
           log("check request '%s' by regions on context (serv=%s) and got the following status:", rid.c_str(), service.c_str());
-          for (monitor::RegionStatus pair : response.regionstatus()) {
+          for (rendezvous::RegionStatus pair : response.regionstatus()) {
             log("\t\t region %s : %s", pair.region().c_str(), RequestStatusToString(pair.status()).c_str());
           }                            
         }
@@ -175,8 +175,8 @@ class RendezvousClient {
 
       void getPreventedInconsistencies() {
         grpc::ClientContext context;
-        monitor::Empty request;
-        monitor::GetPreventedInconsistenciesResponse response;
+        rendezvous::Empty request;
+        rendezvous::GetPreventedInconsistenciesResponse response;
 
         auto status = stub->getPreventedInconsistencies(&context, request, &response);
 
@@ -189,7 +189,7 @@ class RendezvousClient {
       }
 
   private:
-      std::unique_ptr<monitor::MonitorService::Stub> stub;
+      std::unique_ptr<rendezvous::RendezvousService::Stub> stub;
 
 };
 

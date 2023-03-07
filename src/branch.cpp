@@ -1,13 +1,13 @@
 #include "branch.h"
 
-using namespace branch;
+using namespace metadata;
 
-Branch::Branch(long bid, std::string service, std::string region)
-    : bid(bid), service(service), region(region) {
+Branch::Branch(std::string bid, std::string service, std::string region)
+    : bid(bid), service(service), region(region), status(OPENED) {
         
     }
 
-long Branch::getBid() {
+std::string Branch::getBid() {
     return bid;
 }
 
@@ -17,4 +17,12 @@ std::string Branch::getService() {
 
 std::string Branch::getRegion() {
     return region;
+}
+
+void Branch::close() {
+    status = CLOSED;
+}
+
+bool Branch::isClosed() {
+    return status == CLOSED;
 }

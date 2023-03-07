@@ -1,4 +1,4 @@
-#include "monitor.grpc.pb.h"
+#include "rendezvous.grpc.pb.h"
 #include "../examples/cpp/utils.h"
 #include "../src/server.h"
 #include "gtest/gtest.h"
@@ -30,11 +30,11 @@ Helper Methods
 
 void registerRequestAndAssert(std::string * rid) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::RegisterRequestMessage request;
-  monitor::RegisterRequestResponse response;
+  rendezvous::RegisterRequestMessage request;
+  rendezvous::RegisterRequestResponse response;
   request.set_rid(*rid);
 
   auto status = stub->registerRequest(&context, request, &response);
@@ -44,11 +44,11 @@ void registerRequestAndAssert(std::string * rid) {
 
 void registerBranchAndAssert(std::string rid, long bid, std::string service, std::string region) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::RegisterBranchMessage request;
-  monitor::RegisterBranchResponse response;
+  rendezvous::RegisterBranchMessage request;
+  rendezvous::RegisterBranchResponse response;
   request.set_rid(rid);
   request.set_service(service);
   request.set_region(region);
@@ -60,11 +60,11 @@ void registerBranchAndAssert(std::string rid, long bid, std::string service, std
 
 void registerBranchesAndAssert(std::string rid, long num, std::string service, std::string region) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::RegisterBranchesMessage request;
-  monitor::RegisterBranchesResponse response;
+  rendezvous::RegisterBranchesMessage request;
+  rendezvous::RegisterBranchesResponse response;
   request.set_rid(rid);
   request.set_num(num);
   request.set_service(service);
@@ -77,11 +77,11 @@ void registerBranchesAndAssert(std::string rid, long num, std::string service, s
 
 void closeBranchAndAssert(std::string rid, long bid) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::CloseBranchMessage request;
-  monitor::Empty response;
+  rendezvous::CloseBranchMessage request;
+  rendezvous::Empty response;
   request.set_rid(rid);
   request.set_bid(bid);
 
@@ -92,11 +92,11 @@ void closeBranchAndAssert(std::string rid, long bid) {
 
 void checkRequestAndAssert(std::string rid, std::string service, std::string region, int expectedStatus) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::CheckRequestMessage request;
-  monitor::CheckRequestResponse response;
+  rendezvous::CheckRequestMessage request;
+  rendezvous::CheckRequestResponse response;
   request.set_rid(rid);
   request.set_service(service);
   request.set_region(region);
@@ -108,11 +108,11 @@ void checkRequestAndAssert(std::string rid, std::string service, std::string reg
 
 void checkRequestAndAssertError(std::string rid, std::string service, std::string region, grpc::StatusCode expectedStatus) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::CheckRequestMessage request;
-  monitor::CheckRequestResponse response;
+  rendezvous::CheckRequestMessage request;
+  rendezvous::CheckRequestResponse response;
   request.set_rid(rid);
   request.set_service(service);
   request.set_region(region);
@@ -124,11 +124,11 @@ void checkRequestAndAssertError(std::string rid, std::string service, std::strin
 
 void checkRequestByRegionsAndAssertError(std::string rid, std::string service, grpc::StatusCode expectedStatus) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::CheckRequestByRegionsMessage request;
-  monitor::CheckRequestByRegionsResponse response;
+  rendezvous::CheckRequestByRegionsMessage request;
+  rendezvous::CheckRequestByRegionsResponse response;
   request.set_rid(rid);
   request.set_service(service);
 
@@ -139,11 +139,11 @@ void checkRequestByRegionsAndAssertError(std::string rid, std::string service, g
 
 void waitRequest(std::string rid, std::string service, std::string region) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::WaitRequestMessage request;
-  monitor::Empty response;
+  rendezvous::WaitRequestMessage request;
+  rendezvous::Empty response;
   request.set_rid(rid);
 
   auto status = stub->waitRequest(&context, request, &response);
@@ -152,11 +152,11 @@ void waitRequest(std::string rid, std::string service, std::string region) {
 
 void waitRequestAndAssertError(std::string rid, std::string service, std::string region, grpc::StatusCode expectedStatus) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  monitor::WaitRequestMessage request;
-  monitor::Empty response;
+  rendezvous::WaitRequestMessage request;
+  rendezvous::Empty response;
   request.set_rid(rid);
   request.set_service(service);
   request.set_region(region);
@@ -174,7 +174,7 @@ GTest Suit
 
 TEST(gRPCTest, RegisterRequest_WithRID_RegisterAndCloseBranches) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = RID;
 
@@ -191,13 +191,13 @@ TEST(gRPCTest, RegisterRequest_WithRID_RegisterAndCloseBranches) {
 
 TEST(gRPCTest, RegisterBranch_NoRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Branch */
   grpc::ClientContext context;
-  monitor::RegisterBranchMessage request;
-  monitor::RegisterBranchResponse response;
+  rendezvous::RegisterBranchMessage request;
+  rendezvous::RegisterBranchResponse response;
 
   status = stub->registerBranch(&context, request, &response);
 
@@ -207,13 +207,13 @@ TEST(gRPCTest, RegisterBranch_NoRID) {
 
 TEST(gRPCTest, RegisterBranches_NoRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Multiple Branches */
   grpc::ClientContext context;
-  monitor::RegisterBranchesMessage request;
-  monitor::RegisterBranchesResponse response;
+  rendezvous::RegisterBranchesMessage request;
+  rendezvous::RegisterBranchesResponse response;
   request.set_num(3);
 
   status = stub->registerBranches(&context, request, &response);
@@ -228,7 +228,7 @@ TEST(gRPCTest, RegisterBranches_NoRID) {
 
 TEST(gRPCTest, RegisterBranch_InvalidRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -236,8 +236,8 @@ TEST(gRPCTest, RegisterBranch_InvalidRID) {
 
   /* Register Branch */
   grpc::ClientContext context;
-  monitor::RegisterBranchMessage request;
-  monitor::RegisterBranchResponse response;
+  rendezvous::RegisterBranchMessage request;
+  rendezvous::RegisterBranchResponse response;
   request.set_rid("invalid_rid");
 
   status = stub->registerBranch(&context, request, &response);
@@ -248,13 +248,13 @@ TEST(gRPCTest, RegisterBranch_InvalidRID) {
 
 TEST(gRPCTest, RegisterBranches_InvalidRid) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Branch */
   grpc::ClientContext context;
-  monitor::RegisterBranchesMessage request;
-  monitor::RegisterBranchesResponse response;
+  rendezvous::RegisterBranchesMessage request;
+  rendezvous::RegisterBranchesResponse response;
   request.set_num(3);
   request.set_rid("invalid_rid");
 
@@ -266,7 +266,7 @@ TEST(gRPCTest, RegisterBranches_InvalidRid) {
 
 TEST(gRPCTest, CloseBranch_InvalidBID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -274,8 +274,8 @@ TEST(gRPCTest, CloseBranch_InvalidBID) {
 
   /* Close Branch */
   grpc::ClientContext context;
-  monitor::CloseBranchMessage request;
-  monitor::Empty response;
+  rendezvous::CloseBranchMessage request;
+  rendezvous::Empty response;
   request.set_rid(rid);
   request.set_bid(-1);
 
@@ -288,7 +288,7 @@ TEST(gRPCTest, CloseBranch_InvalidBID) {
 
 TEST(gRPCTest, CheckRequest) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -326,7 +326,7 @@ TEST(gRPCTest, CheckRequest) {
 
 TEST(gRPCTest, CheckRequest_ContextNotFound) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -341,7 +341,7 @@ TEST(gRPCTest, CheckRequest_ContextNotFound) {
 
 TEST(gRPCTest, CheckRequestByRegions_InvalidRid) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   checkRequestByRegionsAndAssertError("invalid_rid", "s", grpc::INVALID_ARGUMENT);
@@ -349,7 +349,7 @@ TEST(gRPCTest, CheckRequestByRegions_InvalidRid) {
 
 TEST(gRPCTest, CheckRequestByRegions_ContextAndRegionNotFound) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -367,7 +367,7 @@ TEST(gRPCTest, CheckRequestByRegions_ContextAndRegionNotFound) {
 
 TEST(gRPCTest, CheckRequestByRegions) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
   std::string rid = "";
 
@@ -380,8 +380,8 @@ TEST(gRPCTest, CheckRequestByRegions) {
 
   /* Check Request By Regions */
   grpc::ClientContext context_chr2;
-  monitor::CheckRequestByRegionsMessage request_chr2;
-  monitor::CheckRequestByRegionsResponse response_chr2;
+  rendezvous::CheckRequestByRegionsMessage request_chr2;
+  rendezvous::CheckRequestByRegionsResponse response_chr2;
   request_chr2.set_rid(rid);
 
   status = stub->checkRequestByRegions(&context_chr2, request_chr2, &response_chr2);
@@ -398,8 +398,8 @@ TEST(gRPCTest, CheckRequestByRegions) {
 
   /* Check Request By Regions With Service */
   grpc::ClientContext context_chr3;
-  monitor::CheckRequestByRegionsMessage request_chr3;
-  monitor::CheckRequestByRegionsResponse response_chr3;
+  rendezvous::CheckRequestByRegionsMessage request_chr3;
+  rendezvous::CheckRequestByRegionsResponse response_chr3;
   request_chr3.set_rid(rid);
   request_chr3.set_service("s");
 
@@ -413,14 +413,14 @@ TEST(gRPCTest, CheckRequestByRegions) {
 
 TEST(gRPCTest, WaitRequest_InvalidRid) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   waitRequestAndAssertError("invalid_rid", "s", "r", grpc::INVALID_ARGUMENT);
 }
 
 TEST(gRPCTest, WaitRequest_ContextNotFound) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   std::string rid = "";
 
   registerRequestAndAssert(&rid);
@@ -432,7 +432,7 @@ TEST(gRPCTest, WaitRequest_ContextNotFound) {
 
 TEST(gRPCTest, WaitRequest) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
-  auto stub = monitor::MonitorService::NewStub(channel);
+  auto stub = rendezvous::RendezvousService::NewStub(channel);
   std::vector<std::thread> threads;
   auto status = grpc::Status::OK;
   std::string rid = "";
@@ -512,8 +512,8 @@ TEST(gRPCTest, WaitRequest) {
 
   /* Validate number of prevented inconsistencies*/
   grpc::ClientContext context;
-  monitor::Empty request;
-  monitor::GetPreventedInconsistenciesResponse response;
+  rendezvous::Empty request;
+  rendezvous::GetPreventedInconsistenciesResponse response;
 
   status = stub->getPreventedInconsistencies(&context, request, &response);
   ASSERT_TRUE(status.ok());
