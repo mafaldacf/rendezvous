@@ -64,7 +64,8 @@ Install GoogleTest: [Generic Build Instructions: Standalone CMake Project](https
 
 4. Connect to your EC2 instance via SSH and retrieve docker image from repository
     - Connect via SSH
-        > ssh -i "~/.ssh/rendezvous-eu.pem" ubuntu@ec2-3-70-203-56.eu-central-1.compute.amazonaws.com
+        > ssh -i "~/.ssh/rendezvous-eu.pem" ubuntu@ec2-54-93-76-92.eu-central-1.compute.amazonaws.com
+        > ssh -i "~/.ssh/rendezvous-us.pem" ubuntu@ec2-54-93-76-92.eu-central-1.compute.amazonaws.com
     - Install the necessary tools and configure aws cli to setup keys (access key & secret access key) and default region `eu-central-1`
         > sudo apt-get update
         > sudo apt install docker.io
@@ -78,7 +79,8 @@ Install GoogleTest: [Generic Build Instructions: Standalone CMake Project](https
 
     [NOTE]: make sure you bind your server to *0.0.0.0* to listen to all interfaces, otherwise it won't work and you'll get connection refused ([ref](https://pythonspeed.com/articles/docker-connection-refused/))
 
-    > sudo docker run -it -p 8000:8000 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous
+    > sudo docker run -it -p 8001:8001 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous
+    > sudo docker run -it -p 8002:8002 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous
 
 ## Running server on local Docker container
 

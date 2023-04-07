@@ -17,6 +17,12 @@ elif [ "$#" -eq 1 ] && [ $1 = "build" ]
     make clean
     make
 
+elif [ "$#" -eq 1 ] && [ $1 = "build-config" ]
+  then
+    mkdir -p cmake/build
+    cd cmake/build
+    cmake DCONFIG_ONLY=ON ../..
+
 elif [ "$#" -eq 1 ] && [ $1 = "build-py" ]
   then
     # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
@@ -29,14 +35,14 @@ elif [ "$#" -eq 1 ] && [ $1 = "build-py" ]
     # UNCOMMENT to build from proto file in /examples/python/rendezvous/protos
     # python3 -m grpc_tools.protoc -I rendezvous/protos=examples/python/rendezvous/protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python examples/python/rendezvous/protos/rendezvous.proto
 
-elif [ "$#" -ge 2 ] && [ $1 = "run" ] && [ $2 = "server" ]
+elif [ "$#" -ge 2 ] && [ "$#" -le 3 ] && [ $1 = "run" ] && [ $2 = "server" ]
   then
     cd cmake/build/src
     # Check if there are additional arguments starting from $3
-    if [ "$#" -gt 2 ]
+    if [ "$#" -eq 3 ]
     then
       # Pass all remaining arguments starting from $3 using "$@"
-      ./rendezvous "${@:3}"
+      ./rendezvous $3
     else
       # No additional arguments, run ./rendezvous without any extra arguments
       ./rendezvous
@@ -82,10 +88,11 @@ else
     echo "Usage:"
     echo "(1) ./run.sh clean"
     echo "(2) ./run.sh build"
-    echo "(3) ./run.sh build-py"
-    echo "(4) ./run.sh run server"
-    echo "(5) ./run.sh run client [--script <script name>] | [--stress_test]"
-    echo "(6) ./run.sh run client-py [--script <script name>] | [--stress_test]"
-    echo "(7) ./run.sh run tests"
+    echo "(3) ./run.sh build-config"
+    echo "(4) ./run.sh build-py"
+    echo "(5) ./run.sh run server [<replica id>]"
+    echo "(6) ./run.sh run client [--script <script name>] | [--stress_test]"
+    echo "(7) ./run.sh run client-py [--script <script name>] | [--stress_test]"
+    echo "(8) ./run.sh run tests"
     exit 1
 fi

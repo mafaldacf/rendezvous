@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package rendezvous_server;
+
+service RendezvousServerService {
+  rpc registerRequest(RegisterRequestMessage) returns (Empty);
+  rpc registerBranch(RegisterBranchMessage) returns (Empty);
+  rpc registerBranches(RegisterBranchesMessage) returns (Empty);
+  rpc closeBranch(CloseBranchMessage) returns (Empty);
+}
+
+/* Helpers */
+
+message Empty {
+
+}
+
+message ReplicaRequestContext {
+  string replicaId = 1;
+  int32 requestVersion = 2;
+}
+
+/* Register Request */
+
+message RegisterRequestMessage {
+  string rid = 1;
+}
+
+/* Register Branch */
+
+message RegisterBranchMessage {
+  string rid = 1;
+  string bid = 2;
+  optional string service = 3;
+  string region = 4;
+  ReplicaRequestContext context = 5;
+}
+
+/* Registers Branches */
+
+message RegisterBranchesMessage {
+  string rid = 1;
+  string bid = 2;
+  optional string service = 3;
+  repeated string regions = 4;
+  ReplicaRequestContext context = 5;
+}
+
+/* Close Branch */
+
+message CloseBranchMessage {
+  string rid = 1;
+  string bid = 2;
+  optional string service = 3;
+  string region = 4;
+}

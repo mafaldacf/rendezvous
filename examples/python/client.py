@@ -19,10 +19,19 @@ CHECK_PREVENTED_INCONSISTENCIES = "gi";
 SLEEP = "sleep";
 EXIT = "exit";
 
+def toBytes(info):
+    return info.SerializeToString()
+
+def fromBytes(info):
+    serverInfo = rendezvous.ServerInfo()
+    serverInfo.ParseFromString(info)
+    return serverInfo
+
 def registerRequest(stub, rid):
     try:
         response = stub.registerRequest(rendezvous.RegisterRequestMessage(rid=rid))
         print(f"[Register Request] {response}")
+        return toBytes(response.serverInfo)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -30,6 +39,7 @@ def registerBranch(stub, rid, service, region):
     try:
         response = stub.registerBranch(rendezvous.RegisterBranchMessage(rid=rid, service=service, region=region))
         print(f"[Register Branch] {response}")
+        return toBytes(response.serverInfo)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -37,36 +47,38 @@ def registerBranches(stub, rid, service, regions):
     try:
         response = stub.registerBranches(rendezvous.RegisterBranchesMessage(rid=rid, service=service, regions=regions))
         print(f"[Register Branches] {response}")
+        return toBytes(response.serverInfo)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def closeBranch(stub, rid, service, region):
+def closeBranch(stub, rid, bid, service, region):
     try:
-        stub.closeBranch(rendezvous.CloseBranchMessage(rid=rid, service=service, region=region))
+        stub.closeBranch(rendezvous.CloseBranchMessage(rid=rid, bid=bid, service=service, region=region))
         print(f"[Close Branch] done!\n")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def waitRequest(stub, rid, service, region):
+def waitRequest(stub, rid, service, region, info=None):
     try:
-        request = rendezvous.WaitRequestMessage(rid=rid, region=region)
+        request = rendezvous.WaitRequestMessage(rid=rid, region=region, service=service)
+        request.serverInfo.CopyFrom(fromBytes(info))
         print(f"[Wait Request] > waiting: {request}")
-        response = stub.waitRequest(rendezvous.WaitRequestMessage(rid=rid, region=region))
+        response = stub.waitRequest(request)
         print(f"[Wait Request] < returning: prevented inconsistency = {response.preventedInconsistency}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def checkRequest(stub, rid, service, region):
+def checkRequest(stub, rid, service, region, info=None):
     try:
-        response = stub.checkRequest(rendezvous.CheckRequestMessage(rid=rid, service=service, region=region))
+        response = stub.checkRequest(rendezvous.CheckRequestMessage(rid=rid, service=service, region=region, serverInfo=fromBytes(info)))
         status = rendezvous.RequestStatus.Name(response.status)
         print(f"[Check Request] status:\"{status}\"")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def checkRequestByRegions(stub, rid, service):
+def checkRequestByRegions(stub, rid, service, info=None):
     try:
-        response = stub.checkRequestByRegions(rendezvous.CheckRequestByRegionsMessage(rid=rid, service=service))
+        response = stub.checkRequestByRegions(rendezvous.CheckRequestByRegionsMessage(rid=rid, service=service, serverInfo=fromBytes(info)))
         print(f"[Check Request By Regions]:")
         for regionStatus in response.regionStatus:
             status = rendezvous.RequestStatus.Name(regionStatus.status)
@@ -82,19 +94,22 @@ def getPreventedInconsistencies(stub):
         print(f"[Error] {e.details()}")
 
 def showOptions():
-    print(f"- Register Request: \t \t \t {REGISTER_REQUEST} [<rid>]")
-    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> [<service>] <region>")
-    print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> [<service>] <regions>")
-    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <service> <region>")
-    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> [<service>] <region>")
-    print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> [<service>] <region>")
-    print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> [<service>]")
+    print(f"- Register Request: \t \t \t {REGISTER_REQUEST} <rid>")
+    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <region>")
+    print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> <service> <regions>")
+    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <bid> <service> <region>")
+    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
+    print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> <service> <region>")
+    print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> <service>")
     print(f"- Check Prevented Inconsistencies: \t {CHECK_PREVENTED_INCONSISTENCIES}")
     print(f"- Sleep: \t \t \t \t {SLEEP} <time in seconds>")
     print(f"- Exit: \t \t \t \t {EXIT}")
+    print(f"- Change Stub: \t \t \t \t change 0|1")
     print()
 
-def readInput(stub):
+def readInput(stubs):
+    stub = stubs[0]
+    info = None
     while True:
         user_input = input()
         parts = user_input.split()
@@ -103,13 +118,13 @@ def readInput(stub):
 
         if command == REGISTER_REQUEST and len(args) <= 1:
             rid = args[0] if len(args) == 1 else None
-            registerRequest(stub, rid)
+            info = registerRequest(stub, rid)
 
         elif command == REGISTER_BRANCH and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            registerBranch(stub, rid, service, region)
+            info = registerBranch(stub, rid, service, region)
 
         elif command == REGISTER_BRANCHES and len(args) >= 2:
             rid = args[0]
@@ -118,31 +133,32 @@ def readInput(stub):
             regions = []
             for region in args[2:]:
                 regions.append(region)
-            registerBranches(stub, rid, service, regions)
+            info = registerBranches(stub, rid, service, regions)
 
-        elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 3:
+        elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 4:
             rid = args[0]
-            service = args[1] if len(args) >= 2 else None
-            region = args[2] if len(args) >= 3 else None
-            closeBranch(stub, rid, service, region)
+            bid = args[1] if len(args) >= 2 else None
+            service = args[2] if len(args) >= 3 else None
+            region = args[3] if len(args) >= 4 else None
+            info = closeBranch(stub, rid, bid, service, region)
             
         elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            t = threading.Thread(target=waitRequest, args=(stub, rid, service, region))
+            t = threading.Thread(target=waitRequest, args=(stub, rid, service, region, info))
             t.start()
 
         elif command == CHECK_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            checkRequest(stub, rid, service, region)
+            checkRequest(stub, rid, service, region, info)
 
         elif command == CHECK_REQUEST_BY_REGIONS and len(args) >= 1 and len(args) <= 2:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
-            checkRequestByRegions(stub, rid, service)
+            checkRequestByRegions(stub, rid, service, info)
 
         elif command == CHECK_PREVENTED_INCONSISTENCIES:
             getPreventedInconsistencies(stub)
@@ -156,6 +172,11 @@ def readInput(stub):
         elif command == EXIT:
             print("exiting...")
             sys.exit(1)
+
+        elif command == "change":
+            i = args[0]
+            stub = stubs[int(i)]
+            print("Changed to stub ", i)
 
         else:
             print("ERROR: Invalid command\n")
@@ -174,8 +195,13 @@ def main():
     parser.add_argument('--script', type=str, help='Run script')
     args = parser.parse_args()
 
+    stubs = []
     channel = grpc.insecure_channel('localhost:8001')
     stub = rendezvous_service.RendezvousServiceStub(channel)
+    stubs.append(stub)
+    channel = grpc.insecure_channel('localhost:8002')
+    stub = rendezvous_service.RendezvousServiceStub(channel)
+    stubs.append(stub)
 
     if args.script:
         runScript(stub, args.script)
@@ -183,7 +209,7 @@ def main():
         runStressTest(stub)
     else:
         showOptions()
-        readInput(stub)
+        readInput(stubs)
         
     
 

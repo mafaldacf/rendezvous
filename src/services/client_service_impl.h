@@ -1,53 +1,31 @@
-#ifndef SERVICE_H
-#define SERVICE_H
+#ifndef CLIENT_SERVICE_H
+#define CLIENT_SERVICE_H
 
-#include "rendezvous.grpc.pb.h"
-#include "request.h"
+#include "rendezvous_server.grpc.pb.h"
+#include "../metadata/request.h"
+#include "../server.h"
+#include "../replicas/replica_client.h"
+#include "../utils.h"
 #include <atomic>
+#include <vector>
 #include <mutex>
-#include "server.h"
 #include <iostream>
 #include <memory>
 #include <string>
 
-// debug mode
-#ifndef DEBUG 
-#define DEBUG 1
-#endif
-
-#if DEBUG
-#define log(...) {\
-    char str[255];\
-    sprintf(str, __VA_ARGS__);\
-    std::cout << "[" << __FUNCTION__ << "] " << str << std::endl;\
-    }
-#else
-#define log(...)
-#endif
-
-// measure overhead of API without any consistency checks
-#ifndef NO_CONSISTENCY_CHECKS 
-#define NO_CONSISTENCY_CHECKS 0
-#endif 
-
 namespace service {
-
-    const std::string ERROR_MESSAGE_SERVICE_NOT_FOUND = "Request status not found for the provided service";
-    const std::string ERROR_MESSAGE_REGION_NOT_FOUND = "Request status not found for the provided region";
-    const std::string ERROR_MESSAGE_INVALID_REQUEST = "Invalid request identifier";
-    const std::string ERROR_MESSAGE_INVALID_BRANCH = "No branch was found with the provided bid";
-    const std::string ERROR_MESSAGE_INVALID_BRANCH_SERVICE = "No branch was found for the provided service";
-    const std::string ERROR_MESSAGE_INVALID_BRANCH_REGION = "No branch was found for the provided service";
-    const std::string ERROR_MESSAGE_EMPTY_REGION = "Region cannot be empty";
-    const std::string ERROR_MESSAGE_REQUEST_ALREADY_EXISTS = "A request was already registered with the provided identifier";
 
     class RendezvousServiceImpl final : public rendezvous::RendezvousService::Service {
 
         private:
-            server::Server server;
+            std::shared_ptr<rendezvous::Server> server;
+            replicas::ReplicaClient replicaClient;
+
+            // debugging purposes
+            std::atomic<int> waitRequestCalls;
 
         public:
-            RendezvousServiceImpl(std::string sid);
+            RendezvousServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs);
 
             /* gRPC generated methods*/
             grpc::Status registerRequest(grpc::ServerContext * context, const rendezvous::RegisterRequestMessage * request, rendezvous::RegisterRequestResponse * response) override;

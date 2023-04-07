@@ -1,15 +1,22 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 #include <cstdio> 
-#include <grpcpp/grpcpp.h>
 #include <thread>
-
-#include "serviceImpl.h"
-#include "request.h"
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <grpcpp/grpcpp.h>
+#include <nlohmann/json.hpp>
+#include "services/client_service_impl.h"
+#include "services/server_service_impl.h"
+#include "server.h"
 #include "rendezvous.grpc.pb.h"
 
-void shutdown(std::unique_ptr<grpc::Server> & server, service::RendezvousServiceImpl * service) {
+using json = nlohmann::json;
+
+void shutdown(std::unique_ptr<grpc::Server> & server) {
   std::cout << "Press any key to stop the server..." << std::endl << std::endl;
   getchar();
 
@@ -18,55 +25,90 @@ void shutdown(std::unique_ptr<grpc::Server> & server, service::RendezvousService
 }
 
 
-void run(std::string id, std::string host, std::string port) {
-  std::string server_address(host + ':' + port);
-  service::RendezvousServiceImpl service(id);
+void run(std::string replicaId, std::string replicaAddr, std::vector<std::string> addrs) {
+
+  std::shared_ptr<rendezvous::Server> rendezvousServer = std::make_shared<rendezvous::Server>(replicaId);
+  service::RendezvousServiceImpl clientService(rendezvousServer, addrs);
+  service::RendezvousServerServiceImpl serverService(rendezvousServer);
 
   grpc::ServerBuilder builder;
-  builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-  builder.RegisterService(&service);
+  builder.AddListeningPort(replicaAddr, grpc::InsecureServerCredentials());
+  builder.RegisterService(&clientService);
+  builder.RegisterService(&serverService);
 
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
-  std::cout << "Server listening on " << server_address << "..." << std::endl;
+  std::cout << "Server listening on " << replicaAddr << "..." << std::endl;
 
-  std::thread t(shutdown, std::ref(server), &service);
+  std::thread t(shutdown, std::ref(server));
   
   server->Wait();
 
   t.join();
 }
 
+std::string parseConfig(std::string replicaId, std::vector<std::string>& addrs) {
+  std::string replicaAddr;
+
+  std::ifstream file("../config.json");
+  if (!file.is_open()) {
+      std::cerr << "[ERROR] Failed to open config.json" << std::endl;
+      exit(-1);
+  }
+
+  std::cout << "[INFO] Parsing JSON config..." << std::endl;
+
+  try {
+      json root;
+      file >> root;
+
+      for (const auto& replica : root.items()) {
+        std::string id = replica.key();
+        std::string addr = replica.value()["host"].get<std::string>() + ':' + std::to_string(replica.value()["port"].get<int>());
+
+        if (replicaId == id) {
+          std::cout << id << " --> " << addr << " (current replica)" << std::endl;
+          replicaAddr = "0.0.0.0:" + std::to_string(replica.value()["port"].get<int>());
+        }
+        else {
+          addrs.push_back(addr);
+          std::cout << id << " --> " << addr << std::endl;
+        }
+    }
+    std::cout << std::endl;
+  } catch (json::exception& e) {
+      std::cerr << "[ERROR] Failed to parse config.json: " << e.what() << std::endl;
+      exit(-1);
+  }
+  return replicaAddr;
+}
+
 void usage(char* argv[]) {
-  std::cout << "Usage: " << argv[0] << " <id> <host> <port>" << std::endl;
-  std::cout << "Example: " << argv[0] << " eu localhost 8000" << std::endl;
+  std::cout << "Usage: " << argv[0] << " <'replica id' as in config.json>" << std::endl;
   exit(-1);
 }
 
 int main(int argc, char* argv[]) {
-    std::string id("eu"); // eu -> europe
-    std::string host("0.0.0.0");
-    std::string port("8001");
+    std::string replicaId("replica-eu");
+
+    std::vector<std::string> addrs;
+
 
     if (argc > 1) {
       if (argc == 2) {
-        id = argv[1];
+        replicaId = argv[1];
       }
-      if (argc == 3) {
-        host = argv[2];
-      }
-      if (argc == 4) {
-        port = argv[3];
-      }
-      if (argc > 4) {
-        std::cout << "[ERROR] Invalid arguments!" << std::endl;
+      else if (argc > 2) {
+        std::cout << "[ERROR] Invalid number of arguments!" << std::endl;
         usage(argv);
       }
     }
 
-    std::cout << "** Rendezvous Server '" << id << "' **" << std::endl << std::endl;
+    std::string replicaAddr = parseConfig(replicaId, addrs);
     
-    run(id, host, port);
+    std::cout << "** Rendezvous Server '" << replicaId << "' **" << std::endl << std::endl;
+    
+    run(replicaId, replicaAddr, addrs);
     
     return 0;
 }

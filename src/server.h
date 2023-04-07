@@ -1,28 +1,28 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#include "rendezvous.grpc.pb.h"
-#include "request.h"
-#include "branch.h"
+#include "metadata/request.h"
+#include "metadata/branch.h"
+#include "replicas/version_registry.h"
+#include "replicas/replica_client.h"
+#include "utils.h"
 #include <atomic>
+#include <vector>
 #include <mutex>
 #include <iostream>
 #include <memory>
 #include <string>
 
-namespace server {
+namespace rendezvous {
 
     class Server {
 
         private:
-            std::string sid;
+            const std::string sid;
+
             std::atomic<long> nextRid;
-            std::unordered_map<std::string, metadata::Request*> * requests;
-
-            // Track number of prevented inconsistencies
             std::atomic<long> inconsistencies;
-
-            // Concurrency Control
+            std::unordered_map<std::string, metadata::Request*> *requests;
             std::mutex mutex_requests;
 
         public:
@@ -30,12 +30,33 @@ namespace server {
             ~Server();
 
             /**
-             * Get request according to the provided identifier or register request if not registered yet
+             * Return server identifier
              * 
-             * @param rid Request identifier
-             * @return Request if successfully registered, otherwise return nullptr
+             * @return The server identifier 
              */
-            metadata::Request * getOrRegisterRequest(std::string rid);
+            std::string getSid();
+
+            /**
+             * Generate an identifier for a new request
+             * 
+             * @return The new identifier
+             */
+            std::string genRid();
+
+            /**
+             * Generate an identifier for a new branch
+             * 
+             * @param request The request where the branch is going to be registered
+             * @return the new identifier 
+             */
+            std::string genBid(metadata::Request * request);
+
+            /**
+             * Returns the number of inconsistencies prevented so far
+             * 
+             * @return The number of prevented inconsistencies
+             */
+            long getNumInconsistencies();
 
             /**
              * Get request according to the provided identifier
@@ -46,91 +67,85 @@ namespace server {
             metadata::Request * getRequest(const std::string& rid);
 
             /**
-             * Register a new request
+             * Get request according to the provided identifier or register request if not registered yet
              * 
-             * @param rid Request identifier: empty or not
-             * @return The new request if it was not yet registered, otherwise return nullptr
+             * @param rid Request identifier
+             * @return Request if successfully registered, otherwise return nullptr
              */
-            metadata::Request * registerRequest(std::string rid);
+            metadata::Request * getOrRegisterRequest(std::string rid);
 
             /**
              * Register a new branch for a given request
              * 
              * @param request Request where the branch is registered
-             * @param service The service context (optional)
-             * @param region The region context (optional)
+             * @param service The service context
+             * @param region The region context
+             * @param bid The set of branches identifier: empty if request is from client
              * @return The new branch identifiers
              */
-            std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region);
+            std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region, std::string bid = "");
 
             /**
              * Register new branches for a given request
              * 
              * @param request Request where the branch is registered
-             * @param service The service context (optional)
-             * @param region The regions context for each branch
+             * @param service The service context
+             * @param regions The regions context for each branch
+             * @param version The (new) version of the replica for the current request
              * @return The new identifier of the set of branches
              */
-            std::string registerBranches(metadata::Request * request, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions);
+            std::string registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, std::string bid = "");
 
             /**
-             * Remove a branch according to its identifier
+             * Close a branch according to its identifier
              * 
-             * @param rid Request identifier
+             * @param request Request where the branch is registered
              * @param service Service where branch was registered
              * @param region Region where branch was registered
              * @param bid The identifier of the set of branches where the current branch was registered
-             * @return Possible return values:
-             * - 0 if branch was successfully removed
-             * - (-1) if rid is invalid
-             * - (-2) if no branch was found for a given service
-             * - (-3) if no branch was found for a given region
              */
-            int closeBranch(const std::string& rid, const std::string& service, const std::string& region, const std::string& bid);
+            void closeBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& bid);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)
              * 
-             * @param rid Request identifier
-             * @param service The service context (optional)
-             * @param region The region context (optional)
+             * @param request Request where the branch is registered
+             * @param service The service context
+             * @param region The region context
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - (-1) if rid is invalid
              * - (-2) if no status was found for a given service
              * - (-3) if no status was found for a given region
              */
-            int waitRequest(const std::string& rid, const std::string& service, const std::string& region);
+            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)
              * 
-             * @param rid Request identifier
-             * @param service The service context (optional)
-             * @param region The region context (optional)
+             * @param request Request where the branch is registered
+             * @param service The service context
+             * @param region The region context
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-1) if rid is invalid
              * - (-2) if no status was found for a given service
              * - (-3) if no status was found for a given region
              */
-            int checkRequest(const std::string& rid, const std::string& service, const std::string& region);
+            int checkRequest(metadata::Request * request, const std::string& service, const std::string& region);
             
             /**
              * Check status of request for each available region and for a given contex (service)
              *
-             * @param rid Request identifier
-             * @param service The name of the service that defines the waiting context (optional)
+             * @param request Request where the branch is registered
+             * @param service The name of the service that defines the waiting context
              * @param status Sets value depending on the outcome:
-             * - (-1) if rid is invalid
              * - (-2) if no status was found for a given service
              *
              * @return Map of status of the request (OPENED or CLOSED) for each region
              */
             
-            std::map<std::string, int> checkRequestByRegions(const std::string& rid, const std::string& service, int * status);
+            std::map<std::string, int> checkRequestByRegions(metadata::Request * request, const std::string& service, int * status);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

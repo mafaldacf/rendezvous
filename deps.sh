@@ -40,4 +40,13 @@ sudo cmake .. -DBUILD_GMOCK=OFF
 sudo make
 sudo make install
 
+# Install JSON for C++
+echo '(5) Installing JSON for C++...'
+git clone -b v3.11.2 --depth 1 https://github.com/nlohmann/json.git
+cd json
+mkdir build
+cd build
+sudo cmake ..
+sudo cmake --install .
+
 echo 'Done!'

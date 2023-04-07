@@ -14,7 +14,9 @@ RUN apt-get update \
     automake \
     libtool \
     curl \
+    zip \
     unzip \
+    tar \
     make \
     wget \
     g++ \
@@ -47,6 +49,14 @@ RUN git clone https://github.com/google/googletest.git -b v1.13.0 \
     && make \
     && make install
 
+# Install JSON for C++
+RUN git clone -b v3.11.2 --depth 1 https://github.com/nlohmann/json.git \
+    && cd json \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && cmake --install .
+
 WORKDIR /app
 COPY . .
 
@@ -55,4 +65,4 @@ COPY . .
 # Build project
 RUN ./start.sh build
     
-CMD ["./start.sh", "run", "server"]
+#CMD ["./start.sh", "run", "server"]

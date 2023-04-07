@@ -1,51 +1,64 @@
 #ifndef REQUEST_H
 #define REQUEST_H
 
+#include "branch.h"
+#include "../replicas/version_registry.h"
+#include "../utils.h"
 #include <iostream>
 #include <map>
 #include <memory>
 #include <atomic>
+#include <unordered_map>
 #include <mutex>
 #include <condition_variable>
 #include <cstring>
 #include <vector>
-#include "branch.h"
+#include <string>
+#include <stdint.h>
 
 namespace metadata {
 
     class Request {
 
         /* request status */
-        const int OPENED = 0;
-        const int CLOSED = 1;
+        static const int OPENED = 0;
+        static const int CLOSED = 1;
+
+        /* branch tracking */
+        const int REGISTER = 1;
+        const int REMOVE = -1;
 
         private:
+            const std::string rid;
             std::atomic<long> nextId;
-            std::string rid;
 
-            /* Branches */
-            // nested map: <service, <region, vector with branch pointers>>
-            using Branches = std::vector<metadata::Branch*>;
-            std::unordered_map<std::string, std::unordered_map<std::string, Branches>> branches;
+            // replica version control
+            replicas::VersionRegistry * versionsRegistry;
+
+            // <bid, branch>
+            std::unordered_map<std::string, metadata::Branch*> branches;
 
 
             /* Opened Branches */
-            std::atomic<int> numBranches;
-            std::unordered_map<std::string, int> numBranchesPerRegion;
-            std::unordered_map<std::string, int> numBranchesPerService;
+            std::atomic<uint64_t> numBranches;
+            std::unordered_map<std::string, uint64_t> numBranchesService;
+            std::unordered_map<std::string, uint64_t> numBranchesRegion;
+            std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> numBranchesServiceRegion;
 
             /*  Concurrency Control */
             std::mutex mutex_branches;
-            std::mutex mutex_numBranchesPerRegion;
-            std::mutex mutex_numBranchesPerService;
+            std::mutex mutex_numBranchesService;
+            std::mutex mutex_numBranchesRegion;
+            std::mutex mutex_numBranchesServiceRegion;
             
             std::condition_variable cond_branches;
-            std::condition_variable cond_numBranchesPerRegion;
-            std::condition_variable cond_numBranchesPerService;
+            std::condition_variable cond_numBranchesService;
+            std::condition_variable cond_numBranchesRegion;
+            std::condition_variable cond_numBranchesServiceRegion;
 
         public:
 
-            Request(std::string rid);
+            Request(std::string rid, replicas::VersionRegistry * versionsRegistry);
             ~Request();
 
             /**
@@ -56,13 +69,36 @@ namespace metadata {
             std::string getRid();
 
             /**
-             * Atomically get and incremented next identifier to be part of a new bid
+             * Get versions registry
              * 
-             * @return new identifier
+             * @return registry's pointer
              */
-            long computeNextId();
+            replicas::VersionRegistry * getVersionsRegistry();
 
-            void addBranch(metadata::Branch * branch);
+            /**
+             * Generate a new identifier
+             * 
+             * @return new id
+             */
+            std::string genId();
+
+            /**
+             * Register a branch in the request
+             * 
+             * @param bid The identifier of the set of branches where the current branch is going to be registered
+             * @param service The service where the branch is being registered
+             * @param region The region where the branch is being registered
+             */
+            void registerBranch(const std::string& bid, const std::string& service, const std::string& region);
+
+            /**
+             * Register a set of branches in the request
+             * 
+             * @param bid The identifier of the set of branches
+             * @param service The service where the branches are being registered
+             * @param region The regions for each branch
+             */
+            void registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
@@ -71,20 +107,28 @@ namespace metadata {
              * @param region The region where the branch was registered
              * @param bid The identifier of the set of branches where the current branch was registered
              * 
-             * @return Possible return values:
-             * - 0 if successfully removed
-             * - (-2) if no branch was found for a given service
-             * - (-3) if no branch was found for a given region
-             * - (-4) if no branch was found with a given bid
+             * @return true if branch was found and closed and false if no branch was found and a new closed one was created
              */
-            int closeBranch(const std::string& service, const std::string& region, const std::string& bid);
+            bool closeBranch(const std::string& service, const std::string& region, const std::string& bid);
 
             /**
              * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps
              *
+             * @param service The service context
+             * @param region The region context
              * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
              */
-            void trackBranchOnContext(metadata::Branch * branch, long value);
+            void trackBranchOnContext(const std::string& service, const std::string& region, const long& value);
+
+            /**
+             * Track a set of branches (add or remove) according to their context (service, region or none) in the corresponding maps
+             *
+             * @param service The service context
+             * @param regions The regions for each branch
+             * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
+             * @param num The number of new branches
+             */
+            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, const long& value, const int& num);
 
             /**
              * Wait until request is closed
@@ -132,14 +176,6 @@ namespace metadata {
              * - (-3) if no status was found for a given region
              */
             int waitOnServiceAndRegion(const std::string& service, const std::string& region);
-
-            /**
-             * Check if branches are opened for a given service and region
-             * 
-             * @param branches The vector containing branches for a given context
-             * @return true if at least one branch is opened and false otherwise 
-             */
-            bool hasOpenedBranches(std::vector<metadata::Branch*> branches);
 
             /**
              * Check status of request
