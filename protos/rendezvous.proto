@@ -78,9 +78,8 @@ message RegisterBranchesResponse {
 
 message CloseBranchMessage {
   string rid = 1;
-  optional string service = 2;
+  string bid = 2;
   string region = 3;
-  string bid = 4;
 }
 
 /* Wait Request */

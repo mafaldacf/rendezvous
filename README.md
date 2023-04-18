@@ -65,7 +65,7 @@ Install GoogleTest: [Generic Build Instructions: Standalone CMake Project](https
 4. Connect to your EC2 instance via SSH and retrieve docker image from repository
     - Connect via SSH
         > ssh -i "~/.ssh/rendezvous-eu.pem" ubuntu@ec2-54-93-76-92.eu-central-1.compute.amazonaws.com
-        > ssh -i "~/.ssh/rendezvous-us.pem" ubuntu@ec2-54-93-76-92.eu-central-1.compute.amazonaws.com
+        > ssh -i "~/.ssh/rendezvous-us.pem" ubuntu@ec2-44-201-115-5.compute-1.amazonaws.com
     - Install the necessary tools and configure aws cli to setup keys (access key & secret access key) and default region `eu-central-1`
         > sudo apt-get update
         > sudo apt install docker.io

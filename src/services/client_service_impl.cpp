@@ -45,6 +45,11 @@ grpc::Status RendezvousServiceImpl::registerBranch(grpc::ServerContext* context,
 
   req = server->getOrRegisterRequest(rid);
   std::string bid = server->registerBranch(req, service, region);
+
+  // sanity check - must never happen
+  if (bid.empty()) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERROR_MESSAGE_BRANCH_ALREADY_EXISTS);
+  }
   
   std::string sid = server->getSid();
   int version = req->getVersionsRegistry()->updateLocalVersion(sid);
@@ -88,6 +93,11 @@ grpc::Status RendezvousServiceImpl::registerBranches(grpc::ServerContext* contex
   req = server->getOrRegisterRequest(rid);
   std::string bid = server->registerBranches(req, service, regions);
 
+  // sanity check - must never happen
+  if (bid.empty()) {
+    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERROR_MESSAGE_BRANCH_ALREADY_EXISTS);
+  }
+
   std::string sid = server->getSid();
   int version = req->getVersionsRegistry()->updateLocalVersion(sid);
   ctx.mutable_versions()->insert({sid, version});
@@ -115,22 +125,25 @@ grpc::Status RendezvousServiceImpl::closeBranch(grpc::ServerContext* context, co
   if (NO_CONSISTENCY_CHECKS) return grpc::Status::OK;
   
   const std::string& rid = request->rid();
-  const std::string& service = request->service();
   const std::string& region = request->region();
-  std::string bid = request->bid();
+  const std::string& bid = request->bid();
 
-  log("> closing branch for request '%s' on service=%s and region=%s", rid.c_str(), service.c_str(), region.c_str());
+  log("> closing branch '%s' for request '%s' on region=%s", bid.c_str(), rid.c_str(), region.c_str());
 
   if (region.empty()) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERROR_MESSAGE_EMPTY_REGION);
   }
 
   metadata::Request * req = server->getOrRegisterRequest(rid);
-  server->closeBranch(req, service, region, bid);
+  bool region_found = server->closeBranch(req, bid, region);
 
-  replicaClient.sendCloseBranch(rid, bid, service, region);
+  if (!region_found) {
+    return grpc::Status(grpc::StatusCode::ABORTED, utils::ERROR_MESSAGE_REGION_NOT_FOUND);
+  }
+
+  replicaClient.sendCloseBranch(rid, bid, region);
   
-  log("< closed branch '%s' for request '%s' on service=%s and region=%s", bid.c_str(), rid.c_str(), service.c_str(), region.c_str());
+  log("< closed branch '%s' for request '%s' on region=%s", bid.c_str(), rid.c_str(), region.c_str());
   return grpc::Status::OK;
 }
 

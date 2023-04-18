@@ -24,7 +24,6 @@ namespace metadata {
         public:
             Branch(std::string bid, std::string service, std::string region);
             Branch(std::string bid, std::string service, const utils::ProtoVec& regionsVec);
-            Branch(std::string bid, std::string service, std::string region, int status);
 
             /**
              * Get identifier (bid) of the object

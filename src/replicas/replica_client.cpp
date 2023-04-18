@@ -129,8 +129,8 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
     }).detach();
 }
 
-void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region) {
-    std::thread([this, rid, bid, service, region]() {
+void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& region) {
+    std::thread([this, rid, bid, region]() {
         struct RequestHelper rh;
 
         for (const auto& server : servers) {
@@ -146,7 +146,6 @@ void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& b
             rendezvous_server::CloseBranchMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
-            request.set_service(service);
             request.set_region(region);
 
             rh.rpcs.emplace_back(server->AsynccloseBranch(context, request, &rh.completionQueue));

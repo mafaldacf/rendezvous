@@ -17,6 +17,6 @@ else()
     compile_protos(rendezvous_server)
 
     add_subdirectory(src)
-    #add_subdirectory(test)
+    add_subdirectory(test)
     #add_subdirectory(examples/cpp)
 endif()

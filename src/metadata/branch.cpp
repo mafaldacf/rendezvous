@@ -16,12 +16,6 @@ Branch::Branch(std::string bid, std::string service, const utils::ProtoVec& regi
         }
     }
 
-Branch::Branch(std::string bid, std::string service, std::string region, int status)
-    : bid(bid), service(service) {
-        regions = std::unordered_map<std::string, int>();
-        regions[region] = status;
-    }
-
 std::string Branch::getBid() {
     return bid;
 }
@@ -31,9 +25,13 @@ std::string Branch::getService() {
 }
 
 bool Branch::close(const std::string &region) {
-    if (regions[region] == OPENED) {
-        regions[region] = CLOSED;
-        return true;
+    auto region_it = regions.find(region);
+
+    // region not found
+    if (region_it == regions.end()) {
+        return false;
     }
-    return false;
+
+    regions[region] = CLOSED;
+    return true;
 }

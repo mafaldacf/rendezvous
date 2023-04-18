@@ -74,10 +74,9 @@ namespace replicas {
              * 
              * @param rid The identifier of the request associated with the branch
              * @param bid The identifier of the set of branches generated when the branch was registered
-             * @param service The service where the branch was registered
              * @param region The region where the branch was registered
              */
-            void sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region);
+            void sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& region);
 
         };
     

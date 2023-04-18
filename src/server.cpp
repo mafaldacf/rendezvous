@@ -79,7 +79,12 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
   if (bid.empty()) {
     bid = genBid(request);
   }
-  request->registerBranch(bid, service, region);
+  int res = request->registerBranch(bid, service, region);
+
+  if (res == -1) {
+    return "";
+  }
+
   return bid;
 }
 
@@ -87,16 +92,17 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
   if (bid.empty()) {
     bid = genBid(request);
   }
-  request->registerBranches(bid, service, regions);
+  int res = request->registerBranches(bid, service, regions);
+
+  if (res == -1) {
+    return "";
+  }
+
   return bid;
 }
 
-void Server::closeBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& bid) {
-  bool found = request->closeBranch(service, region, bid);
-
-  if (DEBUG && !found) {
-    std::cout << "[INFO] no branch was found and a new closed one was created" << std::endl;
-  }
+bool Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
+  return request->closeBranch(bid, region);
 }
 
 int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region) {

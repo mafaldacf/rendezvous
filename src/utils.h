@@ -41,6 +41,7 @@ namespace utils {
     /* common gRPC custom error messages */
     const std::string ERROR_MESSAGE_INVALID_REQUEST = "Invalid request identifier";
     const std::string ERROR_MESSAGE_REQUEST_ALREADY_EXISTS = "A request was already registered with the provided identifier";
+    const std::string ERROR_MESSAGE_BRANCH_ALREADY_EXISTS = "A branch was already registered with the provided identifier";
 }
 
 #endif

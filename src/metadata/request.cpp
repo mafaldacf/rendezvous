@@ -33,10 +33,16 @@ std::string Request::genId() {
   return std::to_string(nextId.fetch_add(1));
 }
 
-void Request::registerBranch(const std::string& bid, const std::string& service, const std::string& region) {
+int Request::registerBranch(const std::string& bid, const std::string& service, const std::string& region) {
     mutex_branches.lock();
 
     auto branch_it = branches.find(bid);
+
+    // branches already exist
+    if (branch_it != branches.end()) {
+        mutex_branches.unlock();
+        return -1;
+    }
 
     // branch not found
     if (branch_it == branches.end()) {
@@ -45,51 +51,57 @@ void Request::registerBranch(const std::string& bid, const std::string& service,
         trackBranchOnContext(service, region, REGISTER);
     }
 
+    cond_new_branches.notify_all();
     mutex_branches.unlock();
+    return 0;
 }
 
-void Request::registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions) {
+int Request::registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions) {
     mutex_branches.lock();
 
     auto branch_it = branches.find(bid);
 
-    // branch not found
-    if (branch_it == branches.end()) {
-        metadata::Branch * branch = new metadata::Branch(bid, service, regions);
-        branches[bid] = branch;
-        int num = regions.size();
-        trackBranchesOnContext(service, regions, REGISTER, num);
+    // branches already exist
+    if (branch_it != branches.end()) {
+        mutex_branches.unlock();
+        return -1;
     }
 
+    metadata::Branch * branch = new metadata::Branch(bid, service, regions);
+    branches[bid] = branch;
+    int num = regions.size();
+    trackBranchesOnContext(service, regions, REGISTER, num);
+
+    cond_new_branches.notify_all();
     mutex_branches.unlock();
+    return 0;
 }
 
-bool Request::closeBranch(const std::string& service, const std::string& region, const std::string& bid) {
-    mutex_branches.lock();
+bool Request::closeBranch(const std::string& bid, const std::string& region) {
+    std::unique_lock<std::mutex> lock(mutex_branches);
 
-    bool found = false;
+    bool region_found = false;
     auto branch_it = branches.find(bid);
 
     // branch not found
-    if (branch_it == branches.end()) {
-        metadata::Branch * branch = new metadata::Branch(bid, service, region, CLOSED);
-        branches[bid] = branch;
+    while (branch_it == branches.end()) {
+        cond_new_branches.wait(lock);
+        branch_it = branches.find(bid);
     }
-    else  {
-        metadata::Branch * branch = branch_it->second;
-        if (branch->close(region)) {
-            trackBranchOnContext(service, region, REMOVE);
-        }
-        found = true;
+
+    metadata::Branch * branch = branch_it->second;
+    if (branch->close(region)) {
+        trackBranchOnContext(branch->getService(), region, REMOVE);
+        region_found = true;
     }
 
     cond_branches.notify_all();
-    mutex_branches.unlock();
-    return found;
+    return region_found;
 }
 
 void Request::trackBranchOnContext(const std::string& service, const std::string& region, const long& value) {
     numBranches.fetch_add(value);
+
     if (!service.empty()) {
         mutex_numBranchesService.lock();
 
@@ -121,6 +133,7 @@ void Request::trackBranchOnContext(const std::string& service, const std::string
 
 void Request::trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, const long& value, const int& num) {
     numBranches.fetch_add(value*num);
+
     if (!service.empty()) {
         mutex_numBranchesService.lock();
 
@@ -136,7 +149,9 @@ void Request::trackBranchesOnContext(const std::string& service, const utils::Pr
         mutex_numBranchesServiceRegion.lock();
 
         for (const auto& region : regions) {
+            // sanity check - region can never be empty when registering a set of branches
             if (!region.empty()) {
+
                 numBranchesRegion[region] += value;
                 if (value == REMOVE)
                     cond_numBranchesRegion.notify_all();

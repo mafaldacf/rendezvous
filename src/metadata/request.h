@@ -51,6 +51,7 @@ namespace metadata {
             std::mutex mutex_numBranchesRegion;
             std::mutex mutex_numBranchesServiceRegion;
             
+            std::condition_variable cond_new_branches;
             std::condition_variable cond_branches;
             std::condition_variable cond_numBranchesService;
             std::condition_variable cond_numBranchesRegion;
@@ -88,8 +89,10 @@ namespace metadata {
              * @param bid The identifier of the set of branches where the current branch is going to be registered
              * @param service The service where the branch is being registered
              * @param region The region where the branch is being registered
+             * 
+             * @param return 0 if successfully registered and -1 otherwise (if branch already exists)
              */
-            void registerBranch(const std::string& bid, const std::string& service, const std::string& region);
+            int registerBranch(const std::string& bid, const std::string& service, const std::string& region);
 
             /**
              * Register a set of branches in the request
@@ -97,19 +100,20 @@ namespace metadata {
              * @param bid The identifier of the set of branches
              * @param service The service where the branches are being registered
              * @param region The regions for each branch
+             * 
+             * @param return 0 if successfully registered and -1 otherwise (if branches already exists
              */
-            void registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
+            int registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
              * 
-             * @param service The service where the branch was registered
-             * @param region The region where the branch was registered
              * @param bid The identifier of the set of branches where the current branch was registered
+             * @param region The region where the branch was registered
              * 
              * @return true if branch was found and closed and false if no branch was found and a new closed one was created
              */
-            bool closeBranch(const std::string& service, const std::string& region, const std::string& bid);
+            bool closeBranch(const std::string& bid, const std::string& region);
 
             /**
              * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps

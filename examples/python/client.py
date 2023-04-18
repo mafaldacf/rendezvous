@@ -51,9 +51,9 @@ def registerBranches(stub, rid, service, regions):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def closeBranch(stub, rid, bid, service, region):
+def closeBranch(stub, rid, bid, region):
     try:
-        stub.closeBranch(rendezvous.CloseBranchMessage(rid=rid, bid=bid, service=service, region=region))
+        stub.closeBranch(rendezvous.CloseBranchMessage(rid=rid, bid=bid, region=region))
         print(f"[Close Branch] done!\n")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
@@ -97,7 +97,7 @@ def showOptions():
     print(f"- Register Request: \t \t \t {REGISTER_REQUEST} <rid>")
     print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <region>")
     print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> <service> <regions>")
-    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <bid> <service> <region>")
+    print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <bid> <region>")
     print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
     print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> <service> <region>")
     print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> <service>")
@@ -135,12 +135,11 @@ def readInput(stubs):
                 regions.append(region)
             info = registerBranches(stub, rid, service, regions)
 
-        elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 4:
+        elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             bid = args[1] if len(args) >= 2 else None
-            service = args[2] if len(args) >= 3 else None
-            region = args[3] if len(args) >= 4 else None
-            info = closeBranch(stub, rid, bid, service, region)
+            region = args[2] if len(args) >= 3 else None
+            info = closeBranch(stub, rid, bid, region)
             
         elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]

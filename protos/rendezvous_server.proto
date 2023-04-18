@@ -51,6 +51,5 @@ message RegisterBranchesMessage {
 message CloseBranchMessage {
   string rid = 1;
   string bid = 2;
-  optional string service = 3;
-  string region = 4;
+  string region = 3;
 }

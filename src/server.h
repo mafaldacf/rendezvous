@@ -81,7 +81,7 @@ namespace rendezvous {
              * @param service The service context
              * @param region The region context
              * @param bid The set of branches identifier: empty if request is from client
-             * @return The new branch identifiers
+             * @return The new branch identifiers or empty if an error ocurred (branches already exist with bid)
              */
             std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region, std::string bid = "");
 
@@ -92,7 +92,7 @@ namespace rendezvous {
              * @param service The service context
              * @param regions The regions context for each branch
              * @param version The (new) version of the replica for the current request
-             * @return The new identifier of the set of branches
+             * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
             std::string registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, std::string bid = "");
 
@@ -100,11 +100,12 @@ namespace rendezvous {
              * Close a branch according to its identifier
              * 
              * @param request Request where the branch is registered
-             * @param service Service where branch was registered
-             * @param region Region where branch was registered
              * @param bid The identifier of the set of branches where the current branch was registered
+             * @param region Region where branch was registered
+             * 
+             * @param return true if successfully closed or false if region context is not valid
              */
-            void closeBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& bid);
+            bool closeBranch(metadata::Request * request, const std::string& bid, const std::string& region);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)

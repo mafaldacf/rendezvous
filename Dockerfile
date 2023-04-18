@@ -20,6 +20,7 @@ RUN apt-get update \
     make \
     wget \
     g++ \
+    nano \
     && apt-get clean
 
 # Create ./local directory for CMake, gRPC and Protobuf
@@ -65,4 +66,4 @@ COPY . .
 # Build project
 RUN ./start.sh build
     
-#CMD ["./start.sh", "run", "server"]
+#CMD ["./start.sh", "run", "server", "${REPLICA_ID}"]
