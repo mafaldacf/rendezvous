@@ -40,6 +40,7 @@ void run(std::string replicaId, std::string replicaAddr, std::vector<std::string
 
   std::cout << "Server listening on " << replicaAddr << "..." << std::endl;
 
+  rendezvousServer->initCleanRequests();
   std::thread t(shutdown, std::ref(server));
   
   server->Wait();
@@ -85,6 +86,9 @@ std::string parseConfig(std::string replicaId, std::vector<std::string>& addrs) 
 
 void usage(char* argv[]) {
   std::cout << "Usage: " << argv[0] << " <'replica id' as in config.json>" << std::endl;
+  
+  // TODO for oficial code
+  //std::cout << "Usage: " << argv[0] << " [--debug] [--logs] [--no_consistency_checks] <replica_id>" << std::endl;
   exit(-1);
 }
 

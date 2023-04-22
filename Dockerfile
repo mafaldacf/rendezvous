@@ -42,13 +42,13 @@ RUN git clone --recurse-submodules -b v1.52.0 --depth 1 --shallow-submodules htt
     && cd ../..
 
 # Install GTest
-RUN git clone https://github.com/google/googletest.git -b v1.13.0 \
-    && cd googletest \
-    && mkdir build \
-    && cd build \
-    && cmake .. -DBUILD_GMOCK=OFF \
-    && make \
-    && make install
+#RUN git clone https://github.com/google/googletest.git -b v1.13.0 \
+#    && cd googletest \
+#    && mkdir build \
+#    && cd build \
+#    && cmake .. -DBUILD_GMOCK=OFF \
+#    && make \
+#    && make install
 
 # Install JSON for C++
 RUN git clone -b v3.11.2 --depth 1 https://github.com/nlohmann/json.git \

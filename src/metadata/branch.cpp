@@ -35,3 +35,13 @@ bool Branch::close(const std::string &region) {
     regions[region] = CLOSED;
     return true;
 }
+
+json Branch::toJson() const {
+    json j;
+    j[bid]["service"] = service;
+
+    for (const auto& regions_it : regions) {
+        j[bid]["regions"].push_back(regions_it.first);
+    }
+    return j;
+}

@@ -5,10 +5,12 @@ using namespace metadata;
 Request::Request(std::string rid, replicas::VersionRegistry * versionsRegistry)
     : rid(rid), nextId(0), numBranches(0), versionsRegistry(versionsRegistry) {
     
+    initTs = std::chrono::system_clock::now();
+    finalTs = initTs;
+    
     // <bid, branch>
     branches = std::unordered_map<std::string, metadata::Branch*>();
 
-    /* Opened Branches */
     numBranchesRegion = std::unordered_map<std::string, uint64_t>();
     numBranchesService = std::unordered_map<std::string, uint64_t>();
     numBranchesServiceRegion = std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>>();
@@ -19,6 +21,39 @@ Request::~Request() {
         delete branch_it.second;
     }
     delete versionsRegistry;
+}
+
+json Request::toJson() const {
+    json j;
+
+    std::time_t initTs_t = std::chrono::system_clock::to_time_t(initTs);
+    std::time_t finalTs_t = std::chrono::system_clock::to_time_t(finalTs);
+    auto initialTs_tm = *std::localtime(&initTs_t);
+    auto finalTs_tm = *std::localtime(&finalTs_t);
+
+    std::ostringstream initialTs_oss;
+    std::ostringstream finalTs_oss;
+    initialTs_oss << std::put_time(&initialTs_tm, utils::TIME_FORMAT.c_str());
+    finalTs_oss << std::put_time(&finalTs_tm, utils::TIME_FORMAT.c_str());
+    auto initialTs_str = initialTs_oss.str();
+    auto finalTs_str = finalTs_oss.str();
+
+    auto duration = finalTs - initTs;
+    auto duration_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+
+    j[rid]["init_ts"] = initialTs_str;
+    j[rid]["last_ts"] = finalTs_str;
+    j[rid]["duration_ms"] = duration_seconds.count();
+
+    for (const auto& branches_it : branches) {
+        j[rid]["branches"].push_back(branches_it.second->toJson());
+    }
+    return j;
+}
+
+bool Request::canRemove(std::chrono::time_point<std::chrono::system_clock> now) {
+    auto timeSince = now - finalTs;
+    return timeSince > std::chrono::hours(12);
 }
 
 std::string Request::getRid() {
@@ -101,6 +136,10 @@ bool Request::closeBranch(const std::string& bid, const std::string& region) {
 
 void Request::trackBranchOnContext(const std::string& service, const std::string& region, const long& value) {
     numBranches.fetch_add(value);
+
+    if (value == REMOVE && numBranches.load() == 0) {
+        finalTs = std::chrono::system_clock::now();
+    }
 
     if (!service.empty()) {
         mutex_numBranchesService.lock();

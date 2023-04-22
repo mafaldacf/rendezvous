@@ -22,10 +22,17 @@ namespace utils {
     #define log(...)
     #endif
 
+    // log mode
+    #ifndef LOG_REQUESTS
+    #define LOG_REQUESTS 1
+    #endif
+
     // measure overhead of API without any consistency checks
     #ifndef NO_CONSISTENCY_CHECKS 
     #define NO_CONSISTENCY_CHECKS 0
     #endif 
+
+    const std::string TIME_FORMAT = "%Y-%m-%d %H:%M:%S";
 
     /* client gRPC custom error messages */
     const std::string ERROR_MESSAGE_SERVICE_NOT_FOUND = "Request status not found for the provided service";

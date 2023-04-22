@@ -6,6 +6,7 @@
 #include "../utils.h"
 #include <iostream>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <memory>
 #include <atomic>
 #include <unordered_map>
@@ -15,6 +16,11 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include <iomanip>
+#include <chrono>
+#include <sstream>
+
+using json = nlohmann::json;
 
 namespace metadata {
 
@@ -25,27 +31,30 @@ namespace metadata {
         static const int CLOSED = 1;
 
         /* branch tracking */
-        const int REGISTER = 1;
-        const int REMOVE = -1;
+        static const int REGISTER = 1;
+        static const int REMOVE = -1;
 
         private:
             const std::string rid;
             std::atomic<long> nextId;
+            std::chrono::time_point<std::chrono::system_clock> initTs;
+            std::chrono::time_point<std::chrono::system_clock> finalTs;
 
-            // replica version control
+            /* replicas versioning */
             replicas::VersionRegistry * versionsRegistry;
+
+            /* branching management */
 
             // <bid, branch>
             std::unordered_map<std::string, metadata::Branch*> branches;
 
-
-            /* Opened Branches */
+            // number of opened branches
             std::atomic<uint64_t> numBranches;
             std::unordered_map<std::string, uint64_t> numBranchesService;
             std::unordered_map<std::string, uint64_t> numBranchesRegion;
             std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> numBranchesServiceRegion;
 
-            /*  Concurrency Control */
+            // concurrency control
             std::mutex mutex_branches;
             std::mutex mutex_numBranchesService;
             std::mutex mutex_numBranchesRegion;
@@ -61,6 +70,21 @@ namespace metadata {
 
             Request(std::string rid, replicas::VersionRegistry * versionsRegistry);
             ~Request();
+
+            /**
+             * Stores request info in json format
+             * 
+             * @return json 
+             */
+            json toJson() const;
+
+            /**
+             * Check if last closure timestamp is older than 12 hours to acknowledge if request can be removed
+             * 
+             * @param now The timestamp representing the current time
+             * @return true if request can be removed and false otherwise
+             */
+            bool canRemove(std::chrono::time_point<std::chrono::system_clock> now);
 
             /**
              * Get the identifier (rid) of the object

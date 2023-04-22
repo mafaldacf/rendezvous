@@ -19,19 +19,19 @@ CHECK_PREVENTED_INCONSISTENCIES = "gi";
 SLEEP = "sleep";
 EXIT = "exit";
 
-def toBytes(info):
-    return info.SerializeToString()
+def toBytes(ctx):
+    return ctx.SerializeToString()
 
-def fromBytes(info):
-    serverInfo = rendezvous.ServerInfo()
-    serverInfo.ParseFromString(info)
-    return serverInfo
+def fromBytes(ctx):
+    ctx = rendezvous.RequestContext()
+    ctx.ParseFromString(ctx)
+    return ctx
 
 def registerRequest(stub, rid):
     try:
         response = stub.registerRequest(rendezvous.RegisterRequestMessage(rid=rid))
         print(f"[Register Request] {response}")
-        return toBytes(response.serverInfo)
+        return toBytes(response.context)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -39,7 +39,7 @@ def registerBranch(stub, rid, service, region):
     try:
         response = stub.registerBranch(rendezvous.RegisterBranchMessage(rid=rid, service=service, region=region))
         print(f"[Register Branch] {response}")
-        return toBytes(response.serverInfo)
+        return toBytes(response.context)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -47,7 +47,7 @@ def registerBranches(stub, rid, service, regions):
     try:
         response = stub.registerBranches(rendezvous.RegisterBranchesMessage(rid=rid, service=service, regions=regions))
         print(f"[Register Branches] {response}")
-        return toBytes(response.serverInfo)
+        return toBytes(response.context)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -58,27 +58,27 @@ def closeBranch(stub, rid, bid, region):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def waitRequest(stub, rid, service, region, info=None):
+def waitRequest(stub, rid, service, region, ctx=None):
     try:
         request = rendezvous.WaitRequestMessage(rid=rid, region=region, service=service)
-        request.serverInfo.CopyFrom(fromBytes(info))
+        request.context.CopyFrom(fromBytes(ctx))
         print(f"[Wait Request] > waiting: {request}")
         response = stub.waitRequest(request)
         print(f"[Wait Request] < returning: prevented inconsistency = {response.preventedInconsistency}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def checkRequest(stub, rid, service, region, info=None):
+def checkRequest(stub, rid, service, region, ctx=None):
     try:
-        response = stub.checkRequest(rendezvous.CheckRequestMessage(rid=rid, service=service, region=region, serverInfo=fromBytes(info)))
+        response = stub.checkRequest(rendezvous.CheckRequestMessage(rid=rid, service=service, region=region, serverctx=fromBytes(ctx)))
         status = rendezvous.RequestStatus.Name(response.status)
         print(f"[Check Request] status:\"{status}\"")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def checkRequestByRegions(stub, rid, service, info=None):
+def checkRequestByRegions(stub, rid, service, ctx=None):
     try:
-        response = stub.checkRequestByRegions(rendezvous.CheckRequestByRegionsMessage(rid=rid, service=service, serverInfo=fromBytes(info)))
+        response = stub.checkRequestByRegions(rendezvous.CheckRequestByRegionsMessage(rid=rid, service=service, serverctx=fromBytes(ctx)))
         print(f"[Check Request By Regions]:")
         for regionStatus in response.regionStatus:
             status = rendezvous.RequestStatus.Name(regionStatus.status)
@@ -109,7 +109,7 @@ def showOptions():
 
 def readInput(stubs):
     stub = stubs[0]
-    info = None
+    ctx = None
     while True:
         user_input = input()
         parts = user_input.split()
@@ -118,13 +118,13 @@ def readInput(stubs):
 
         if command == REGISTER_REQUEST and len(args) <= 1:
             rid = args[0] if len(args) == 1 else None
-            info = registerRequest(stub, rid)
+            ctx = registerRequest(stub, rid)
 
         elif command == REGISTER_BRANCH and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            info = registerBranch(stub, rid, service, region)
+            ctx = registerBranch(stub, rid, service, region)
 
         elif command == REGISTER_BRANCHES and len(args) >= 2:
             rid = args[0]
@@ -133,31 +133,32 @@ def readInput(stubs):
             regions = []
             for region in args[2:]:
                 regions.append(region)
-            info = registerBranches(stub, rid, service, regions)
+            ctx = registerBranches(stub, rid, service, regions)
 
         elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             bid = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            info = closeBranch(stub, rid, bid, region)
+            t = threading.Thread(target=closeBranch, args=(stub, rid, bid, region))
+            t.start()
             
         elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            t = threading.Thread(target=waitRequest, args=(stub, rid, service, region, info))
+            t = threading.Thread(target=waitRequest, args=(stub, rid, service, region, ctx))
             t.start()
 
         elif command == CHECK_REQUEST and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            checkRequest(stub, rid, service, region, info)
+            checkRequest(stub, rid, service, region, ctx)
 
         elif command == CHECK_REQUEST_BY_REGIONS and len(args) >= 1 and len(args) <= 2:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
-            checkRequestByRegions(stub, rid, service, info)
+            checkRequestByRegions(stub, rid, service, ctx)
 
         elif command == CHECK_PREVENTED_INCONSISTENCIES:
             getPreventedInconsistencies(stub)

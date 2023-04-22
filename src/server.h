@@ -12,6 +12,14 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
+#include <vector>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+
+using json = nlohmann::json;
 
 namespace rendezvous {
 
@@ -28,6 +36,12 @@ namespace rendezvous {
         public:
             Server(std::string sid);
             ~Server();
+
+            /**
+             * Process that periodically cleans old and unused requests
+             * 
+             */
+            void initCleanRequests();
 
             /**
              * Return server identifier
