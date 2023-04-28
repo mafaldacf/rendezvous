@@ -21,7 +21,7 @@ elif [ "$#" -eq 1 ] && [ $1 = "build-config" ]
   then
     mkdir -p cmake/build
     cd cmake/build
-    cmake DCONFIG_ONLY=ON ../..
+    cmake -DCMAKE_PREFIX_PATH=$MY_INSTALL_DIR ../..
 
 elif [ "$#" -eq 1 ] && [ $1 = "build-py" ]
   then

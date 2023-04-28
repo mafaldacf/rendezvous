@@ -23,7 +23,7 @@ namespace replicas {
         };
 
         private:
-            std::vector<std::shared_ptr<rendezvous_server::RendezvousServerService::Stub>> servers;
+            std::vector<std::shared_ptr<rendezvous_server::RendezvousServerService::Stub>> _servers;
 
         public:
             ReplicaClient(std::vector<std::string> addrs);

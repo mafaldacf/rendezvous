@@ -7,18 +7,18 @@ ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
     for (const auto& addr : addrs) {
       auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
       auto stub = rendezvous_server::RendezvousServerService::NewStub(channel);
-      servers.push_back(std::move(stub));
+      _servers.push_back(std::move(stub));
     }
 }
 
-void ReplicaClient::waitCompletionQueue(const std::string& request, struct RequestHelper& rh) {
-    for(int i = 0; i < rh.nrpcs; i++) {
+void ReplicaClient::waitCompletionQueue(const std::string& request, struct RequestHelper& req_helper) {
+    for(int i = 0; i < req_helper.nrpcs; i++) {
         void * tagPtr;
         bool ok = false;
 
-        rh.completionQueue.Next(&tagPtr, &ok);
+        req_helper.completionQueue.Next(&tagPtr, &ok);
         const size_t tag = size_t(tagPtr);
-        const grpc::Status & status = *(rh.statuses[tag-1].get());
+        const grpc::Status & status = *(req_helper.statuses[tag-1].get());
 
         if (status.ok()) {
             log("[%s] RPC #%zu OK", request.c_str(), tag);
@@ -31,49 +31,49 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
 
 void ReplicaClient::sendRegisterRequest(const std::string& rid) {
     std::thread([this, rid]() {
-        struct RequestHelper rh;
+        struct RequestHelper req_helper;
 
-        for (const auto& server : servers) {
+        for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
-            rh.contexts.emplace_back(context);
+            req_helper.contexts.emplace_back(context);
 
             grpc::Status * status = new grpc::Status();
-            rh.statuses.emplace_back(status);
+            req_helper.statuses.emplace_back(status);
 
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            rh.responses.emplace_back(response);
+            req_helper.responses.emplace_back(response);
 
             rendezvous_server::RegisterRequestMessage request;
             request.set_rid(rid);
             
-            rh.rpcs.emplace_back(server->AsyncregisterRequest(context, request, &rh.completionQueue));
-            rh.rpcs[rh.nrpcs]->Finish(response, status, (void*)1);
+            req_helper.rpcs.emplace_back(server->AsyncregisterRequest(context, request, &req_helper.completionQueue));
+            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
-            rh.nrpcs++;
+            req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Register Request", rh);
+        waitCompletionQueue("Register Request", req_helper);
 
      }).detach();
 }
 
 void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, const std::string& id, const int& version) {
     std::thread([this, rid, bid, service, region, id, version]() {
-        struct RequestHelper rh;
+        struct RequestHelper req_helper;
 
-        for (const auto& server : servers) {
+        for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
-            rh.contexts.emplace_back(context);
+            req_helper.contexts.emplace_back(context);
 
             grpc::Status * status = new grpc::Status();
-            rh.statuses.emplace_back(status);
+            req_helper.statuses.emplace_back(status);
 
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            rh.responses.emplace_back(response);
+            req_helper.responses.emplace_back(response);
 
             rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replicaid(id);
-            ctx.set_requestversion(version);
+            ctx.set_replica_id(id);
+            ctx.set_request_version(version);
 
             rendezvous_server::RegisterBranchMessage request;
             request.set_rid(rid);
@@ -82,34 +82,34 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
             request.set_region(region);
             request.mutable_context()->CopyFrom(ctx);
 
-            rh.rpcs.emplace_back(server->AsyncregisterBranch(context, request, &rh.completionQueue));
-            rh.rpcs[rh.nrpcs]->Finish(response, status, (void*)1);
+            req_helper.rpcs.emplace_back(server->AsyncregisterBranch(context, request, &req_helper.completionQueue));
+            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
-            rh.nrpcs++;
+            req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Register Branch", rh);
+        waitCompletionQueue("Register Branch", req_helper);
 
     }).detach();
 }
 
 void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, const std::string& id, const int& version) {
     std::thread([this, rid, bid, service, regions, id, version]() {
-        struct RequestHelper rh;
+        struct RequestHelper req_helper;
 
-        for (const auto& server : servers) {
+        for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
-            rh.contexts.emplace_back(context);
+            req_helper.contexts.emplace_back(context);
 
             grpc::Status * status = new grpc::Status();
-            rh.statuses.emplace_back(status);
+            req_helper.statuses.emplace_back(status);
 
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            rh.responses.emplace_back(response);
+            req_helper.responses.emplace_back(response);
 
             rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replicaid(id);
-            ctx.set_requestversion(version);
+            ctx.set_replica_id(id);
+            ctx.set_request_version(version);
 
             rendezvous_server::RegisterBranchesMessage request;
             request.set_rid(rid);
@@ -118,43 +118,43 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
             request.mutable_regions()->CopyFrom(regions);
             request.mutable_context()->CopyFrom(ctx);
 
-            rh.rpcs.emplace_back(server->AsyncregisterBranches(context, request, &rh.completionQueue));
-            rh.rpcs[rh.nrpcs]->Finish(response, status, (void*)1);
+            req_helper.rpcs.emplace_back(server->AsyncregisterBranches(context, request, &req_helper.completionQueue));
+            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
-            rh.nrpcs++;
+            req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Register Branches", rh);
+        waitCompletionQueue("Register Branches", req_helper);
 
     }).detach();
 }
 
 void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& region) {
     std::thread([this, rid, bid, region]() {
-        struct RequestHelper rh;
+        struct RequestHelper req_helper;
 
-        for (const auto& server : servers) {
+        for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
-            rh.contexts.emplace_back(context);
+            req_helper.contexts.emplace_back(context);
 
             grpc::Status * status = new grpc::Status();
-            rh.statuses.emplace_back(status);
+            req_helper.statuses.emplace_back(status);
 
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            rh.responses.emplace_back(response);
+            req_helper.responses.emplace_back(response);
 
             rendezvous_server::CloseBranchMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_region(region);
 
-            rh.rpcs.emplace_back(server->AsynccloseBranch(context, request, &rh.completionQueue));
-            rh.rpcs[rh.nrpcs]->Finish(response, status, (void*)1);
+            req_helper.rpcs.emplace_back(server->AsynccloseBranch(context, request, &req_helper.completionQueue));
+            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
-            rh.nrpcs++;
+            req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Close Branch", rh);
+        waitCompletionQueue("Close Branch", req_helper);
 
     }).detach();
 }

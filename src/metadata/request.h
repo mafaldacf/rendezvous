@@ -19,6 +19,7 @@
 #include <iomanip>
 #include <chrono>
 #include <sstream>
+#include <thread>
 
 using json = nlohmann::json;
 
@@ -29,46 +30,47 @@ namespace metadata {
         /* request status */
         static const int OPENED = 0;
         static const int CLOSED = 1;
+        static const int NOT_FOUND = 2;
 
         /* branch tracking */
         static const int REGISTER = 1;
         static const int REMOVE = -1;
 
         private:
-            const std::string rid;
-            std::atomic<long> nextId;
-            std::chrono::time_point<std::chrono::system_clock> initTs;
-            std::chrono::time_point<std::chrono::system_clock> finalTs;
+            const std::string _rid;
+            std::atomic<long> _next_id;
+            std::chrono::time_point<std::chrono::system_clock> _init_ts;
+            std::chrono::time_point<std::chrono::system_clock> _final_ts;
 
             /* replicas versioning */
-            replicas::VersionRegistry * versionsRegistry;
+            replicas::VersionRegistry * _versions_registry;
 
             /* branching management */
 
             // <bid, branch>
-            std::unordered_map<std::string, metadata::Branch*> branches;
+            std::unordered_map<std::string, metadata::Branch*> _branches;
 
             // number of opened branches
-            std::atomic<uint64_t> numBranches;
-            std::unordered_map<std::string, uint64_t> numBranchesService;
-            std::unordered_map<std::string, uint64_t> numBranchesRegion;
-            std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> numBranchesServiceRegion;
+            std::atomic<uint64_t> _num_branches;
+            std::unordered_map<std::string, uint64_t> _num_branches_service;
+            std::unordered_map<std::string, uint64_t> _num_branches_region;
+            std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> _num_branches_service_region;
 
             // concurrency control
-            std::mutex mutex_branches;
-            std::mutex mutex_numBranchesService;
-            std::mutex mutex_numBranchesRegion;
-            std::mutex mutex_numBranchesServiceRegion;
+            std::mutex _mutex_branches;
+            std::mutex _mutex_num_branches_service;
+            std::mutex _mutex_num_branches_region;
+            std::mutex _mutex_num_branches_service_region;
             
-            std::condition_variable cond_new_branches;
-            std::condition_variable cond_branches;
-            std::condition_variable cond_numBranchesService;
-            std::condition_variable cond_numBranchesRegion;
-            std::condition_variable cond_numBranchesServiceRegion;
+            std::condition_variable _cond_new_branches;
+            std::condition_variable _cond_branches;
+            std::condition_variable _cond_num_branches_service;
+            std::condition_variable _cond_num_branches_region;
+            std::condition_variable _cond_num_branches_service_region;
 
         public:
 
-            Request(std::string rid, replicas::VersionRegistry * versionsRegistry);
+            Request(std::string rid, replicas::VersionRegistry * versions_registry);
             ~Request();
 
             /**
@@ -114,9 +116,9 @@ namespace metadata {
              * @param service The service where the branch is being registered
              * @param region The region where the branch is being registered
              * 
-             * @param return 0 if successfully registered and -1 otherwise (if branch already exists)
+             * @param return true if successfully registered and false otherwise (if branch already exists)
              */
-            int registerBranch(const std::string& bid, const std::string& service, const std::string& region);
+            bool registerBranch(const std::string& bid, const std::string& service, const std::string& region);
 
             /**
              * Register a set of branches in the request
@@ -125,9 +127,9 @@ namespace metadata {
              * @param service The service where the branches are being registered
              * @param region The regions for each branch
              * 
-             * @param return 0 if successfully registered and -1 otherwise (if branches already exists
+             * @param return true if successfully registered and false otherwise (if branches already exists)
              */
-            int registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
+            bool registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
@@ -162,8 +164,9 @@ namespace metadata {
              * Wait until request is closed
              *
              * @return Possible return values:
-             *  - 0 if call did not block, 
-             *  - 1 if inconsistency was prevented
+             * - 0 if call did not block, 
+             * - 1 if inconsistency was prevented
+             * - 2 if context was not found
              */
             int wait();
 
@@ -175,7 +178,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - (-2) if no status was found for a given service
+             * - 2 if context was not found
              */
             int waitOnService(const std::string& service);
 
@@ -187,7 +190,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - (-3) if no status was found for a given region
+             * - 2 if context was not found
              */
             int waitOnRegion(const std::string& region);
 
@@ -200,8 +203,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - (-2) if no status was found for a given service
-             * - (-3) if no status was found for a given region
+             * - 2 if context was not found
              */
             int waitOnServiceAndRegion(const std::string& service, const std::string& region);
 
@@ -222,7 +224,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-3) if no status was found for a given region
+             * - 2 if context was not found
              */
             int getStatusOnRegion(const std::string& region);
 
@@ -234,7 +236,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-2) if no status was found for a given service
+             * - 2 if context was not found
              */
             int getStatusOnService(const std::string& service);
 
@@ -247,8 +249,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-2) if no status was found for a given service
-             * - (-3) if no status was found for a given region
+             * - 2 if context was not found
              */
             int getStatusOnServiceAndRegion(const std::string& service, const std::string& region);
 
@@ -263,12 +264,10 @@ namespace metadata {
              * Check status of request for each available region and for a given contex (service)
              *
              * @param service The name of the service that defines the waiting context
-             * @param status Sets value depending on the outcome:
-             * - (-2) if no status was found for a given service
              *
              * @return Map of status of the request (OPENED or CLOSED) for each region
              */
-            std::map<std::string, int> getStatusByRegionsOnService(const std::string& service, int * status);
+            std::map<std::string, int> getStatusByRegionsOnService(const std::string& service);
 
         };
     

@@ -17,11 +17,11 @@ namespace replicas {
 
         private:
             // hash map: <server id, version>
-            std::unordered_map<std::string, int> versions;
+            std::unordered_map<std::string, int> _versions;
 
             // concurrency control
-            std::mutex mutex_versions;
-            std::condition_variable cond_versions;
+            std::mutex _mutex_versions;
+            std::condition_variable _cond_versions;
 
         public:
             VersionRegistry();

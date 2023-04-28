@@ -16,8 +16,8 @@ message Empty {
 }
 
 message ReplicaRequestContext {
-  string replicaId = 1;
-  int32 requestVersion = 2;
+  string replica_id = 1;
+  int32 request_version = 2;
 }
 
 /* Register Request */
@@ -31,7 +31,7 @@ message RegisterRequestMessage {
 message RegisterBranchMessage {
   string rid = 1;
   string bid = 2;
-  optional string service = 3;
+  string service = 3;
   string region = 4;
   ReplicaRequestContext context = 5;
 }
@@ -41,7 +41,7 @@ message RegisterBranchMessage {
 message RegisterBranchesMessage {
   string rid = 1;
   string bid = 2;
-  optional string service = 3;
+  string service = 3;
   repeated string regions = 4;
   ReplicaRequestContext context = 5;
 }

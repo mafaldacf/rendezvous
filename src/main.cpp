@@ -25,20 +25,20 @@ void shutdown(std::unique_ptr<grpc::Server> & server) {
 }
 
 
-void run(std::string replicaId, std::string replicaAddr, std::vector<std::string> addrs) {
+void run(std::string replica_id, std::string replica_addr, std::vector<std::string> addrs) {
 
-  std::shared_ptr<rendezvous::Server> rendezvousServer = std::make_shared<rendezvous::Server>(replicaId);
+  std::shared_ptr<rendezvous::Server> rendezvousServer = std::make_shared<rendezvous::Server>(replica_id);
   service::RendezvousServiceImpl clientService(rendezvousServer, addrs);
   service::RendezvousServerServiceImpl serverService(rendezvousServer);
 
   grpc::ServerBuilder builder;
-  builder.AddListeningPort(replicaAddr, grpc::InsecureServerCredentials());
+  builder.AddListeningPort(replica_addr, grpc::InsecureServerCredentials());
   builder.RegisterService(&clientService);
   builder.RegisterService(&serverService);
 
   std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
 
-  std::cout << "Server listening on " << replicaAddr << "..." << std::endl;
+  std::cout << "Server listening on " << replica_addr << "..." << std::endl;
 
   rendezvousServer->initCleanRequests();
   std::thread t(shutdown, std::ref(server));
@@ -48,8 +48,8 @@ void run(std::string replicaId, std::string replicaAddr, std::vector<std::string
   t.join();
 }
 
-std::string parseConfig(std::string replicaId, std::vector<std::string>& addrs) {
-  std::string replicaAddr;
+std::string parseConfig(std::string replica_id, std::vector<std::string>& addrs) {
+  std::string replica_addr;
 
   std::ifstream file("../config.json");
   if (!file.is_open()) {
@@ -67,9 +67,9 @@ std::string parseConfig(std::string replicaId, std::vector<std::string>& addrs) 
         std::string id = replica.key();
         std::string addr = replica.value()["host"].get<std::string>() + ':' + std::to_string(replica.value()["port"].get<int>());
 
-        if (replicaId == id) {
+        if (replica_id == id) {
           std::cout << id << " --> " << addr << " (current replica)" << std::endl;
-          replicaAddr = "0.0.0.0:" + std::to_string(replica.value()["port"].get<int>());
+          replica_addr = "0.0.0.0:" + std::to_string(replica.value()["port"].get<int>());
         }
         else {
           addrs.push_back(addr);
@@ -81,7 +81,7 @@ std::string parseConfig(std::string replicaId, std::vector<std::string>& addrs) 
       std::cerr << "[ERROR] Failed to parse config.json: " << e.what() << std::endl;
       exit(-1);
   }
-  return replicaAddr;
+  return replica_addr;
 }
 
 void usage(char* argv[]) {
@@ -93,14 +93,14 @@ void usage(char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
-    std::string replicaId("replica-eu");
+    std::string replica_id("replica-eu");
 
     std::vector<std::string> addrs;
 
 
     if (argc > 1) {
       if (argc == 2) {
-        replicaId = argv[1];
+        replica_id = argv[1];
       }
       else if (argc > 2) {
         std::cout << "[ERROR] Invalid number of arguments!" << std::endl;
@@ -108,11 +108,11 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    std::string replicaAddr = parseConfig(replicaId, addrs);
+    std::string replica_addr = parseConfig(replica_id, addrs);
     
-    std::cout << "** Rendezvous Server '" << replicaId << "' **" << std::endl << std::endl;
+    std::cout << "** Rendezvous Server '" << replica_id << "' **" << std::endl << std::endl;
     
-    run(replicaId, replicaAddr, addrs);
+    run(replica_id, replica_addr, addrs);
     
     return 0;
 }

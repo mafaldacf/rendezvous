@@ -2,6 +2,7 @@
 .vscode/
 .vscode/
 cmake/build/
+build/
 examples/python/__pycache__
 *.tar
 examples/python/rendezvous/protos/__pycache__/rendezvous_pb2.cpython-310.pyc

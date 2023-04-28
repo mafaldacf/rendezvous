@@ -17,8 +17,7 @@ const int CLOSED = 1;
 const int PREVENTED_INCONSISTENCY = 1;
 
 const int INVALID_REQUEST = -1;
-const int SERVICE_NOT_FOUND = -2;
-const int REGION_NOT_FOUND = -3;
+const int CONTEXT_NOT_FOUND = 2;
 const int INVALID_BRANCH_SERVICE = -2;
 const int INVALID_BRANCH_REGION = -3;
 
@@ -133,29 +132,6 @@ TEST(ServerTest, CloseBranch) {
 
   bool found_region =server.closeBranch(request, getBid(0), "r");
   ASSERT_EQ(true, found_region);
-}
-
-TEST(ServerTest, CloseBranchBeforeRegister) {
-  rendezvous::Server server(SID);
-  std::vector<std::thread> threads;
-
-  metadata::Request * request = server.getOrRegisterRequest(RID);
-
-  threads.emplace_back([&server, request] {
-    bool found_region = server.closeBranch(request, getBid(0), "region");
-    ASSERT_EQ(true, found_region);
-  });
-  threads.back().detach();
-
-  std::string bid = server.registerBranch(request, "service", "region");
-  ASSERT_EQ(getBid(0), bid);
-
-  // sanity check - wait threads
-  for(auto& thread : threads) {
-    if (thread.joinable()) {
-        thread.join();
-    }
-  }
 }
 
 TEST(ServerTest, CloseBranchInvalidRegion) {
@@ -326,7 +302,7 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   /* global verifications */
 
   status = server.checkRequest(request, "post-notifications", "");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
+  ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   status = server.checkRequest(request, "", "EU");
   ASSERT_EQ(CLOSED, status);
@@ -366,20 +342,19 @@ TEST(ServerTest, CheckRequest_ContextNotFound) {
   server.registerBranch(request, "s", "r"); // bid = 3
 
   status = server.checkRequest(request, "s1", "");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
+  ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   status = server.checkRequest(request, "", "r1");
-  ASSERT_EQ(REGION_NOT_FOUND, status);
+  ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   status = server.checkRequest(request, "s1", "r1");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
+  ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 }
 
 TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) { 
   rendezvous::Server server(SID);
   std::map<std::string, int> result;
   std::string bid;
-  int status;
   bool found_region = false;
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
@@ -404,8 +379,7 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) {
   bid = server.registerBranches(request, "s2", regionsService2);
   ASSERT_EQ(getBid(2), bid);
 
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_TRUE(result.size() == 2); // 2 opened regions: 'r1' and 'r2'
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
@@ -418,16 +392,14 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) {
   found_region = server.closeBranch(request, getBid(2), "r2");
   ASSERT_EQ(true, found_region);
 
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(2, result.size()); // 2 regions: 'r1' (opened) and 'r2' (closed)
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
   ASSERT_EQ(OPENED, result["r1"]);
   ASSERT_EQ(CLOSED, result["r2"]);
 
-  result = server.checkRequestByRegions(request, "s1" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "s1");
   ASSERT_EQ(1, result.size()); // service 's1' only has region 'r1' which is opened
   ASSERT_TRUE(result.count("r1"));
   ASSERT_FALSE(result.count("r2"));
@@ -448,8 +420,7 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) {
   ASSERT_EQ(true, found_region);
 
   /* request is now closed for every region */
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(2, result.size());
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
@@ -461,7 +432,6 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
   rendezvous::Server server(SID);
   std::map<std::string, int> result;
   std::string bid;
-  int status;
   bool found_region = false;
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
@@ -475,8 +445,7 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
   bid = server.registerBranch(request, "s2", "r1"); // bid = 6
   bid = server.registerBranch(request, "s2", "r2"); // bid = 7
 
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_TRUE(result.size() == 2); // 2 opened regions: 'r1' and 'r2'
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
@@ -489,16 +458,14 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
   found_region = server.closeBranch(request, getBid(7), "r2"); // bid 7
   ASSERT_EQ(true, found_region);
 
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(2, result.size()); // 2 regions: 'r1' (opened) and 'r2' (closed)
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
   ASSERT_EQ(OPENED, result["r1"]);
   ASSERT_EQ(CLOSED, result["r2"]);
 
-  result = server.checkRequestByRegions(request, "s1" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "s1");
   ASSERT_EQ(1, result.size()); // service 's1' only has region 'r1' which is opened
   ASSERT_TRUE(result.count("r1"));
   ASSERT_FALSE(result.count("r2"));
@@ -519,8 +486,7 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
   ASSERT_EQ(true, found_region);
 
   /* request is now closed for every region */
-  result = server.checkRequestByRegions(request, "" ,&status);
-  ASSERT_EQ(OK, status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(2, result.size());
   ASSERT_TRUE(result.count("r1"));
   ASSERT_TRUE(result.count("r2"));
@@ -531,25 +497,23 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
 TEST(ServerTest, CheckRequestByRegions_RegionAndContextNotFound) { 
   rendezvous::Server server(SID);
   std::map<std::string, int> result;
-  int status;
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
 
-  result = server.checkRequestByRegions(request, "" ,&status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(0, result.size());
 
   server.registerBranch(request, "", ""); // bid = 0
   server.registerBranch(request, "s", ""); // bid = 1
 
-  result = server.checkRequestByRegions(request, "" ,&status);
+  result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(0, result.size());
 
   server.registerBranch(request, "", "r"); // bid = 2
   server.registerBranch(request, "s", "r"); // bid = 3
 
-  result = server.checkRequestByRegions(request, "s1" ,&status);
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
+  result = server.checkRequestByRegions(request, "s1");
 }
 
 // sanity check
@@ -558,143 +522,4 @@ TEST(ServerTest, PreventedInconsistencies_GetZeroValue) {
 
   long value = server.getPreventedInconsistencies();
   ASSERT_EQ(0, value);
-}
-
-TEST(gRPCTest, WaitRequest_ContextNotFound) {
-  rendezvous::Server server(SID);
-  int status;
-
-  metadata::Request * request = server.getOrRegisterRequest(RID);
-  ASSERT_EQ(RID, request->getRid());
-
-  status = server.waitRequest(request, "wrong_service", "");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
-
-  status = server.waitRequest(request, "", "wrong_region");
-  ASSERT_EQ(REGION_NOT_FOUND, status);
-
-  status = server.waitRequest(request, "wrong_service", "wrong_region");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
-
-  std::string bid = server.registerBranch(request, "service", "region"); // bid = 0
-  ASSERT_EQ(getBid(0), bid);
-
-  status = server.waitRequest(request, "service", "wrong_region");
-  ASSERT_EQ(REGION_NOT_FOUND, status);
-
-  status = server.waitRequest(request, "wrong_service", "region");
-  ASSERT_EQ(SERVICE_NOT_FOUND, status);
-}
-
-TEST(gRPCTest, WaitRequest) { 
-  std::vector<std::thread> threads;
-  rendezvous::Server server(SID);
-  std::string bid;
-  int status;
-  bool found_region = false;
-
-  metadata::Request * request = server.getOrRegisterRequest(RID);
-  ASSERT_EQ(RID, request->getRid());
-
-  bid =  server.registerBranch(request, "", ""); // bid = 0
-  ASSERT_EQ(getBid(0), bid);
-
-  bid =  server.registerBranch(request, "service1", ""); // bid = 1
-  ASSERT_EQ(getBid(1), bid);
-
-  bid =  server.registerBranch(request, "", "region1"); // bid = 2
-  ASSERT_EQ(getBid(2), bid);
-
-  bid =  server.registerBranch(request, "service2", "region2"); // bid = 3
-  ASSERT_EQ(getBid(3), bid);
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service1", "");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "region1");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service2", "region2");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  sleep(0.5);
-  found_region = server.closeBranch(request, getBid(0), ""); // bid 0
-  ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, getBid(1), ""); // bid 1
-  ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, getBid(2), "region1"); // bid 2
-  ASSERT_EQ(true, found_region);
-
-  /* Sanity Check - ensure that locks still work */
-  bid =  server.registerBranch(request, "storage", "EU"); // bid = 4
-  ASSERT_EQ(getBid(4), bid);
-
-  bid =  server.registerBranch(request, "storage", "US"); // bid = 5
-  ASSERT_EQ(getBid(5), bid);
-
-  bid =  server.registerBranch(request, "notification", "GLOBAL"); // bid = 6
-  ASSERT_EQ(getBid(6), bid);
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "storage", "US");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "storage", "");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "GLOBAL");
-    ASSERT_EQ(PREVENTED_INCONSISTENCY, status);
-  });
-  threads.back().detach();
-
-  sleep(0.5);
-
-  found_region = server.closeBranch(request, getBid(3), "region2"); // bid 3
-  ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, getBid(4), "EU"); // bid 4
-  ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, getBid(5), "US"); // bid 5
-  ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, getBid(6), "GLOBAL"); // bid 6
-  ASSERT_EQ(true, found_region);
-  
-  /* wait for all threads */
-  for(auto& thread : threads) {
-    if (thread.joinable()) {
-        thread.join();
-    }
-  }
-
-  sleep(0.5);
-
-  /* validate number of prevented inconsistencies*/
-  long value = server.getPreventedInconsistencies();
-  ASSERT_EQ(8, value);
 }

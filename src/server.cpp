@@ -3,23 +3,23 @@
 using namespace rendezvous;
 
 Server::Server(std::string sid)
-    : nextRid(0), inconsistencies(0), sid(sid) {
+    : _next_rid(0), _inconsistencies(0), _sid(sid) {
     
-    requests = new std::unordered_map<std::string, metadata::Request*>();
+    _requests = std::unordered_map<std::string, metadata::Request*>();
 }
 
 Server::~Server() {
-  for (auto pair = requests->begin(); pair != requests->end(); pair++) {
+  for (auto pair = _requests.begin(); pair != _requests.end(); pair++) {
     metadata::Request * request = pair->second;
     delete request;
   }
-  delete requests;
 }
 
 void Server::initCleanRequests() {
   std::thread([this]() {
 
     while (true) {
+      break; //TODO: REMOVE
       std::this_thread::sleep_for(std::chrono::hours(12));
 
       std::cout << "[INFO] initializing clean requests procedure..." << std::endl;
@@ -27,27 +27,28 @@ void Server::initCleanRequests() {
       int num = 0;
       auto now = std::chrono::system_clock::now();
 
-      std::vector<metadata::Request*> oldRequests;
+      std::vector<metadata::Request*> old_requests;
 
-      mutex_requests.lock();
+      _mutex_requests.lock();
       // collect old requests
-      for (const auto & request_it : *requests) {
+      for (const auto & request_it : _requests) {
         if (request_it.second->canRemove(now)) {
-          oldRequests.emplace_back(request_it.second);
+          old_requests.emplace_back(request_it.second);
         }
       }
       // remove old requests from the requests map
-      for (const auto & request : oldRequests) {
-        requests->erase(request->getRid());
+      for (const auto & request : old_requests) {
+        _requests.erase(request->getRid());
       }
-      mutex_requests.unlock();
+      _mutex_requests.unlock();
 
-      // log request and delete it
-      if (LOG_REQUESTS && oldRequests.size() > 0) {
+      // log request and delete them
+      if (LOG_REQUESTS && old_requests.size() > 0) {
         json j;
-        for (const auto& request : oldRequests) {
+        for (const auto& request : old_requests) {
           j["requests"].push_back(request->toJson());
           num++;
+          //TODO DELETE
         }
 
         // compute filename based on the current timestamp
@@ -79,46 +80,46 @@ void Server::initCleanRequests() {
 }
 
 std::string Server::getSid() {
-  return sid;
+  return _sid;
 }
 
 std::string Server::genRid() {
-  return sid + ':' + std::to_string(nextRid.fetch_add(1));
+  return _sid + ':' + std::to_string(_next_rid.fetch_add(1));
 }
 
 std::string Server::genBid(metadata::Request * request) {
-  return sid + ':' + request->genId();
+  return _sid + ':' + request->genId();
 }
 
 long Server::getNumInconsistencies() {
-  return inconsistencies.load();
+  return _inconsistencies.load();
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {
-  mutex_requests.lock();
+  _mutex_requests.lock();
 
-  auto pair = requests->find(rid);
+  auto pair = _requests.find(rid);
   
   // return request if it was found
-  if (pair != requests->end()) {
-      mutex_requests.unlock();
+  if (pair != _requests.end()) {
+      _mutex_requests.unlock();
       return pair->second;
   }
 
-  mutex_requests.unlock();
+  _mutex_requests.unlock();
   return nullptr;
 }
 
 metadata::Request * Server::getOrRegisterRequest(std::string rid) {
-  mutex_requests.lock();
+  _mutex_requests.lock();
 
   // rid is not empty so we try to get the request
   if (!rid.empty()) {
-    auto pair = requests->find(rid);
+    auto pair = _requests.find(rid);
 
     // return request if it was found
-    if (pair != requests->end()) {
-      mutex_requests.unlock();
+    if (pair != _requests.end()) {
+      _mutex_requests.unlock();
       return pair->second;
     }
   }
@@ -131,9 +132,9 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   // register request 
   replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry();
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
-  requests->insert({rid, request});
+  _requests.insert({rid, request});
 
-  mutex_requests.unlock();
+  _mutex_requests.unlock();
   return request;
 }
 
@@ -141,9 +142,9 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
   if (bid.empty()) {
     bid = genBid(request);
   }
-  int res = request->registerBranch(bid, service, region);
+  bool registered = request->registerBranch(bid, service, region);
 
-  if (res == -1) {
+  if (!registered) {
     return "";
   }
 
@@ -154,9 +155,9 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
   if (bid.empty()) {
     bid = genBid(request);
   }
-  int res = request->registerBranches(bid, service, regions);
+  bool registered = request->registerBranches(bid, service, regions);
 
-  if (res == -1) {
+  if (!registered) {
     return "";
   }
 
@@ -183,7 +184,7 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
     result = request->wait();
 
   if (result == 1) {
-    inconsistencies.fetch_add(1);
+    _inconsistencies.fetch_add(1);
   }
 
   return result;
@@ -202,15 +203,13 @@ int Server::checkRequest(metadata::Request * request, const std::string& service
   return request->getStatus();
 }
 
-std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * request, const std::string& service, int * status) {
-  *status = 0;
-
+std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * request, const std::string& service) {
   if (!service.empty())
-    return request->getStatusByRegionsOnService(service, status);
+    return request->getStatusByRegionsOnService(service);
 
   return request->getStatusByRegions();
 }
 
 long Server::getPreventedInconsistencies() {
-  return inconsistencies.load();
+  return _inconsistencies.load();
 }

@@ -2,32 +2,32 @@
 
 using namespace metadata;
 
-Request::Request(std::string rid, replicas::VersionRegistry * versionsRegistry)
-    : rid(rid), nextId(0), numBranches(0), versionsRegistry(versionsRegistry) {
+Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
+    : _rid(rid), _next_id(0), _num_branches(0), _versions_registry(versions_registry) {
     
-    initTs = std::chrono::system_clock::now();
-    finalTs = initTs;
+    _init_ts = std::chrono::system_clock::now();
+    _final_ts = _init_ts;
     
     // <bid, branch>
-    branches = std::unordered_map<std::string, metadata::Branch*>();
+    _branches = std::unordered_map<std::string, metadata::Branch*>();
 
-    numBranchesRegion = std::unordered_map<std::string, uint64_t>();
-    numBranchesService = std::unordered_map<std::string, uint64_t>();
-    numBranchesServiceRegion = std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>>();
+    _num_branches_region = std::unordered_map<std::string, uint64_t>();
+    _num_branches_service = std::unordered_map<std::string, uint64_t>();
+    _num_branches_service_region = std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>>();
 }
 
 Request::~Request() {
-    for (const auto& branch_it : branches) {
+    for (const auto& branch_it : _branches) {
         delete branch_it.second;
     }
-    delete versionsRegistry;
+    delete _versions_registry;
 }
 
 json Request::toJson() const {
     json j;
 
-    std::time_t initTs_t = std::chrono::system_clock::to_time_t(initTs);
-    std::time_t finalTs_t = std::chrono::system_clock::to_time_t(finalTs);
+    std::time_t initTs_t = std::chrono::system_clock::to_time_t(_init_ts);
+    std::time_t finalTs_t = std::chrono::system_clock::to_time_t(_final_ts);
     auto initialTs_tm = *std::localtime(&initTs_t);
     auto finalTs_tm = *std::localtime(&finalTs_t);
 
@@ -38,182 +38,197 @@ json Request::toJson() const {
     auto initialTs_str = initialTs_oss.str();
     auto finalTs_str = finalTs_oss.str();
 
-    auto duration = finalTs - initTs;
+    auto duration = _final_ts - _init_ts;
     auto duration_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
 
-    j[rid]["init_ts"] = initialTs_str;
-    j[rid]["last_ts"] = finalTs_str;
-    j[rid]["duration_ms"] = duration_seconds.count();
+    j[_rid]["init_ts"] = initialTs_str;
+    j[_rid]["last_ts"] = finalTs_str;
+    j[_rid]["duration_ms"] = duration_seconds.count();
 
-    for (const auto& branches_it : branches) {
-        j[rid]["branches"].push_back(branches_it.second->toJson());
+    for (const auto& branches_it : _branches) {
+        j[_rid]["branches"].push_back(branches_it.second->toJson());
     }
     return j;
 }
 
 bool Request::canRemove(std::chrono::time_point<std::chrono::system_clock> now) {
-    auto timeSince = now - finalTs;
+    auto timeSince = now - _final_ts;
     return timeSince > std::chrono::hours(12);
 }
 
 std::string Request::getRid() {
-    return rid;
+    return _rid;
 }
 
 replicas::VersionRegistry * Request::getVersionsRegistry() {
-    return versionsRegistry;
+    return _versions_registry;
 }
 
 std::string Request::genId() {
-  return std::to_string(nextId.fetch_add(1));
+  return std::to_string(_next_id.fetch_add(1));
 }
 
-int Request::registerBranch(const std::string& bid, const std::string& service, const std::string& region) {
-    mutex_branches.lock();
+bool Request::registerBranch(const std::string& bid, const std::string& service, const std::string& region) {
+    _mutex_branches.lock();
 
-    auto branch_it = branches.find(bid);
+    auto branch_it = _branches.find(bid);
 
     // branches already exist
-    if (branch_it != branches.end()) {
-        mutex_branches.unlock();
-        return -1;
+    if (branch_it != _branches.end()) {
+        _mutex_branches.unlock();
+        return false;
     }
 
     // branch not found
-    if (branch_it == branches.end()) {
+    if (branch_it == _branches.end()) {
         metadata::Branch * branch = new metadata::Branch(bid, service, region);
-        branches[bid] = branch;
+        _branches[bid] = branch;
         trackBranchOnContext(service, region, REGISTER);
     }
 
-    cond_new_branches.notify_all();
-    mutex_branches.unlock();
-    return 0;
+    _cond_new_branches.notify_all();
+    _mutex_branches.unlock();
+    return true;
 }
 
-int Request::registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions) {
-    mutex_branches.lock();
+bool Request::registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions) {
+    _mutex_branches.lock();
 
-    auto branch_it = branches.find(bid);
+    auto branch_it = _branches.find(bid);
 
     // branches already exist
-    if (branch_it != branches.end()) {
-        mutex_branches.unlock();
-        return -1;
+    if (branch_it != _branches.end()) {
+        _mutex_branches.unlock();
+        return false;
     }
 
     metadata::Branch * branch = new metadata::Branch(bid, service, regions);
-    branches[bid] = branch;
+    _branches[bid] = branch;
     int num = regions.size();
     trackBranchesOnContext(service, regions, REGISTER, num);
 
-    cond_new_branches.notify_all();
-    mutex_branches.unlock();
-    return 0;
+    _cond_new_branches.notify_all();
+    _mutex_branches.unlock();
+    return true;
 }
 
 bool Request::closeBranch(const std::string& bid, const std::string& region) {
-    std::unique_lock<std::mutex> lock(mutex_branches);
+    std::unique_lock<std::mutex> lock(_mutex_branches);
 
     bool region_found = false;
-    auto branch_it = branches.find(bid);
+    auto branch_it = _branches.find(bid);
 
     // branch not found
-    while (branch_it == branches.end()) {
-        cond_new_branches.wait(lock);
-        branch_it = branches.find(bid);
+    if (branch_it == _branches.end()) {
+        std::thread([this, &branch_it, bid, region]() {
+            std::unique_lock<std::mutex> lock_thread(_mutex_branches);
+
+            while (branch_it == _branches.end()) {
+                _cond_new_branches.wait(lock_thread);
+                branch_it = _branches.find(bid);
+            }
+            metadata::Branch * branch = branch_it->second;
+            if (branch->close(region)) {
+                trackBranchOnContext(branch->getService(), region, REMOVE);
+            }
+        }).detach();
+        return true;
     }
 
     metadata::Branch * branch = branch_it->second;
-    if (branch->close(region)) {
+    int res = branch->close(region);
+    if (res == 1) {
         trackBranchOnContext(branch->getService(), region, REMOVE);
         region_found = true;
     }
+    else if (res == 0) {
+        region_found = true;
+    }
 
-    cond_branches.notify_all();
+    _cond_branches.notify_all();
     return region_found;
 }
 
 void Request::trackBranchOnContext(const std::string& service, const std::string& region, const long& value) {
-    numBranches.fetch_add(value);
+    _num_branches.fetch_add(value);
 
-    if (value == REMOVE && numBranches.load() == 0) {
-        finalTs = std::chrono::system_clock::now();
+    if (value == REMOVE && _num_branches.load() == 0) {
+        _final_ts = std::chrono::system_clock::now();
     }
 
     if (!service.empty()) {
-        mutex_numBranchesService.lock();
+        _mutex_num_branches_service.lock();
 
-        numBranchesService[service] += value;
+        _num_branches_service[service] += value;
         if (value == REMOVE) 
-            cond_numBranchesService.notify_all();
+            _cond_num_branches_service.notify_all();
 
-        mutex_numBranchesService.unlock();
+        _mutex_num_branches_service.unlock();
     }
     if (!region.empty()) {
-        mutex_numBranchesRegion.lock();
+        _mutex_num_branches_region.lock();
 
-        numBranchesRegion[region] += value;
+        _num_branches_region[region] += value;
         if (value == REMOVE) 
-            cond_numBranchesRegion.notify_all();
+            _cond_num_branches_region.notify_all();
             
-        mutex_numBranchesRegion.unlock();
+        _mutex_num_branches_region.unlock();
     }
     if (!service.empty() && !region.empty()) {
-        mutex_numBranchesServiceRegion.lock();
+        _mutex_num_branches_service_region.lock();
 
-        numBranchesServiceRegion[service][region] += value;
+        _num_branches_service_region[service][region] += value;
         if (value == REMOVE) 
-            cond_numBranchesServiceRegion.notify_all();
+            _cond_num_branches_service_region.notify_all();
             
-        mutex_numBranchesServiceRegion.unlock();
+        _mutex_num_branches_service_region.unlock();
     }
 }
 
 void Request::trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, const long& value, const int& num) {
-    numBranches.fetch_add(value*num);
+    _num_branches.fetch_add(value*num);
 
     if (!service.empty()) {
-        mutex_numBranchesService.lock();
+        _mutex_num_branches_service.lock();
 
-        numBranchesService[service] += value*num;
+        _num_branches_service[service] += value*num;
         if (value == REMOVE) 
-            cond_numBranchesService.notify_all();
+            _cond_num_branches_service.notify_all();
 
-        mutex_numBranchesService.unlock();
+        _mutex_num_branches_service.unlock();
     }
 
     if (regions.size() > 0) {
-        mutex_numBranchesRegion.lock();
-        mutex_numBranchesServiceRegion.lock();
+        _mutex_num_branches_region.lock();
+        _mutex_num_branches_service_region.lock();
 
         for (const auto& region : regions) {
             // sanity check - region can never be empty when registering a set of branches
             if (!region.empty()) {
 
-                numBranchesRegion[region] += value;
+                _num_branches_region[region] += value;
                 if (value == REMOVE)
-                    cond_numBranchesRegion.notify_all();
+                    _cond_num_branches_region.notify_all();
 
                 if (!service.empty()) {
-                    numBranchesServiceRegion[service][region] += value;
+                    _num_branches_service_region[service][region] += value;
                     if (value == REMOVE)
-                        cond_numBranchesServiceRegion.notify_all();
+                        _cond_num_branches_service_region.notify_all();
                 }
             }
         }
 
-        mutex_numBranchesRegion.unlock();
-        mutex_numBranchesServiceRegion.unlock();
+        _mutex_num_branches_region.unlock();
+        _mutex_num_branches_service_region.unlock();
     }
 
 }
 
 int Request::wait() {
     int inconsistency = 0;
-    std::unique_lock<std::mutex> lock(mutex_branches);
-    while (numBranches.load() != 0) {
-        cond_branches.wait(lock);
+    std::unique_lock<std::mutex> lock(_mutex_branches);
+    while (_num_branches.load() != 0) {
+        _cond_branches.wait(lock);
         inconsistency = 1;
     }
     return inconsistency;
@@ -222,15 +237,15 @@ int Request::wait() {
 int Request::waitOnService(const std::string& service) {
     int inconsistency = 0;
 
-    std::unique_lock<std::mutex> lock(mutex_numBranchesService);
+    std::unique_lock<std::mutex> lock(_mutex_num_branches_service);
 
-    if (numBranchesService.count(service) == 0) { // not found
-        return -2;
+    if (_num_branches_service.count(service) == 0) { // not found
+        return NOT_FOUND;
     }
 
-    uint64_t * valuePtr = &numBranchesService[service];
+    uint64_t * valuePtr = &_num_branches_service[service];
     while (*valuePtr != 0) {
-        cond_numBranchesService.wait(lock);
+        _cond_num_branches_service.wait(lock);
         inconsistency = 1;
     }
     
@@ -240,15 +255,15 @@ int Request::waitOnService(const std::string& service) {
 int Request::waitOnRegion(const std::string& region) {
     int inconsistency = 0;
 
-    std::unique_lock<std::mutex> lock(mutex_numBranchesRegion);
+    std::unique_lock<std::mutex> lock(_mutex_num_branches_region);
 
-    if (numBranchesRegion.count(region) == 0) { // not found
-        return -3;
+    if (_num_branches_region.count(region) == 0) { // not found
+        return NOT_FOUND;
     }
 
-    uint64_t * valuePtr = &numBranchesRegion[region];
+    uint64_t * valuePtr = &_num_branches_region[region];
     while (*valuePtr != 0) {
-        cond_numBranchesRegion.wait(lock);
+        _cond_num_branches_region.wait(lock);
         inconsistency = 1;
     }
 
@@ -258,115 +273,113 @@ int Request::waitOnRegion(const std::string& region) {
 int Request::waitOnServiceAndRegion(const std::string& service, const std::string& region) {
     int inconsistency = 0;
 
-    std::unique_lock<std::mutex> lock(mutex_numBranchesServiceRegion);
+    std::unique_lock<std::mutex> lock(_mutex_num_branches_service_region);
 
-    auto service_it = numBranchesServiceRegion.find(service);
-    if (service_it == numBranchesServiceRegion.end()) {
-        return -2;
+    auto service_it = _num_branches_service_region.find(service);
+    if (service_it == _num_branches_service_region.end()) {
+        return NOT_FOUND;
     }
 
     auto region_it = service_it->second.find(region);
     if (region_it == service_it->second.end()) {
-        return -3;
+        return NOT_FOUND;
     }
 
-    uint64_t * valuePtr = &numBranchesServiceRegion[service][region];
+    uint64_t * valuePtr = &_num_branches_service_region[service][region];
 
     while (*valuePtr != 0) {
-        cond_numBranchesServiceRegion.wait(lock);
+        _cond_num_branches_service_region.wait(lock);
         inconsistency = 1;
     }
     return inconsistency;
 }
 
 int Request::getStatus() {
-    if (numBranches.load() == 0) {
+    if (_num_branches.load() == 0) {
         return CLOSED;
     }
     return OPENED;
 }
 
 int Request::getStatusOnService(const std::string& service) {
-    mutex_numBranchesService.lock();
+    _mutex_num_branches_service.lock();
 
-    if (!numBranchesService.count(service)) {
-        mutex_numBranchesService.unlock();
-        return -2;
+    if (!_num_branches_service.count(service)) {
+        _mutex_num_branches_service.unlock();
+        return NOT_FOUND;
     }
 
-    if (numBranchesService[service] == 0) {
-        mutex_numBranchesService.unlock();
+    if (_num_branches_service[service] == 0) {
+        _mutex_num_branches_service.unlock();
         return CLOSED;
     }
 
-    mutex_numBranchesService.unlock();
+    _mutex_num_branches_service.unlock();
     return OPENED;
 }
 
 int Request::getStatusOnRegion(const std::string& region) {
-    mutex_numBranchesRegion.lock();
+    _mutex_num_branches_region.lock();
 
-    if (!numBranchesRegion.count(region)) {
-        mutex_numBranchesRegion.unlock();
-        return -3;
+    if (!_num_branches_region.count(region)) {
+        _mutex_num_branches_region.unlock();
+        return NOT_FOUND;
     }
 
-    if (numBranchesRegion[region] == 0) {
-        mutex_numBranchesRegion.unlock();
+    if (_num_branches_region[region] == 0) {
+        _mutex_num_branches_region.unlock();
         return CLOSED;
     }
 
-    mutex_numBranchesRegion.unlock();
+    _mutex_num_branches_region.unlock();
     return OPENED;
 }
 
 int Request::getStatusOnServiceAndRegion(const std::string& service, const std::string& region) {
-    mutex_numBranchesServiceRegion.lock();
+    _mutex_num_branches_service_region.lock();
 
-    auto service_it = numBranchesServiceRegion.find(service);
-    if (service_it == numBranchesServiceRegion.end()) {
-        mutex_numBranchesServiceRegion.unlock();
-        return -2;
+    auto service_it = _num_branches_service_region.find(service);
+    if (service_it == _num_branches_service_region.end()) {
+        _mutex_num_branches_service_region.unlock();
+        return NOT_FOUND;
     }
 
     auto region_it = service_it->second.find(region);
     if (region_it == service_it->second.end()) {
-        mutex_numBranchesServiceRegion.unlock();
-        return -3;
+        _mutex_num_branches_service_region.unlock();
+        return NOT_FOUND;
     }
 
-    if (numBranchesServiceRegion[service][region] == 0) {
-        mutex_numBranchesServiceRegion.unlock();
+    if (_num_branches_service_region[service][region] == 0) {
+        _mutex_num_branches_service_region.unlock();
         return CLOSED;
     }
 
-    mutex_numBranchesServiceRegion.unlock();
+    _mutex_num_branches_service_region.unlock();
     return OPENED;
 }
 
 std::map<std::string, int> Request::getStatusByRegions() {
     std::map<std::string, int> result = std::map<std::string, int>();
 
-    mutex_numBranchesRegion.lock();
-    for (const auto& it : numBranchesRegion) {
+    _mutex_num_branches_region.lock();
+    for (const auto& it : _num_branches_region) {
         result[it.first] = it.second == 0 ? CLOSED : OPENED;
     }
-    mutex_numBranchesRegion.unlock();
+    _mutex_num_branches_region.unlock();
     
     return result;
 }
 
-std::map<std::string, int> Request::getStatusByRegionsOnService(const std::string& service, int * status) {
+std::map<std::string, int> Request::getStatusByRegionsOnService(const std::string& service) {
     std::map<std::string, int> result = std::map<std::string, int>();
-    *status = 0;
 
-    mutex_numBranchesServiceRegion.lock();
-    auto service_it = numBranchesServiceRegion.find(service);
+    _mutex_num_branches_service_region.lock();
+    auto service_it = _num_branches_service_region.find(service);
 
     // no status found for a given service
-    if (service_it == numBranchesServiceRegion.end()) {
-        *status = -2;
-        mutex_numBranchesServiceRegion.unlock();
+    if (service_it == _num_branches_service_region.end()) {
+        _mutex_num_branches_service_region.unlock();
         return result;
     }
 
@@ -378,7 +391,7 @@ std::map<std::string, int> Request::getStatusByRegionsOnService(const std::strin
         }
     }
     
-    mutex_numBranchesServiceRegion.unlock();
+    _mutex_num_branches_service_region.unlock();
     
     return result;
 }

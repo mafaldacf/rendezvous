@@ -6,6 +6,7 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 CLOSED: RequestStatus
 DESCRIPTOR: _descriptor.FileDescriptor
+NOT_FOUND: RequestStatus
 OPENED: RequestStatus
 
 class CheckRequestByRegionsMessage(_message.Message):
@@ -19,10 +20,17 @@ class CheckRequestByRegionsMessage(_message.Message):
     def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class CheckRequestByRegionsResponse(_message.Message):
-    __slots__ = ["regionStatus"]
-    REGIONSTATUS_FIELD_NUMBER: _ClassVar[int]
-    regionStatus: _containers.RepeatedCompositeFieldContainer[RegionStatus]
-    def __init__(self, regionStatus: _Optional[_Iterable[_Union[RegionStatus, _Mapping]]] = ...) -> None: ...
+    __slots__ = ["statuses"]
+    class StatusesEntry(_message.Message):
+        __slots__ = ["key", "value"]
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: RequestStatus
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[_Union[RequestStatus, str]] = ...) -> None: ...
+    STATUSES_FIELD_NUMBER: _ClassVar[int]
+    statuses: _containers.ScalarMap[str, RequestStatus]
+    def __init__(self, statuses: _Optional[_Mapping[str, RequestStatus]] = ...) -> None: ...
 
 class CheckRequestMessage(_message.Message):
     __slots__ = ["context", "region", "rid", "service"]
@@ -61,14 +69,6 @@ class GetPreventedInconsistenciesResponse(_message.Message):
     INCONSISTENCIES_FIELD_NUMBER: _ClassVar[int]
     inconsistencies: int
     def __init__(self, inconsistencies: _Optional[int] = ...) -> None: ...
-
-class RegionStatus(_message.Message):
-    __slots__ = ["region", "status"]
-    REGION_FIELD_NUMBER: _ClassVar[int]
-    STATUS_FIELD_NUMBER: _ClassVar[int]
-    region: str
-    status: RequestStatus
-    def __init__(self, region: _Optional[str] = ..., status: _Optional[_Union[RequestStatus, str]] = ...) -> None: ...
 
 class RegisterBranchMessage(_message.Message):
     __slots__ = ["context", "region", "rid", "service"]
@@ -154,10 +154,10 @@ class WaitRequestMessage(_message.Message):
     def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class WaitRequestResponse(_message.Message):
-    __slots__ = ["preventedInconsistency"]
-    PREVENTEDINCONSISTENCY_FIELD_NUMBER: _ClassVar[int]
-    preventedInconsistency: bool
-    def __init__(self, preventedInconsistency: bool = ...) -> None: ...
+    __slots__ = ["prevented_inconsistency"]
+    PREVENTED_INCONSISTENCY_FIELD_NUMBER: _ClassVar[int]
+    prevented_inconsistency: bool
+    def __init__(self, prevented_inconsistency: bool = ...) -> None: ...
 
 class RequestStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []

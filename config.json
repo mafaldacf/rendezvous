@@ -1,10 +1,10 @@
 {
     "eu-central-1": {
-      "host": "0.0.0.0",
+      "host": "rendezvous-eu-central-1",
       "port": 8001
     },
     "us-east-1": {
-      "host": "0.0.0.0",
+      "host": "rendezvous-us-east-1",
       "port": 8002
     }
 }

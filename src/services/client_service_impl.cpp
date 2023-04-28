@@ -138,7 +138,7 @@ grpc::Status RendezvousServiceImpl::closeBranch(grpc::ServerContext* context, co
   bool region_found = server->closeBranch(req, bid, region);
 
   if (!region_found) {
-    return grpc::Status(grpc::StatusCode::ABORTED, utils::ERROR_MESSAGE_REGION_NOT_FOUND);
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERROR_MESSAGE_REGION_NOT_FOUND);
   }
 
   replicaClient.sendCloseBranch(rid, bid, region);
@@ -162,16 +162,9 @@ grpc::Status RendezvousServiceImpl::waitRequest(grpc::ServerContext* context, co
 
   int result = server->waitRequest(req, service, region);
 
-  if (result == -2) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERROR_MESSAGE_SERVICE_NOT_FOUND);
-  }
-  else if (result == -3) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERROR_MESSAGE_REGION_NOT_FOUND);
-  }
-
   // inconsistency was prevented
   if (result == 1) {
-    response->set_preventedinconsistency(true);
+    response->set_prevented_inconsistency(true);
     if (DEBUG) {
       std::cout << "[INFO] prevented inconsistencies = " << server->getNumInconsistencies() << std::endl;
     }
@@ -201,13 +194,6 @@ grpc::Status RendezvousServiceImpl::checkRequest(grpc::ServerContext* context, c
 
   int result = server->checkRequest(req, service, region);
 
-  if (result == -2) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERROR_MESSAGE_SERVICE_NOT_FOUND);
-  }
-  else if (result == -3) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERROR_MESSAGE_REGION_NOT_FOUND);
-  }
-
   response->set_status(static_cast<rendezvous::RequestStatus>(result));
 
   log("< returning check request call for request '%s' on service='%s' and region='%s'", rid.c_str(), service.c_str(), region.c_str());
@@ -226,25 +212,14 @@ grpc::Status RendezvousServiceImpl::checkRequestByRegions(grpc::ServerContext* c
   metadata::Request * req = server->getOrRegisterRequest(rid);
   req->getVersionsRegistry()->waitRemoteVersions(ctx);
 
-  int status = 0;
-  std::map<std::string, int> result = server->checkRequestByRegions(req, service, &status);
+  std::map<std::string, int> result = server->checkRequestByRegions(req, service);
 
-  if (status == -2) {
-    return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERROR_MESSAGE_SERVICE_NOT_FOUND);
+  auto * statuses = response->mutable_statuses();
+  for (auto pair = result.begin(); pair != result.end(); pair++) {
+    std::string region = pair->first;
+    int status = pair->second;
+    (*statuses)[region] = static_cast<rendezvous::RequestStatus>(status);
   }
-
-  auto last = result.end();
-
-  for (auto pair = result.begin(); pair != last; pair++) {
-      std::string region = pair->first;
-      int status = pair->second;
-
-      rendezvous::RegionStatus regionStatus;
-      regionStatus.set_region(region);
-      regionStatus.set_status(static_cast<rendezvous::RequestStatus>(status));
-
-      response->add_regionstatus()->CopyFrom(regionStatus);
-    }
 
   log("< returning check request by regions call for request '%s' on service='%s'", rid.c_str(), service.c_str());
   return grpc::Status::OK;

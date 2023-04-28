@@ -28,8 +28,8 @@ grpc::Status RendezvousServerServiceImpl::registerBranch(grpc::ServerContext* co
   const std::string& bid = request->bid();
   const std::string& service = request->service();
   const std::string& region = request->region();
-  const std::string& replicaId = request->context().replicaid();
-  const int& requestVersion = request->context().requestversion();
+  const std::string& replica_id = request->context().replica_id();
+  const int& request_version = request->context().request_version();
   metadata::Request * req;
 
   log("[REPLICA] > registering branch for request '%s' on service='%s' and region='%s'", rid.c_str(), service.c_str(), region.c_str());
@@ -44,7 +44,7 @@ grpc::Status RendezvousServerServiceImpl::registerBranch(grpc::ServerContext* co
 
   log("[REPLICA] < registered branch '%s' for request '%s' on service='%s' and region='%s'", bid.c_str(), req->getRid().c_str(), service.c_str(), region.c_str());
 
-  req->getVersionsRegistry()->updateRemoteVersion(replicaId, requestVersion);
+  req->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
   return grpc::Status::OK;
 }
 
@@ -54,8 +54,8 @@ grpc::Status RendezvousServerServiceImpl::registerBranches(grpc::ServerContext* 
   std::string service = request->service();
   const std::string& bid = request->bid();
   const std::string& rid = request->rid();
-  const std::string& replicaId = request->context().replicaid();
-  const int& requestVersion = request->context().requestversion();
+  const std::string& replica_id = request->context().replica_id();
+  const int& request_version = request->context().request_version();
   metadata::Request * req;
 
   // workaround of logging
@@ -85,7 +85,7 @@ grpc::Status RendezvousServerServiceImpl::registerBranches(grpc::ServerContext* 
     std::cout << std::endl;
   }
 
-  req->getVersionsRegistry()->updateRemoteVersion(replicaId, requestVersion);
+  req->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
 
   return grpc::Status::OK;
 }

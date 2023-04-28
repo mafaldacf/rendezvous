@@ -18,6 +18,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <set>
 
 using json = nlohmann::json;
 
@@ -26,12 +27,12 @@ namespace rendezvous {
     class Server {
 
         private:
-            const std::string sid;
+            const std::string _sid;
 
-            std::atomic<long> nextRid;
-            std::atomic<long> inconsistencies;
-            std::unordered_map<std::string, metadata::Request*> *requests;
-            std::mutex mutex_requests;
+            std::atomic<long> _next_rid;
+            std::atomic<long> _inconsistencies;
+            std::unordered_map<std::string, metadata::Request*> _requests;
+            std::mutex _mutex_requests;
 
         public:
             Server(std::string sid);
@@ -130,8 +131,6 @@ namespace rendezvous {
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - (-2) if no status was found for a given service
-             * - (-3) if no status was found for a given region
              */
             int waitRequest(metadata::Request * request, const std::string& service, const std::string& region);
             
@@ -144,8 +143,7 @@ namespace rendezvous {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-2) if no status was found for a given service
-             * - (-3) if no status was found for a given region
+             * - 2 if context was not found
              */
             int checkRequest(metadata::Request * request, const std::string& service, const std::string& region);
             
@@ -154,13 +152,11 @@ namespace rendezvous {
              *
              * @param request Request where the branch is registered
              * @param service The name of the service that defines the waiting context
-             * @param status Sets value depending on the outcome:
-             * - (-2) if no status was found for a given service
              *
              * @return Map of status of the request (OPENED or CLOSED) for each region
              */
             
-            std::map<std::string, int> checkRequestByRegions(metadata::Request * request, const std::string& service, int * status);
+            std::map<std::string, int> checkRequestByRegions(metadata::Request * request, const std::string& service);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

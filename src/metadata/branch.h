@@ -18,15 +18,15 @@ namespace metadata {
         static const int CLOSED = 1;
 
         private:
-            const std::string bid;
-            const std::string service;
+            const std::string _bid;
+            const std::string _service;
 
             // <region, status>
-            std::unordered_map<std::string, int> regions;
+            std::unordered_map<std::string, int> _regions;
 
         public:
             Branch(std::string bid, std::string service, std::string region);
-            Branch(std::string bid, std::string service, const utils::ProtoVec& regionsVec);
+            Branch(std::string bid, std::string service, const utils::ProtoVec& vector_regions);
 
             /**
              * Get identifier (bid) of the object
@@ -46,8 +46,10 @@ namespace metadata {
              * Set status to close for a given region
              * 
              * @param region The region context
+             * 
+             * @returns -1 if region does not exist, 1 if if was successfully closed and 0 if it was already closed
              */
-            bool close(const std::string &region);
+            int close(const std::string &region);
             
             /**
              * Stores branch info in json format
