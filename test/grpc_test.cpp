@@ -1,4 +1,4 @@
-#include "rendezvous.grpc.pb.h"
+#include "server.grpc.pb.h"
 #include "../examples/cpp/utils.h"
 #include "../src/server.h"
 #include "gtest/gtest.h"

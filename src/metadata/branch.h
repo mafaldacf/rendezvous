@@ -5,8 +5,11 @@
 #include <unordered_map>
 #include <vector>
 #include <nlohmann/json.hpp>
-#include "rendezvous.grpc.pb.h"
+#include "client.grpc.pb.h"
 #include "../utils.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
 
 using json = nlohmann::json;
 
@@ -18,22 +21,22 @@ namespace metadata {
         static const int CLOSED = 1;
 
         private:
-            const std::string _bid;
             const std::string _service;
+            const std::string _tag;
 
             // <region, status>
             std::unordered_map<std::string, int> _regions;
 
         public:
-            Branch(std::string bid, std::string service, std::string region);
-            Branch(std::string bid, std::string service, const utils::ProtoVec& vector_regions);
+            Branch(std::string service, std::string tag, std::string region);
+            Branch(std::string service, std::string tag, const utils::ProtoVec& vector_regions);
 
             /**
-             * Get identifier (bid) of the object
+             * Get the branche's tag
              * 
              * @return bid
              */
-            std::string getBid();
+            std::string getTag();
 
             /**
              * Get service of the object
@@ -54,9 +57,11 @@ namespace metadata {
             /**
              * Stores branch info in json format
              * 
+             * @param bid
+             * 
              * @return json 
              */
-            json toJson() const;
+            json toJson(const std::string& bid) const;
         };
     
 }

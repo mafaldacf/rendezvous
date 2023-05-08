@@ -24,13 +24,13 @@ function(compile_protos proto_name)
     include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
     # Libraries
-    add_library(${proto_name}_lib
+    add_library(rendezvous_${proto_name}_lib
     ${GRPC_SOURCES}
     ${GRPC_HEADERS}
     ${PROTO_SOURCES}
     ${PROTO_HEADERS})
     
-    target_link_libraries(${proto_name}_lib
+    target_link_libraries(rendezvous_${proto_name}_lib
     gRPC::grpc++
     protobuf::libprotobuf)
 

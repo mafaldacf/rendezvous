@@ -14,7 +14,7 @@ elif [ "$#" -eq 1 ] && [ $1 = "build" ]
     mkdir -p cmake/build
     cd cmake/build
     cmake ../..
-    make clean
+    #make clean
     make
 
 elif [ "$#" -eq 1 ] && [ $1 = "build-config" ]
@@ -86,13 +86,13 @@ elif [ "$#" -eq 2 ] && [ $1 = "run" ] && [ $2 = "tests" ]
 else
     echo "Invalid arguments!"
     echo "Usage:"
-    echo "(1) ./run.sh clean"
-    echo "(2) ./run.sh build"
-    echo "(3) ./run.sh build-config"
-    echo "(4) ./run.sh build-py"
-    echo "(5) ./run.sh run server [<replica id>]"
-    echo "(6) ./run.sh run client [--script <script name>] | [--stress_test]"
-    echo "(7) ./run.sh run client-py [--script <script name>] | [--stress_test]"
-    echo "(8) ./run.sh run tests"
+    echo "(1) ./start.sh clean"
+    echo "(2) ./start.sh build"
+    echo "(3) ./start.sh build-config"
+    echo "(4) ./start.sh build-py"
+    echo "(5) ./start.sh run server [<replica id>]"
+    echo "(6) ./start.sh run client [--script <script name>] | [--stress_test]"
+    echo "(7) ./start.sh run client-py [--script <script name>] | [--stress_test]"
+    echo "(8) ./start.sh run tests"
     exit 1
 fi

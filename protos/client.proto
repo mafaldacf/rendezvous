@@ -2,15 +2,18 @@ syntax = "proto3";
 
 package rendezvous;
 
-service RendezvousService {
-  rpc registerRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
-  rpc registerBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
-  rpc registerBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
-  rpc closeBranch(CloseBranchMessage) returns (Empty);
-  rpc waitRequest(WaitRequestMessage) returns (WaitRequestResponse);
-  rpc checkRequest(CheckRequestMessage) returns (CheckRequestResponse);
-  rpc checkRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
-  rpc getPreventedInconsistencies(Empty) returns (GetPreventedInconsistenciesResponse);
+service ClientService {
+  rpc SubscribeBranches(SubscribeBranchesMessage) returns (stream SubscribeBranchesResponse);
+  rpc CloseBranches(stream CloseBranchMessage) returns (Empty);
+
+  rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
+  rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
+  rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
+  rpc CloseBranch(CloseBranchMessage) returns (Empty);
+  rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
+  rpc CheckRequest(CheckRequestMessage) returns (CheckRequestResponse);
+  rpc CheckRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
+  rpc GetNumPreventedInconsistencies(Empty) returns (GetNumPreventedInconsistenciesResponse);
 }
 
 /* Helpers */
@@ -18,7 +21,7 @@ service RendezvousService {
 enum RequestStatus {
   OPENED = 0;
   CLOSED = 1;
-  NOT_FOUND = 2;
+  UNKNOWN = 2;
 }
 
 message Empty {
@@ -27,6 +30,18 @@ message Empty {
 
 message RequestContext {
   map<string, int32> versions = 1;
+}
+
+/* Publish-Subscribe */
+
+message SubscribeBranchesMessage {
+  string service = 1;
+  string tag = 2;
+  string region = 3;
+}
+
+message SubscribeBranchesResponse {
+  string bid = 1;
 }
 
 /* Register Request */
@@ -45,8 +60,9 @@ message RegisterRequestResponse {
 message RegisterBranchMessage {
   string rid = 1;
   string service = 2;
-  string region = 3;
-  RequestContext context = 4;
+  string tag = 3;
+  string region = 4;
+  RequestContext context = 5;
 }
 
 message RegisterBranchResponse {
@@ -60,8 +76,9 @@ message RegisterBranchResponse {
 message RegisterBranchesMessage {
   string rid = 1;
   string service = 2;
-  repeated string regions = 3;
-  RequestContext context = 4;
+  string tag = 3;
+  repeated string regions = 4;
+  RequestContext context = 5;
 }
 
 message RegisterBranchesResponse {
@@ -73,9 +90,9 @@ message RegisterBranchesResponse {
 /* Close Branch */
 
 message CloseBranchMessage {
-  string rid = 1;
-  string bid = 2;
-  string region = 3;
+  string bid = 1;
+  string region = 2;
+  RequestContext context = 3;
 }
 
 /* Wait Request */
@@ -118,6 +135,6 @@ message CheckRequestByRegionsResponse {
 
 /* Get Prevented Inconsistencies */
 
-message GetPreventedInconsistenciesResponse {
+message GetNumPreventedInconsistenciesResponse {
   int64 inconsistencies = 1;
 }

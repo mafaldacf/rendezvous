@@ -1,0 +1,73 @@
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV MY_INSTALL_DIR=$HOME/.local
+ENV PATH="$MY_INSTALL_DIR/bin:$PATH"
+
+ARG BUILD_DEPS="autoconf git pkg-config cmake automake libtool curl zip unzip tar make wget g++ nano libtbb-dev libspdlog-dev"
+
+# Tools
+RUN apt-get update ;\
+  apt-get install -y ${BUILD_DEPS} ;\
+  apt-get clean
+
+# Prepare environment
+RUN mkdir -p $MY_INSTALL_DIR mkdir -p /tmp
+
+# Update CMake
+ARG CMAKE_VERSION=3.19.6
+RUN cd /tmp/ ;\
+    wget -q -O cmake-linux.sh https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-x86_64.sh ;\
+    sh cmake-linux.sh -- --skip-license --prefix=$MY_INSTALL_DIR ;\
+    rm cmake-linux.sh
+
+# Install gRPC and Protobuf dependencies
+ARG GRPC_VERSION=1.52.0
+RUN cd /tmp/ ;\
+    git clone --recurse-submodules -b v${GRPC_VERSION} --depth 1 --shallow-submodules https://github.com/grpc/grpc ;\
+    cd grpc ;\
+    mkdir -p cmake/build ;\
+    cd cmake/build ;\
+    cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DgRPC_BUILD_CSHARP_EXT=OFF -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR ../.. ;\
+    make -j 4 ;\
+    make install ;\
+    cd /tmp/ ;\
+    rm -rf grpc
+
+# Install JSON for C++
+ARG JSON_VERSION=3.11.2
+RUN cd /tmp/ ;\
+    git clone -b v${JSON_VERSION} --depth 1 https://github.com/nlohmann/json.git ;\
+    cd json ;\
+    mkdir build ;\
+    cd build ;\
+    cmake .. ;\
+    cmake --install .;\
+    cd /tmp/ ;\
+    rm -rf json
+
+ARG GTEST_VERSION=1.13.0
+
+# Install GTest
+RUN cd /tmp/ ;\
+    git clone https://github.com/google/googletest.git -b v${GTEST_VERSION} ;\
+    cd googletest ;\
+    mkdir build ;\
+    cd build ;\
+    cmake .. -DBUILD_GMOCK=OFF ;\
+    make ;\
+    make install ;\
+    cd /tmp/ ;\
+    rm -rf googletest
+
+# Install spdlog
+ARG SPDLOG_VERSION=1.11.0
+RUN cd /tmp/ ;\
+    git clone -b v${SPDLOG_VERSION} https://github.com/gabime/spdlog.git ;\
+    cd spdlog ;\
+    mkdir build ;\
+    cd build ;\
+    cmake .. ;\
+    make -j ;\
+    cd /tmp/ ;\
+    rm -rf spdlog

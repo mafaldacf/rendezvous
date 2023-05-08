@@ -51,18 +51,30 @@ class CheckRequestResponse(_message.Message):
     def __init__(self, status: _Optional[_Union[RequestStatus, str]] = ...) -> None: ...
 
 class CloseBranchMessage(_message.Message):
-    __slots__ = ["bid", "region", "rid"]
+    __slots__ = ["bid", "context", "region"]
     BID_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
     REGION_FIELD_NUMBER: _ClassVar[int]
-    RID_FIELD_NUMBER: _ClassVar[int]
     bid: str
+    context: RequestContext
     region: str
-    rid: str
-    def __init__(self, rid: _Optional[str] = ..., bid: _Optional[str] = ..., region: _Optional[str] = ...) -> None: ...
+    def __init__(self, bid: _Optional[str] = ..., region: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class Empty(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
+
+class GetOpenedRequestsMessage(_message.Message):
+    __slots__ = ["service"]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    def __init__(self, service: _Optional[str] = ...) -> None: ...
+
+class GetOpenedRequestsResponse(_message.Message):
+    __slots__ = ["rids"]
+    RIDS_FIELD_NUMBER: _ClassVar[int]
+    rids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, rids: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class GetPreventedInconsistenciesResponse(_message.Message):
     __slots__ = ["inconsistencies"]
@@ -70,17 +82,33 @@ class GetPreventedInconsistenciesResponse(_message.Message):
     inconsistencies: int
     def __init__(self, inconsistencies: _Optional[int] = ...) -> None: ...
 
+class RecoverBranchesMessage(_message.Message):
+    __slots__ = ["service"]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    def __init__(self, service: _Optional[str] = ...) -> None: ...
+
+class RecoverBranchesResponse(_message.Message):
+    __slots__ = ["bids", "done"]
+    BIDS_FIELD_NUMBER: _ClassVar[int]
+    DONE_FIELD_NUMBER: _ClassVar[int]
+    bids: _containers.RepeatedScalarFieldContainer[str]
+    done: bool
+    def __init__(self, bids: _Optional[_Iterable[str]] = ..., done: bool = ...) -> None: ...
+
 class RegisterBranchMessage(_message.Message):
-    __slots__ = ["context", "region", "rid", "service"]
+    __slots__ = ["context", "region", "rid", "service", "tag"]
     CONTEXT_FIELD_NUMBER: _ClassVar[int]
     REGION_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
     SERVICE_FIELD_NUMBER: _ClassVar[int]
+    TAG_FIELD_NUMBER: _ClassVar[int]
     context: RequestContext
     region: str
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., region: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
+    tag: str
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., tag: _Optional[str] = ..., region: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class RegisterBranchResponse(_message.Message):
     __slots__ = ["bid", "context", "rid"]
@@ -93,16 +121,18 @@ class RegisterBranchResponse(_message.Message):
     def __init__(self, rid: _Optional[str] = ..., bid: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class RegisterBranchesMessage(_message.Message):
-    __slots__ = ["context", "regions", "rid", "service"]
+    __slots__ = ["context", "regions", "rid", "service", "tag"]
     CONTEXT_FIELD_NUMBER: _ClassVar[int]
     REGIONS_FIELD_NUMBER: _ClassVar[int]
     RID_FIELD_NUMBER: _ClassVar[int]
     SERVICE_FIELD_NUMBER: _ClassVar[int]
+    TAG_FIELD_NUMBER: _ClassVar[int]
     context: RequestContext
     regions: _containers.RepeatedScalarFieldContainer[str]
     rid: str
     service: str
-    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., regions: _Optional[_Iterable[str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
+    tag: str
+    def __init__(self, rid: _Optional[str] = ..., service: _Optional[str] = ..., tag: _Optional[str] = ..., regions: _Optional[_Iterable[str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
 class RegisterBranchesResponse(_message.Message):
     __slots__ = ["bid", "context", "rid"]
@@ -141,6 +171,20 @@ class RequestContext(_message.Message):
     versions: _containers.ScalarMap[str, int]
     def __init__(self, versions: _Optional[_Mapping[str, int]] = ...) -> None: ...
 
+class SubscribeBranchesMessage(_message.Message):
+    __slots__ = ["service", "tag"]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    TAG_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    tag: str
+    def __init__(self, service: _Optional[str] = ..., tag: _Optional[str] = ...) -> None: ...
+
+class SubscribeBranchesResponse(_message.Message):
+    __slots__ = ["bid"]
+    BID_FIELD_NUMBER: _ClassVar[int]
+    bid: str
+    def __init__(self, bid: _Optional[str] = ...) -> None: ...
+
 class WaitRequestMessage(_message.Message):
     __slots__ = ["context", "region", "rid", "service"]
     CONTEXT_FIELD_NUMBER: _ClassVar[int]
@@ -158,6 +202,34 @@ class WaitRequestResponse(_message.Message):
     PREVENTED_INCONSISTENCY_FIELD_NUMBER: _ClassVar[int]
     prevented_inconsistency: bool
     def __init__(self, prevented_inconsistency: bool = ...) -> None: ...
+
+class WatchOpenedRequestsMessage(_message.Message):
+    __slots__ = ["service"]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    def __init__(self, service: _Optional[str] = ...) -> None: ...
+
+class WatchOpenedRequestsResponse(_message.Message):
+    __slots__ = ["done", "rids"]
+    DONE_FIELD_NUMBER: _ClassVar[int]
+    RIDS_FIELD_NUMBER: _ClassVar[int]
+    done: bool
+    rids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, rids: _Optional[_Iterable[str]] = ..., done: bool = ...) -> None: ...
+
+class WatchPendingRequestsMessage(_message.Message):
+    __slots__ = ["service"]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    def __init__(self, service: _Optional[str] = ...) -> None: ...
+
+class WatchPendingRequestsResponse(_message.Message):
+    __slots__ = ["done", "rids"]
+    DONE_FIELD_NUMBER: _ClassVar[int]
+    RIDS_FIELD_NUMBER: _ClassVar[int]
+    done: bool
+    rids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, rids: _Optional[_Iterable[str]] = ..., done: bool = ...) -> None: ...
 
 class RequestStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []

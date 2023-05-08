@@ -11,3 +11,6 @@ examples/python/rendezvous/protos/rendezvous_pb2.py
 examples/python/rendezvous/protos/rendezvous_pb2.pyi
 examples/python/rendezvous/protos/rendezvous_pb2_grpc.py
 /logs/*
+/aws/*
+*.txt
+protos/rendezvous.proto

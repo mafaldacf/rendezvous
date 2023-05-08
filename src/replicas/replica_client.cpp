@@ -6,7 +6,7 @@ ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
     // by default, addrs does not contain the address of the current replica
     for (const auto& addr : addrs) {
       auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
-      auto stub = rendezvous_server::RendezvousServerService::NewStub(channel);
+      auto stub = rendezvous_server::ServerService::NewStub(channel);
       _servers.push_back(std::move(stub));
     }
 }
@@ -16,15 +16,15 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
         void * tagPtr;
         bool ok = false;
 
-        req_helper.completionQueue.Next(&tagPtr, &ok);
+        req_helper.queue.Next(&tagPtr, &ok);
         const size_t tag = size_t(tagPtr);
         const grpc::Status & status = *(req_helper.statuses[tag-1].get());
 
         if (status.ok()) {
-            log("[%s] RPC #%zu OK", request.c_str(), tag);
+            spdlog::debug("[%s] RPC #%zu OK", request.c_str(), tag);
         }
         else {
-            log("[%s] RPC #%zu ERROR: %s", request.c_str(), tag, status.error_message().c_str());
+            spdlog::debug("[%s] RPC #%zu ERROR: %s", request.c_str(), tag, status.error_message().c_str());
         }
     }
 }
@@ -46,7 +46,7 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
             rendezvous_server::RegisterRequestMessage request;
             request.set_rid(rid);
             
-            req_helper.rpcs.emplace_back(server->AsyncregisterRequest(context, request, &req_helper.completionQueue));
+            req_helper.rpcs.emplace_back(server->AsyncRegisterRequest(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
             req_helper.nrpcs++;
@@ -82,7 +82,7 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
             request.set_region(region);
             request.mutable_context()->CopyFrom(ctx);
 
-            req_helper.rpcs.emplace_back(server->AsyncregisterBranch(context, request, &req_helper.completionQueue));
+            req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
             req_helper.nrpcs++;
@@ -118,7 +118,7 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
             request.mutable_regions()->CopyFrom(regions);
             request.mutable_context()->CopyFrom(ctx);
 
-            req_helper.rpcs.emplace_back(server->AsyncregisterBranches(context, request, &req_helper.completionQueue));
+            req_helper.rpcs.emplace_back(server->AsyncRegisterBranches(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
             req_helper.nrpcs++;
@@ -129,8 +129,8 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
     }).detach();
 }
 
-void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& region) {
-    std::thread([this, rid, bid, region]() {
+void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region) {
+    std::thread([this, bid, region]() {
         struct RequestHelper req_helper;
 
         for (const auto& server : _servers) {
@@ -144,11 +144,10 @@ void ReplicaClient::sendCloseBranch(const std::string& rid, const std::string& b
             req_helper.responses.emplace_back(response);
 
             rendezvous_server::CloseBranchMessage request;
-            request.set_rid(rid);
             request.set_bid(bid);
             request.set_region(region);
 
-            req_helper.rpcs.emplace_back(server->AsynccloseBranch(context, request, &req_helper.completionQueue));
+            req_helper.rpcs.emplace_back(server->AsyncCloseBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
             req_helper.nrpcs++;

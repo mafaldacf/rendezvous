@@ -1,12 +1,15 @@
 #ifndef REPLICA_CLIENT_H
 #define REPLICA_CLIENT_H
 
-#include "rendezvous.grpc.pb.h"
-#include "rendezvous_server.grpc.pb.h"
+#include "client.grpc.pb.h"
+#include "server.grpc.pb.h"
 #include "../utils.h"
 #include <grpcpp/grpcpp.h>
 #include <string>
 #include <thread>
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
 
 namespace replicas {
 
@@ -15,7 +18,7 @@ namespace replicas {
         // Helper structure for grpc requests
         struct RequestHelper {
             int nrpcs = 0;
-            grpc::CompletionQueue completionQueue;
+            grpc::CompletionQueue queue;
             std::vector<std::unique_ptr<grpc::Status>> statuses;
             std::vector<std::unique_ptr<grpc::ClientContext>> contexts;
             std::vector<std::unique_ptr<rendezvous_server::Empty>> responses;
@@ -23,7 +26,7 @@ namespace replicas {
         };
 
         private:
-            std::vector<std::shared_ptr<rendezvous_server::RendezvousServerService::Stub>> _servers;
+            std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
 
         public:
             ReplicaClient(std::vector<std::string> addrs);
@@ -72,11 +75,10 @@ namespace replicas {
             /**
              * Send close branch call to all replicas
              * 
-             * @param rid The identifier of the request associated with the branch
              * @param bid The identifier of the set of branches generated when the branch was registered
              * @param region The region where the branch was registered
              */
-            void sendCloseBranch(const std::string& rid, const std::string& bid, const std::string& region);
+            void sendCloseBranch(const std::string& bid, const std::string& region);
 
         };
     

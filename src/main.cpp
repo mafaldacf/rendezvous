@@ -1,8 +1,10 @@
 #include <iostream>
+#include <csignal>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <vector>
-#include <cstdio> 
+#include <cstdio>
 #include <thread>
 #include <vector>
 #include <iostream>
@@ -12,11 +14,31 @@
 #include "services/client_service_impl.h"
 #include "services/server_service_impl.h"
 #include "server.h"
-#include "rendezvous.grpc.pb.h"
+#include "client.grpc.pb.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 using json = nlohmann::json;
 
-void shutdown(std::unique_ptr<grpc::Server> & server) {
+std::unique_ptr<grpc::Server> server;
+
+static std::string _replica_id = "replica-eu";
+static std::string _replica_addr;
+static std::vector<std::string> _replicas_addrs;
+static int _requests_cleanup_sleep_m;
+static int _subscribers_cleanup_sleep_m;
+static int _subscribers_max_wait_time_s;
+static int _wait_replica_timeout_s;
+
+void sigintHandler(int sig) {
+  server->Shutdown();
+  exit(EXIT_SUCCESS);
+}
+
+void shutdown(std::unique_ptr<grpc::Server> &server) {
+  // doesn't work using docker compose
   std::cout << "Press any key to stop the server..." << std::endl << std::endl;
   getchar();
 
@@ -24,95 +46,100 @@ void shutdown(std::unique_ptr<grpc::Server> & server) {
   server->Shutdown();
 }
 
+void run() {
 
-void run(std::string replica_id, std::string replica_addr, std::vector<std::string> addrs) {
+  auto rendezvous_server = std::make_shared<rendezvous::Server> (
+    _replica_id, _requests_cleanup_sleep_m, 
+    _subscribers_cleanup_sleep_m, _subscribers_max_wait_time_s,
+    _wait_replica_timeout_s);
 
-  std::shared_ptr<rendezvous::Server> rendezvousServer = std::make_shared<rendezvous::Server>(replica_id);
-  service::RendezvousServiceImpl clientService(rendezvousServer, addrs);
-  service::RendezvousServerServiceImpl serverService(rendezvousServer);
+  service::ClientServiceImpl client_service(rendezvous_server, _replicas_addrs);
+  service::ServerServiceImpl server_service(rendezvous_server);
 
   grpc::ServerBuilder builder;
-  builder.AddListeningPort(replica_addr, grpc::InsecureServerCredentials());
-  builder.RegisterService(&clientService);
-  builder.RegisterService(&serverService);
+  builder.AddListeningPort(_replica_addr, grpc::InsecureServerCredentials());
+  builder.RegisterService(&client_service);
+  builder.RegisterService(&server_service);
 
-  std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+  server = std::unique_ptr<grpc::Server>(builder.BuildAndStart());
 
-  std::cout << "Server listening on " << replica_addr << "..." << std::endl;
+  spdlog::info("Server listening on {}...", _replica_addr);
 
-  rendezvousServer->initCleanRequests();
-  std::thread t(shutdown, std::ref(server));
-  
+  rendezvous_server->initRequestsCleanup();
+  rendezvous_server->initSubscribersCleanup();
+  signal(SIGINT, sigintHandler);
+  // std::thread t(shutdown, std::ref(server));
+
   server->Wait();
-
-  t.join();
 }
 
-std::string parseConfig(std::string replica_id, std::vector<std::string>& addrs) {
-  std::string replica_addr;
-
+void loadConfig() {
   std::ifstream file("../config.json");
   if (!file.is_open()) {
-      std::cerr << "[ERROR] Failed to open config.json" << std::endl;
-      exit(-1);
+    spdlog::error("Error opening JSON config");
+    exit(-1);
   }
 
-  std::cout << "[INFO] Parsing JSON config..." << std::endl;
+  spdlog::info("Parsing JSON config...");
 
   try {
-      json root;
-      file >> root;
+    json root;
+    file >> root;
+    // load timers for garbage collector
+    _requests_cleanup_sleep_m = root["requests_cleanup_sleep_m"].get<int>();
+    _subscribers_cleanup_sleep_m = root["subscribers_cleanup_sleep_m"].get<int>();
 
-      for (const auto& replica : root.items()) {
-        std::string id = replica.key();
-        std::string addr = replica.value()["host"].get<std::string>() + ':' + std::to_string(replica.value()["port"].get<int>());
+    // load timeouts for subscribers and replicas
+    _subscribers_max_wait_time_s = root["subscribers_max_wait_time_s"].get<int>();
+    _subscribers_max_wait_time_s = root["wait_replica_timeout_s"].get<int>();
 
-        if (replica_id == id) {
-          std::cout << id << " --> " << addr << " (current replica)" << std::endl;
-          replica_addr = "0.0.0.0:" + std::to_string(replica.value()["port"].get<int>());
-        }
-        else {
-          addrs.push_back(addr);
-          std::cout << id << " --> " << addr << std::endl;
-        }
+    // load replicas addresses
+    for (const auto &replica : root["replicas"].items()) {
+      std::string id = replica.key();
+      std::string addr = replica.value()["host"].get<std::string>() + ':' + std::to_string(replica.value()["port"].get<int>());
+
+      if (_replica_id == id) {
+        spdlog::info("{} --> {} (current replica)", id, addr);
+        _replica_addr = "0.0.0.0:" + std::to_string(replica.value()["port"].get<int>());
+      }
+      else {
+        _replicas_addrs.push_back(addr);
+        spdlog::info("{} --> {} ", id, addr);
+      }
     }
-    std::cout << std::endl;
-  } catch (json::exception& e) {
-      std::cerr << "[ERROR] Failed to parse config.json: " << e.what() << std::endl;
-      exit(-1);
   }
-  return replica_addr;
+  catch (json::exception &e) {
+    spdlog::error("Error parsing JSON config");
+    exit(-1);
+  }
 }
 
-void usage(char* argv[]) {
-  std::cout << "Usage: " << argv[0] << " <'replica id' as in config.json>" << std::endl;
-  
+void usage(char *argv[]) {
+  spdlog::error("Usage: {} <replica_id>", argv[0]);
+
   // TODO for oficial code
-  //std::cout << "Usage: " << argv[0] << " [--debug] [--logs] [--no_consistency_checks] <replica_id>" << std::endl;
+  // std::cout << "Usage: " << argv[0] << " [--debug] [--logs] [--no_consistency_checks] <_replica_id>" << std::endl;
   exit(-1);
 }
 
-int main(int argc, char* argv[]) {
-    std::string replica_id("replica-eu");
+int main(int argc, char *argv[]) {
+  spdlog::set_level(spdlog::level::debug);
 
-    std::vector<std::string> addrs;
-
-
-    if (argc > 1) {
-      if (argc == 2) {
-        replica_id = argv[1];
-      }
-      else if (argc > 2) {
-        std::cout << "[ERROR] Invalid number of arguments!" << std::endl;
-        usage(argv);
-      }
+  if (argc > 1) {
+    if (argc == 2) {
+      _replica_id = argv[1];
     }
+    else if (argc > 2) {
+      spdlog::error("Invalid number of arguments");
+      usage(argv);
+    }
+  }
 
-    std::string replica_addr = parseConfig(replica_id, addrs);
-    
-    std::cout << "** Rendezvous Server '" << replica_id << "' **" << std::endl << std::endl;
-    
-    run(replica_id, replica_addr, addrs);
-    
-    return 0;
+  loadConfig();
+
+  spdlog::info("--------------- Rendezvous Server ({}) --------------- ", _replica_id);
+
+  run();
+
+  return 0;
 }

@@ -7,7 +7,7 @@ export PATH="$MY_INSTALL_DIR/bin:$PATH"
 # Tools
 echo '(1) Installing tools...'
 sudo apt-get update
-sudo apt-get install -y build-essential autoconf git pkg-config cmake automake libtool curl unzip make wget g++
+sudo apt-get install -y autoconf git pkg-config cmake automake libtool curl zip unzip tar make wget g++ nano libtbb-dev libspdlog-dev
 sudo apt-get clean
 
 # Create ./local directory for CMake, gRPC and Protobuf
@@ -26,9 +26,10 @@ cd grpc
 mkdir -p cmake/build
 cd cmake/build
 sudo cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR ../..
-sudo make -j 4
+sudo make -j 2
 sudo make install
 cd ../..
+sudo rm -r grpc
 
 # Install GTest
 echo '(4) Installing GTest...'
@@ -39,6 +40,8 @@ cd build
 sudo cmake .. -DBUILD_GMOCK=OFF
 sudo make
 sudo make install
+cd ../..
+sudo rm -r googletest
 
 # Install JSON for C++
 echo '(5) Installing JSON for C++...'
@@ -48,5 +51,18 @@ mkdir build
 cd build
 sudo cmake ..
 sudo cmake --install .
+cd ../..
+sudo rm -r json
+
+# Install spdlog
+echo '(6) Installing spdlog...'
+git clone -b v${SPDLOG_VERSION} https://github.com/gabime/spdlog.git
+cd spdlog
+mkdir build
+cd build
+cmake ..
+make -j
+cd ../..
+rm -rf spdlog
 
 echo 'Done!'

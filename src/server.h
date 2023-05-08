@@ -3,12 +3,14 @@
 
 #include "metadata/request.h"
 #include "metadata/branch.h"
+#include "metadata/subscriber.h"
 #include "replicas/version_registry.h"
 #include "replicas/replica_client.h"
 #include "utils.h"
 #include <atomic>
 #include <vector>
 #include <mutex>
+#include <shared_mutex>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -19,6 +21,9 @@
 #include <iomanip>
 #include <sstream>
 #include <set>
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
 
 using json = nlohmann::json;
 
@@ -27,22 +32,63 @@ namespace rendezvous {
     class Server {
 
         private:
-            const std::string _sid;
+            static const int REGISTER = 1;
+            static const int REMOVE = -1;
 
+            /* Garbage collector for old requests and subscribers */
+            const int _requests_cleanup_sleep_m;
+            const int _subscribers_cleanup_sleep_m;
+            const int _subscribers_max_wait_time_s;
+            const int _wait_replica_timeout_s;
+
+            const std::string _sid;
             std::atomic<long> _next_rid;
-            std::atomic<long> _inconsistencies;
+            std::atomic<long> _prevented_inconsistencies;
+            
+            // <rid, request_ptr>
             std::unordered_map<std::string, metadata::Request*> _requests;
-            std::mutex _mutex_requests;
+            std::shared_mutex _mutex_requests;
+
+            // <service w/ tag, <region, subscriber_ptr>>
+            std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>> _subscribers;
+            std::shared_mutex _mutex_subscribers;
 
         public:
-            Server(std::string sid);
+            Server(std::string sid, int requests_cleanup_sleep_m, 
+                int subscribers_cleanup_sleep_m, int _subscribers_max_wait_time_s,
+                int wait_replica_timeout_s);
             ~Server();
+
+            /**
+             * Get subscriber associated with the subscriber id
+             * 
+             * @param service 
+             * @param tag
+             * @param region
+             * @return metadata::Subscriber* 
+             */
+            metadata::Subscriber * getSubscriber(const std::string& service, const std::string& tag, const std::string& region);
+
+            /**
+             * Publish branches for interested subscribers
+             * 
+             * @param service
+             * @param tag
+             * @param bid 
+             */
+            void publishBranches(const std::string& service, const std::string& tag, const std::string& bid);
+
+            /**
+             * Process that periodically cleans old and disconnected subscribers
+             * 
+             */
+            void initSubscribersCleanup();
 
             /**
              * Process that periodically cleans old and unused requests
              * 
              */
-            void initCleanRequests();
+            void initRequestsCleanup();
 
             /**
              * Return server identifier
@@ -65,6 +111,23 @@ namespace rendezvous {
              * @return the new identifier 
              */
             std::string genBid(metadata::Request * request);
+
+            /**
+             * Get rid from bid
+             * 
+             * @param bid 
+             * @return std::string 
+             */
+            std::string parseRid(std::string bid);
+
+            /**
+             * Compute subscriber id from service and tag
+             * 
+             * @param service 
+             * @param tag 
+             * @return std::string 
+             */
+            std::string computeSubscriberId(const std::string& service, const std::string& tag);
 
             /**
              * Returns the number of inconsistencies prevented so far
@@ -95,10 +158,11 @@ namespace rendezvous {
              * @param request Request where the branch is registered
              * @param service The service context
              * @param region The region context
+             * @param tag The service tag
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new branch identifiers or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region, std::string bid = "");
+            std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& tag, std::string bid = "");
 
             /**
              * Register new branches for a given request
@@ -106,10 +170,11 @@ namespace rendezvous {
              * @param request Request where the branch is registered
              * @param service The service context
              * @param regions The regions context for each branch
-             * @param version The (new) version of the replica for the current request
+             * @param tag The service tag
+             * @param bid The set of branches identifier: empty if request is from client
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, std::string bid = "");
+            std::string registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, const std::string& tag, std::string bid = "");
 
             /**
              * Close a branch according to its identifier
@@ -117,17 +182,17 @@ namespace rendezvous {
              * @param request Request where the branch is registered
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
-             * 
-             * @param return true if successfully closed or false if region context is not valid
+             * @param service Service where branch was registered
+             * @param client_request True if request comes from client and false if request comes from replica
+             * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            bool closeBranch(metadata::Request * request, const std::string& bid, const std::string& region);
+            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool client_request = false);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)
              * 
              * @param request Request where the branch is registered
              * @param service The service context
-             * @param region The region context
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
@@ -163,7 +228,7 @@ namespace rendezvous {
              * 
              * @return The number of inconsistencies
              */
-            long getPreventedInconsistencies();
+            long getNumPreventedInconsistencies();
         
     };
 }

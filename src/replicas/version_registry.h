@@ -7,15 +7,21 @@
 #include <unordered_map>
 #include <map>
 #include <condition_variable>
-#include "rendezvous.grpc.pb.h"
+#include "client.grpc.pb.h"
 #include <grpcpp/grpcpp.h>
 #include "../utils.h"
+#include <chrono>
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
 
 namespace replicas {
 
     class VersionRegistry {
 
         private:
+            const int _wait_replica_timeout_s;
+
             // hash map: <server id, version>
             std::unordered_map<std::string, int> _versions;
 
@@ -24,7 +30,7 @@ namespace replicas {
             std::condition_variable _cond_versions;
 
         public:
-            VersionRegistry();
+            VersionRegistry(int wait_replica_timeout_s);
 
             /**
              * Increment version for current server id

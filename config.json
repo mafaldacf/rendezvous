@@ -1,10 +1,17 @@
 {
-    "eu-central-1": {
-      "host": "rendezvous-eu-central-1",
+  "requests_cleanup_sleep_m": 30,
+  "subscribers_cleanup_sleep_m": 30,
+  "subscribers_max_wait_time_s": 60,
+  "wait_replica_timeout_s": 10,
+  
+  "replicas": {
+    "eu": {
+      "host": "rendezvous-eu",
       "port": 8001
     },
-    "us-east-1": {
-      "host": "rendezvous-us-east-1",
+    "us": {
+      "host": "rendezvous-us",
       "port": 8002
     }
+  }
 }

@@ -2,10 +2,17 @@
 
 using namespace rendezvous;
 
-Server::Server(std::string sid)
-    : _next_rid(0), _inconsistencies(0), _sid(sid) {
+Server::Server(std::string sid, int requests_cleanup_sleep_m, 
+  int subscribers_cleanup_sleep_m, int subscribers_max_wait_time_s,
+  int wait_replica_timeout_s)
+    : _next_rid(0), _prevented_inconsistencies(0), _sid(sid), 
+    _requests_cleanup_sleep_m(requests_cleanup_sleep_m),
+    _subscribers_cleanup_sleep_m(subscribers_cleanup_sleep_m),
+    _subscribers_max_wait_time_s(subscribers_max_wait_time_s),
+    _wait_replica_timeout_s(wait_replica_timeout_s) {
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
+    _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
 }
 
 Server::~Server() {
@@ -13,42 +20,148 @@ Server::~Server() {
     metadata::Request * request = pair->second;
     delete request;
   }
+  for (auto regions_it = _subscribers.begin(); regions_it != _subscribers.end(); regions_it++) {
+    for (auto subscribers_it = regions_it->second.begin(); subscribers_it != regions_it->second.end(); subscribers_it++) {
+      metadata::Subscriber * subscriber = subscribers_it->second;
+      delete subscriber;
+    }
+  }
 }
 
-void Server::initCleanRequests() {
+// -----------------
+// Publish-Subscribe
+//------------------
+
+metadata::Subscriber * Server::getSubscriber(const std::string& service, const std::string& tag, const std::string& region) {
+  const std::string& subscriber_id = computeSubscriberId(service, tag);
+
+  spdlog::info("loading subscriber {} in region {}", subscriber_id.c_str(), region.c_str());
+
+  std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
+  auto it_regions = _subscribers.find(subscriber_id);
+
+  // found subscriber in the region
+  if (it_regions != _subscribers.end()) {
+    auto it_subscriber = it_regions->second.find(region);
+    if (it_subscriber != it_regions->second.end()) {
+      return it_subscriber->second;
+    }
+  }
+
+  // manually upgrade lock (TODO: use tbb::wr_mutex later)
+  read_lock.unlock();
+  std::shared_lock<std::shared_mutex> write_lock(_mutex_subscribers);
+
+  // register new subscriber
+  metadata::Subscriber * subscriber = new metadata::Subscriber(_subscribers_max_wait_time_s);
+  _subscribers[subscriber_id][region] = subscriber;
+  return subscriber;
+}
+
+void Server::publishBranches(const std::string& service, const std::string& tag, const std::string& bid) {
+  metadata::Subscriber * subscriber;
+  const std::string& subscriber_id = computeSubscriberId(service, tag);
+
+  spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
+  
+  std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
+  auto it_regions = _subscribers.find(subscriber_id);
+
+  // found subscriber in certain regions
+  if (it_regions != _subscribers.end()) {
+    for (const auto& subscriber : it_regions->second) {
+      subscriber.second->pushBranch(bid);
+    }
+  }
+}
+
+// -----------------
+// Garbage Collector
+//------------------
+
+void Server::initSubscribersCleanup() {
+  std::thread([this]() {
+    while (true) {
+      break; //TODO: REMOVE
+      std::this_thread::sleep_for(std::chrono::minutes(_subscribers_cleanup_sleep_m));
+
+      auto now = std::chrono::system_clock::now();
+      std::cout << "[INFO] initializing clean subscribers procedure..." << std::endl;
+
+      std::unordered_map<std::string, metadata::Subscriber *> old_subscribers;
+
+      // target old subscribers
+      std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
+      metadata::Subscriber * subscriber;
+      for (auto regions_it = _subscribers.begin(); regions_it != _subscribers.end(); ++regions_it) {
+        for (auto subscribers_it = regions_it->second.begin(); subscribers_it != regions_it->second.end(); subscribers_it++) {
+          auto last_ts = subscribers_it->second->getLastTs();
+          auto time_since = now - last_ts;
+
+          if (time_since > std::chrono::minutes(_subscribers_cleanup_sleep_m)) {
+            old_subscribers.insert({subscribers_it->first + "-" + regions_it->first, subscribers_it->second});
+          }
+        }
+      }
+      read_lock.unlock();
+      std::unique_lock<std::shared_mutex> write_lock(_mutex_subscribers);
+
+      // remove and delete old subscribers
+      for (auto it = old_subscribers.begin(); it != old_subscribers.end(); it++) {
+        _subscribers.erase(it->first);
+        delete(it->second);
+      }
+    }
+  }).detach();
+}
+
+void Server::initRequestsCleanup() {
   std::thread([this]() {
 
     while (true) {
       break; //TODO: REMOVE
-      std::this_thread::sleep_for(std::chrono::hours(12));
-
-      std::cout << "[INFO] initializing clean requests procedure..." << std::endl;
+      std::this_thread::sleep_for(std::chrono::minutes(_requests_cleanup_sleep_m));
 
       int num = 0;
       auto now = std::chrono::system_clock::now();
+      std::cout << "[INFO] initializing clean requests procedure..." << std::endl;
 
+      std::vector<metadata::Request*> requests;
       std::vector<metadata::Request*> old_requests;
 
-      _mutex_requests.lock();
-      // collect old requests
-      for (const auto & request_it : _requests) {
-        if (request_it.second->canRemove(now)) {
-          old_requests.emplace_back(request_it.second);
+      // copy requests
+      std::shared_lock<std::shared_mutex> read_lock(_mutex_requests);
+      std::transform(_requests.begin(), _requests.end(), requests.begin(),
+                   [](const auto& pair){ return pair.second; });
+      read_lock.unlock();
+
+      // target old requests
+      for (const auto & request : requests) {
+        auto last_ts = request->getLastTs();
+        auto time_since = now - last_ts;
+        if (time_since > std::chrono::minutes(_requests_cleanup_sleep_m)) {
+          old_requests.emplace_back(request);
         }
       }
-      // remove old requests from the requests map
+
+      // remove and delete old requests
+      std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
       for (const auto & request : old_requests) {
         _requests.erase(request->getRid());
-      }
-      _mutex_requests.unlock();
 
-      // log request and delete them
-      if (LOG_REQUESTS && old_requests.size() > 0) {
+        if (!LOG_REQUESTS) {
+          delete request;
+        }
+      }
+      write_lock.unlock();
+
+
+      // log requests to output file and only delete after
+      if (LOG_REQUESTS) {
         json j;
         for (const auto& request : old_requests) {
           j["requests"].push_back(request->toJson());
           num++;
-          //TODO DELETE
         }
 
         // compute filename based on the current timestamp
@@ -71,47 +184,67 @@ void Server::initCleanRequests() {
         else {
           std::cout << "[ERROR] could not save logs to json file " << filename << ": " << std::strerror(errno) << std::endl;
         }
-      }
 
-      std::cout << "[INFO] successfully cleaned " << num << " requests!" << std::endl;
+        std::cout << "[INFO] successfully cleaned " << num << " requests!" << std::endl;
+      }
     }
     
   }).detach();
 }
+
+// -----------
+// Identifiers
+//------------
 
 std::string Server::getSid() {
   return _sid;
 }
 
 std::string Server::genRid() {
-  return _sid + ':' + std::to_string(_next_rid.fetch_add(1));
+  return _sid + '_' + std::to_string(_next_rid.fetch_add(1));
 }
 
 std::string Server::genBid(metadata::Request * request) {
-  return _sid + ':' + request->genId();
+  return _sid + '_' + request->genId() + ':' + request->getRid();
 }
 
+std::string Server::parseRid(std::string bid) {
+  size_t delimiter_pos = bid.find(':');
+  std::string rid = "";
+
+  if (delimiter_pos != std::string::npos) {
+    rid = bid.substr(delimiter_pos+1);
+  }
+  return rid;
+}
+
+std::string Server::computeSubscriberId(const std::string& service, const std::string& tag) {
+  return service + ":" + tag;
+}
+
+// -----------
+// Helpers
+//------------
+
 long Server::getNumInconsistencies() {
-  return _inconsistencies.load();
+  return _prevented_inconsistencies.load();
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {
-  _mutex_requests.lock();
+  std::shared_lock<std::shared_mutex> lock(_mutex_requests); 
 
   auto pair = _requests.find(rid);
   
   // return request if it was found
   if (pair != _requests.end()) {
-      _mutex_requests.unlock();
       return pair->second;
   }
 
-  _mutex_requests.unlock();
   return nullptr;
 }
 
 metadata::Request * Server::getOrRegisterRequest(std::string rid) {
-  _mutex_requests.lock();
+  std::shared_lock<std::shared_mutex> read_lock(_mutex_requests); 
 
   // rid is not empty so we try to get the request
   if (!rid.empty()) {
@@ -119,57 +252,74 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 
     // return request if it was found
     if (pair != _requests.end()) {
-      _mutex_requests.unlock();
       return pair->second;
     }
   }
+
+  read_lock.unlock();
 
   // generate new rid
   if (rid.empty()) {
     rid = genRid();
   }
 
+  std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
+
   // register request 
-  replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry();
+  replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry(_wait_replica_timeout_s);
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
   _requests.insert({rid, request});
 
-  _mutex_requests.unlock();
   return request;
 }
 
-std::string Server::registerBranch(metadata::Request * request, const std::string& service, const std::string& region, std::string bid) {
+// ---------------------
+// Main Rendezvous Logic
+//----------------------
+
+std::string Server::registerBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& tag, std::string bid) {
   if (bid.empty()) {
     bid = genBid(request);
   }
-  bool registered = request->registerBranch(bid, service, region);
+  metadata::Branch * branch = request->registerBranch(bid, service, tag, region);
 
-  if (!registered) {
+  if (!branch) {
     return "";
+  }
+
+  if (TRACK_SUBSCRIBED_BRANCHES) {
+    publishBranches(service, tag, bid);
   }
 
   return bid;
 }
 
-std::string Server::registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, std::string bid) {
+std::string Server::registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
   if (bid.empty()) {
     bid = genBid(request);
   }
-  bool registered = request->registerBranches(bid, service, regions);
+  metadata::Branch * branch = request->registerBranches(bid, service, tag, regions);
 
-  if (!registered) {
+  if (!branch) {
     return "";
+  }
+
+  if (TRACK_SUBSCRIBED_BRANCHES) {
+    publishBranches(service, tag, bid);
   }
 
   return bid;
 }
 
-bool Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
-  return request->closeBranch(bid, region);
+int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool client_request) {
+  std::string service, tag;
+  return request->closeBranch(bid, region, service, tag);
 }
 
 int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region) {
   int result;
+  metadata::Subscriber * subscriber;
+  const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
     result = request->waitOnServiceAndRegion(service, region);
@@ -184,7 +334,7 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
     result = request->wait();
 
   if (result == 1) {
-    _inconsistencies.fetch_add(1);
+    _prevented_inconsistencies.fetch_add(1);
   }
 
   return result;
@@ -210,6 +360,6 @@ std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * req
   return request->getStatusByRegions();
 }
 
-long Server::getPreventedInconsistencies() {
-  return _inconsistencies.load();
+long Server::getNumPreventedInconsistencies() {
+  return _prevented_inconsistencies.load();
 }

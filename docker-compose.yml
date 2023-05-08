@@ -1,24 +1,24 @@
-# sudo docker run -it -p 8001:8001 --hostname rendezvous-eu-central-1 --network socialnetwork_default rendezvous
-# sudo docker run -it -p 8002:8002 --hostname rendezvous-us-east-1 --network socialnetwork_default rendezvous
+# sudo docker run -it -p 8001:8001 --hostname rendezvous-eu --network socialnetwork_default rendezvous
+# sudo docker run -it -p 8002:8002 --hostname rendezvous-us --network socialnetwork_default rendezvous
 
 version: "3.9"
 services:
   rendezvous-eu-central-1:
     image: rendezvous:latest
-    hostname: rendezvous-eu-central-1
+    hostname: rendezvous-eu
     ports:
       - 8001:8001
     networks:
       - socialnetwork_default
-    entrypoint: ./start.sh run server eu-central-1
+    entrypoint: ./start.sh run server eu
   rendezvous-us-east-1:
     image: rendezvous:latest
-    hostname: rendezvous-us-east-1
+    hostname: rendezvous-us
     ports:
       - 8002:8002
     networks:
       - socialnetwork_default
-    entrypoint: ./start.sh run server us-east-1
+    entrypoint: ./start.sh run server us
 
 networks:
   socialnetwork_default:

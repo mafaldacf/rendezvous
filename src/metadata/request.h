@@ -11,6 +11,7 @@
 #include <atomic>
 #include <unordered_map>
 #include <mutex>
+#include <shared_mutex>
 #include <condition_variable>
 #include <cstring>
 #include <vector>
@@ -20,6 +21,9 @@
 #include <chrono>
 #include <sstream>
 #include <thread>
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
+#include "spdlog/fmt/ostr.h"
 
 using json = nlohmann::json;
 
@@ -30,17 +34,18 @@ namespace metadata {
         /* request status */
         static const int OPENED = 0;
         static const int CLOSED = 1;
-        static const int NOT_FOUND = 2;
+        static const int UNKNOWN = 2;
 
         /* branch tracking */
         static const int REGISTER = 1;
         static const int REMOVE = -1;
 
         private:
+
             const std::string _rid;
             std::atomic<long> _next_id;
             std::chrono::time_point<std::chrono::system_clock> _init_ts;
-            std::chrono::time_point<std::chrono::system_clock> _final_ts;
+            std::chrono::time_point<std::chrono::system_clock> _last_ts;
 
             /* replicas versioning */
             replicas::VersionRegistry * _versions_registry;
@@ -81,12 +86,15 @@ namespace metadata {
             json toJson() const;
 
             /**
-             * Check if last closure timestamp is older than 12 hours to acknowledge if request can be removed
-             * 
-             * @param now The timestamp representing the current time
-             * @return true if request can be removed and false otherwise
+             * Return timestamp of last modification
              */
-            bool canRemove(std::chrono::time_point<std::chrono::system_clock> now);
+            std::chrono::time_point<std::chrono::system_clock> getLastTs();
+
+            /**
+             * Refresh timestamp of last modification to now
+             * 
+             */
+            void refreshLastTs();
 
             /**
              * Get the identifier (rid) of the object
@@ -114,32 +122,36 @@ namespace metadata {
              * 
              * @param bid The identifier of the set of branches where the current branch is going to be registered
              * @param service The service where the branch is being registered
+             * @param tag The service tag
              * @param region The region where the branch is being registered
              * 
-             * @param return true if successfully registered and false otherwise (if branch already exists)
+             * @param return branch if successfully registered and nullptr otherwise (if branch already exists)
              */
-            bool registerBranch(const std::string& bid, const std::string& service, const std::string& region);
+            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, const std::string& tag, const std::string& region);
 
             /**
              * Register a set of branches in the request
              * 
              * @param bid The identifier of the set of branches
              * @param service The service where the branches are being registered
+             * @param tag The service tag
              * @param region The regions for each branch
              * 
-             * @param return true if successfully registered and false otherwise (if branches already exists)
+             * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            bool registerBranches(const std::string& bid, const std::string& service, const utils::ProtoVec& regions);
+            metadata::Branch * registerBranches(const std::string& bid, const std::string& service, const std::string& tag, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
              * 
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region The region where the branch was registered
+             * @param service to be modified
+             * @param tag to be modified
              * 
-             * @return true if branch was found and closed and false if no branch was found and a new closed one was created
+             * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            bool closeBranch(const std::string& bid, const std::string& region);
+            int closeBranch(const std::string& bid, const std::string& region, std::string& service, std::string& tag);
 
             /**
              * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps
