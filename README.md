@@ -1,5 +1,7 @@
 # Rendezvous
 
+python3 main.py -cp aws -d dynamo -cfg-d datastores-eu.yaml -cfg-r rendezvous-eu.yaml
+
 Request workflow monitor for microservice-web based applications.
 
 Available commands:

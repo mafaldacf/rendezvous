@@ -1,0 +1,19 @@
+rendezvous: 
+  address: rendezvous-us:8002
+
+aws:
+  mysql:
+    host: antipode-lambda-us.cluster-ro-cfiggpj8crt2.us-east-1.rds.amazonaws.com
+    port: 3306
+    user: antipode
+    password: antipode
+    db: antipode
+    table: blobs
+  dynamo:
+    region: us-east-1
+    table: blobs
+  s3:
+    bucket: antipode-lambda-posts-us-rendezvous
+  cache:
+    host: antipode-lambda-us-001.7jax8t.0001.use1.cache.amazonaws.com
+    port: 6379

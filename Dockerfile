@@ -1,11 +1,11 @@
-FROM rendezvous-deps:latest
-
-#ENV REPLICA_ID="eu-central-1"
+FROM mafaldacf/rendezvous-deps:latest
 
 WORKDIR /app
 COPY . .
 
+RUN cd client-process/python ;\
+    pip install -r requirements.txt
 
-RUN ./start.sh clean
-RUN ./start.sh build
-#CMD ["./start.sh", "run", "server", $REPLICA_ID]
+RUN cd rendezvous-server ;\
+    ./start.sh clean ;\
+    ./start.sh build

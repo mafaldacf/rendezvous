@@ -1,0 +1,13 @@
+{
+  "requests_cleanup_sleep_m": 30,
+  "subscribers_cleanup_sleep_m": 30,
+  "subscribers_max_wait_time_s": 60,
+  "wait_replica_timeout_s": 10,
+  
+  "replicas": {
+    "eu": {
+      "host": "3.70.201.28",
+      "port": 8001
+    }
+  }
+}
