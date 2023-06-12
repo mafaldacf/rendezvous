@@ -60,7 +60,7 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
   metadata::Subscriber * subscriber;
   const std::string& subscriber_id = computeSubscriberId(service, tag);
 
-  spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
+  //spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
   
   std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
   auto it_regions = _subscribers.find(subscriber_id);

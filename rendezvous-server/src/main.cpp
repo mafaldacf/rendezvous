@@ -122,7 +122,7 @@ void usage(char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-  spdlog::set_level(spdlog::level::debug);
+  spdlog::set_level(spdlog::level::info);
 
   if (argc > 1) {
     if (argc == 2) {

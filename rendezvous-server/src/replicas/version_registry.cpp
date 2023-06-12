@@ -26,6 +26,6 @@ void VersionRegistry::updateRemoteVersion(const std::string& id, const int& vers
 void VersionRegistry::waitRemoteVersions(const rendezvous::RequestContext& info) {
     std::unique_lock<std::mutex> lock(_mutex_versions);
     for (const auto & pair : info.versions()) {
-        //spdlog::trace("Waiting remote version -> replica {}: remote = {}, local = {}", pair.first, pair.second, _versions[pair.first]);
+        //spdlog::debug("Waiting remote version -> replica {}: remote = {}, local = {}", pair.first, pair.second, _versions[pair.first]);
     }
 }

@@ -1,5 +1,5 @@
-# sudo docker run -it -p 8001:8001 --hostname rendezvous-eu --network socialnetwork_default rendezvous
-# sudo docker run -it -p 8002:8002 --hostname rendezvous-us --network socialnetwork_default rendezvous
+# sudo docker run -it -p 8001:8001 mafaldacf/rendezvous
+# sudo docker run -it -p 8002:8002 rmafaldacf/endezvous
 
 version: "3.9"
 services:
