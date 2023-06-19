@@ -331,9 +331,9 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
   else
     result = request->wait();
 
-  if (result == 1) {
+  /* if (result == 1) {
     _prevented_inconsistencies.fetch_add(1);
-  }
+  } */
 
   return result;
 }

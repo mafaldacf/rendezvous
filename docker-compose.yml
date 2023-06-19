@@ -1,5 +1,5 @@
 # sudo docker run -it -p 8001:8001 mafaldacf/rendezvous
-# sudo docker run -it -p 8002:8002 rmafaldacf/endezvous
+# sudo docker run -it -p 8002:8002 mafaldacf/endezvous
 
 version: "3.9"
 services:

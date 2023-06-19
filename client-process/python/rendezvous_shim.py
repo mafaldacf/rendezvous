@@ -124,7 +124,7 @@ class RendezvousShim:
         reader = self.stub.SubscribeBranches(request)
         for response in reader:
           bid = response.bid
-          print("[DEBUG] Subcription: received bid=", bid, flush=True)
+          #print("[DEBUG] Subcription: received bid=", bid, flush=True)
           with lock:
             bids.add(bid)
             cond.notify_all()
@@ -149,7 +149,7 @@ class RendezvousShim:
       for bid in copy:
         if self.find_metadata(bid):
           try:
-            print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
+            #print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
             self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
             closed.append(bid)
 

@@ -28,15 +28,18 @@ class RendezvousDynamo(RendezvousShim):
     return False
 
   def find_metadata(self, bid):
-    response = self.rendezvous_table.get_item(Key={'bid': bid})
-    if 'Item' in response:
-      item = response['Item']
+    try:
+      response = self.rendezvous_table.get_item(Key={'bid': bid})
+      if 'Item' in response:
+        item = response['Item']
 
-      # wait until object (post) is available
-      if not self._find_object(bid, item['obj_key']):
-        return False
+        # wait until object (post) is available
+        if not self._find_object(bid, item['obj_key']):
+          return False
 
-      return True
+        return True
+    except Exception as e:
+      print(f"[ERROR] [Dynamo] {e.details()}")
     
     return False
 

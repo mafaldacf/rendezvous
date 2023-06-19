@@ -1,5 +1,5 @@
 rendezvous: 
-  address: rendezvous-us:8002
+  address: localhost:8002
 
 aws:
   mysql:

@@ -1,0 +1,15 @@
+metadata_validity_s: 30
+close_branches_db_sleep_time_s: 35
+close_branches_db: True
+server_unavailable_sleep_time_s: 2
+
+rendezvous: 
+  address: localhost:8001
+
+services:
+  post_storage: 
+    region: eu
+    datastores:
+      aws_dynamo:
+        region: eu-central-1
+        table: blobs

@@ -37,6 +37,8 @@ def init_process(cloud_provider, region, datastore):
     rendezvous_api = Rendezvous(shim_layer)
     rendezvous_api.close_subscribed_branches()
 
+# Usage: python3 main.py -cp aws -r eu -d dynamo
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     cloud_provider_group = parser.add_argument_group('Cloud Provider')
