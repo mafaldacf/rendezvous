@@ -49,6 +49,7 @@ class RendezvousCache(RendezvousShim):
     #hardcoded filter
     time_ago = time.time() + self.metadata_validity_s
     for item in items:
-      if item['ts'] >= time_ago:
+      metadata = json.loads(item)
+      if metadata['ts'] >= time_ago:
         result.append(item)
     return result

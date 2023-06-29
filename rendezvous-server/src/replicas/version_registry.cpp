@@ -7,7 +7,8 @@ VersionRegistry::VersionRegistry(int wait_replica_timeout_s) :
 
 int VersionRegistry::updateLocalVersion(const std::string& id) {
     _mutex_versions.lock();
-    int version = ++_versions[id];
+    _versions[id] = _versions[id] + 1;
+    int version = _versions[id];
     _mutex_versions.unlock();
     return version;
 }

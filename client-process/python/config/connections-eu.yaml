@@ -15,5 +15,5 @@ aws:
   s3:
     bucket: antipode-lambda-posts-eu-rendezvous
   cache:
-    host: antipode-lambda-eu-001.gwkjt4.0001.euc1.cache.amazonaws.com
+    host: antipode-lambda-writer-001.gwkjt4.0001.euc1.cache.amazonaws.com
     port: 6379
