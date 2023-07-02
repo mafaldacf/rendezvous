@@ -53,9 +53,8 @@ namespace rendezvous {
             std::shared_mutex _mutex_subscribers;
 
         public:
-            Server(std::string sid, int requests_cleanup_sleep_m, 
-                int subscribers_cleanup_sleep_m, int _subscribers_max_wait_time_s,
-                int wait_replica_timeout_s);
+            Server(std::string sid, json settings);
+            Server(std::string sid);
             ~Server();
 
             /**
@@ -192,11 +191,12 @@ namespace rendezvous {
              * 
              * @param request Request where the branch is registered
              * @param service The service context
+             * @param timeout Timeout in seconds
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              */
-            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region);
+            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout = 0);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)

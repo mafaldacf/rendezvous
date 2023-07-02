@@ -55,10 +55,10 @@ namespace metadata {
             std::unordered_map<std::string, metadata::Branch*> _branches;
 
             // number of opened branches
-            std::atomic<uint64_t> _num_branches;
-            std::unordered_map<std::string, uint64_t> _num_branches_service;
-            std::unordered_map<std::string, uint64_t> _num_branches_region;
-            std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>> _num_branches_service_region;
+            std::atomic<int> _num_branches;
+            std::unordered_map<std::string, int> _num_branches_service;
+            std::unordered_map<std::string, int> _num_branches_region;
+            std::unordered_map<std::string, std::unordered_map<std::string, int>> _num_branches_service_region;
 
             // concurrency control
             std::mutex _mutex_branches;
@@ -159,7 +159,7 @@ namespace metadata {
              * @param region The region context
              * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
              */
-            void trackBranchOnContext(const std::string& service, const std::string& region, const long& value);
+            void trackBranchOnContext(const std::string& service, const std::string& region, long value);
 
             /**
              * Track a set of branches (add or remove) according to their context (service, region or none) in the corresponding maps
@@ -169,54 +169,67 @@ namespace metadata {
              * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
              * @param num The number of new branches
              */
-            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, const long& value, const int& num);
+            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, long value, int num);
+            
+            /**
+             * Compute remaining timeout based on the original timeout value and the elapsed time
+             * 
+             * @param timeout Timeout, in seconds, provided by the user
+             * @param start_time
+            */
+            std::chrono::seconds computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
 
             /**
              * Wait until request is closed
+             * 
+             * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - 2 if context was not found
+             * - (-1) if timeout was reached
              */
-            int wait();
+            int wait(int timeout);
 
             /**
              * Wait until request is closed for a given context (service)
              *
              * @param service The name of the service that defines the waiting context
+             * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - 2 if context was not found
+             * - (-1) if timeout was reached
              */
-            int waitOnService(const std::string& service);
+            int waitOnService(const std::string& service, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
              *
              * @param region The name of the region that defines the waiting context
+             * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - 2 if context was not found
+             * - (-1) if timeout was reached
              */
-            int waitOnRegion(const std::string& region);
+            int waitOnRegion(const std::string& region, int timeout);
 
             /**
              * Wait until request is closed for a given context (service and region)
              *
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
+             * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - 2 if context was not found
              */
-            int waitOnServiceAndRegion(const std::string& service, const std::string& region);
+            int waitOnServiceAndRegion(const std::string& service, const std::string& region, int timeout);
 
             /**
              * Check status of request

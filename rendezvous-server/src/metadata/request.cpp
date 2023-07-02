@@ -11,9 +11,9 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
 
-    _num_branches_region = std::unordered_map<std::string, uint64_t>();
-    _num_branches_service = std::unordered_map<std::string, uint64_t>();
-    _num_branches_service_region = std::unordered_map<std::string, std::unordered_map<std::string, uint64_t>>();
+    _num_branches_region = std::unordered_map<std::string, int>();
+    _num_branches_service = std::unordered_map<std::string, int>();
+    _num_branches_service_region = std::unordered_map<std::string, std::unordered_map<std::string, int>>();
 }
 
 Request::~Request() {
@@ -146,7 +146,7 @@ int Request::closeBranch(const std::string& bid, const std::string& region, std:
     return 1;
 }
 
-void Request::trackBranchOnContext(const std::string& service, const std::string& region, const long& value) {
+void Request::trackBranchOnContext(const std::string& service, const std::string& region, long value) {
     _num_branches.fetch_add(value);
 
     if (!service.empty()) {
@@ -178,7 +178,7 @@ void Request::trackBranchOnContext(const std::string& service, const std::string
     }
 }
 
-void Request::trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, const long& value, const int& num) {
+void Request::trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, long value, int num) {
     _num_branches.fetch_add(value*num);
 
     if (!service.empty()) {
@@ -217,81 +217,126 @@ void Request::trackBranchesOnContext(const std::string& service, const utils::Pr
 
 }
 
-int Request::wait() {
+std::chrono::seconds Request::computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time) {
+    if (timeout != 0) {
+        auto elapsed_time = std::chrono::steady_clock::now() - start_time;
+        auto remaining_timeout = std::chrono::seconds(timeout) - std::chrono::duration_cast<std::chrono::seconds>(elapsed_time);
+        return remaining_timeout;
+    }
+    return std::chrono::seconds(60);
+}
+
+int Request::wait(int timeout) {
     int inconsistency = 0;
+    
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_timeout = computeRemainingTimeout(timeout, start_time);
+
     std::unique_lock<std::mutex> lock(_mutex_branches);
     while (_num_branches.load() != 0) {
-        _cond_branches.wait(lock);
+        _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
         inconsistency = 1;
+
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
     return inconsistency;
 }
 
-int Request::waitOnService(const std::string& service) {
+int Request::waitOnService(const std::string& service, int timeout) {
     int inconsistency = 0;
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_timeout = computeRemainingTimeout(timeout, start_time);
 
     std::unique_lock<std::mutex> lock(_mutex_num_branches_service);
 
-    // branch not registered yet
+    // wait until branch is registered
     while (_num_branches_service.count(service) == 0) {
-        _cond_num_branches_service.wait(lock);
         inconsistency = 1;
+        _cond_branches.wait_for(lock, remaining_timeout);
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
 
-    uint64_t * valuePtr = &_num_branches_service[service];
-    while (*valuePtr != 0) {
-        _cond_num_branches_service.wait(lock);
+    int * num_branches_ptr = &_num_branches_service[service];
+    while (*num_branches_ptr != 0) {
+        _cond_branches.wait_for(lock, remaining_timeout);
         inconsistency = 1;
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
     
     return inconsistency;
 }
 
-int Request::waitOnRegion(const std::string& region) {
+int Request::waitOnRegion(const std::string& region, int timeout) {
     int inconsistency = 0;
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_timeout = computeRemainingTimeout(timeout, start_time);
 
     std::unique_lock<std::mutex> lock(_mutex_num_branches_region);
 
     // branch not registered yet
     while (_num_branches_region.count(region) == 0) {
-        _cond_num_branches_region.wait(lock);
         inconsistency = 1;
+        _cond_num_branches_region.wait_for(lock, remaining_timeout);
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
 
-    uint64_t * valuePtr = &_num_branches_region[region];
-    while (*valuePtr != 0) {
-        _cond_num_branches_region.wait(lock);
+    int * num_branches_ptr = &_num_branches_region[region];
+    while (*num_branches_ptr != 0) {
         inconsistency = 1;
+        _cond_num_branches_region.wait_for(lock, remaining_timeout);
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
 
     return inconsistency;
 }
 
-int Request::waitOnServiceAndRegion(const std::string& service, const std::string& region) {
+int Request::waitOnServiceAndRegion(const std::string& service, const std::string& region, int timeout) {
     int inconsistency = 0;
+
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_timeout = computeRemainingTimeout(timeout, start_time);
 
     std::unique_lock<std::mutex> lock(_mutex_num_branches_service_region);
 
     auto service_it = _num_branches_service_region.find(service);
     while (service_it == _num_branches_service_region.end()) {
-        _cond_num_branches_service_region.wait(lock);
+        _cond_num_branches_service_region.wait_for(lock, remaining_timeout);
         inconsistency = 1;
+
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
+
         service_it = _num_branches_service_region.find(service);
     }
 
     auto region_it = service_it->second.find(region);
     while (region_it == service_it->second.end()) {
-        _cond_num_branches_service_region.wait(lock);
+        _cond_num_branches_service_region.wait_for(lock, remaining_timeout);
         inconsistency = 1;
+
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
+
         region_it = service_it->second.find(region);
     }
 
-    uint64_t * valuePtr = &region_it->second;
+    int * num_branches_ptr = &region_it->second;
 
-    while (*valuePtr != 0) {
-        _cond_num_branches_service_region.wait(lock);
+    while (*num_branches_ptr != 0) {
+        _cond_num_branches_service_region.wait_for(lock, remaining_timeout);
         inconsistency = 1;
+
+        remaining_timeout = computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) return -1;
     }
+
     return inconsistency;
 }
 

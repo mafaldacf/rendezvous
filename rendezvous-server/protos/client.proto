@@ -103,7 +103,8 @@ message WaitRequestMessage {
   string rid = 1;
   string service = 2;
   string region = 3;
-  RequestContext context = 4;
+  int32 timeout = 4;
+  RequestContext context = 5;
 }
 
 message WaitRequestResponse {

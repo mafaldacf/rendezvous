@@ -9,8 +9,6 @@
 TEST SERVER LOGIC
 
 ----------------- */
-
-
 const int OK = 0;
 const int OPENED = 0;
 const int CLOSED = 1;
@@ -24,10 +22,6 @@ const int INVALID_BRANCH_REGION = -3;
 const std::string SID = "eu-central-1";
 const std::string RID = "myrequestid";
 const std::string TAG = "mytag";
-const int _requests_collector_sleep_m = 30;
-const int _subscribers_collector_sleep_m = 30;
-const int _subscribers_max_wait_time_s = 60;
-const int _wait_replica_timeout_s = 10;
 
 std::string getRid(int id) {
   return SID + ':' + std::to_string(id);
@@ -38,8 +32,7 @@ std::string getBid(std::string rid, int id) {
 }
 
 TEST(ServerTest, getOrRegisterRequest_WithNoRid) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID);
 
   metadata::Request * request = server.getOrRegisterRequest(getRid(0));
   ASSERT_TRUE(request != nullptr);
@@ -52,8 +45,8 @@ TEST(ServerTest, getOrRegisterRequest_WithNoRid) {
 }
 
 TEST(ServerTest, getOrRegisterRequest_WithRid) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_TRUE(request != nullptr);
@@ -66,16 +59,16 @@ TEST(ServerTest, getOrRegisterRequest_WithRid) {
 }
 
 TEST(ServerTest, GetRequest_InvalidRID) {
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s); 
+  rendezvous::Server server(SID); 
+     
 
   metadata::Request * request = server.getRequest("invalidRID");
   ASSERT_TRUE(request == nullptr);
 }
 
 TEST(ServerTest, GetOrRegisterAndGetRequest) {
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s); 
+  rendezvous::Server server(SID); 
+     
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   metadata::Request * request2 = server.getRequest(RID);
@@ -86,8 +79,8 @@ TEST(ServerTest, GetOrRegisterAndGetRequest) {
 }
 
 TEST(ServerTest, GetOrRegisterTwiceRequest) {
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s); 
+  rendezvous::Server server(SID); 
+     
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   metadata::Request * request2 = server.getOrRegisterRequest(RID);
@@ -98,8 +91,8 @@ TEST(ServerTest, GetOrRegisterTwiceRequest) {
 }
 
 TEST(ServerTest, RegisterBranch) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -108,8 +101,8 @@ TEST(ServerTest, RegisterBranch) {
 }
 
 TEST(ServerTest, RegisterBranch_WithService) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -118,8 +111,8 @@ TEST(ServerTest, RegisterBranch_WithService) {
 }
 
 TEST(ServerTest, RegisterBranch_WithRegion) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -128,8 +121,8 @@ TEST(ServerTest, RegisterBranch_WithRegion) {
 }
 
 TEST(ServerTest, RegisterBranch_WithServiceAndRegion) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -138,8 +131,8 @@ TEST(ServerTest, RegisterBranch_WithServiceAndRegion) {
 }
 
 TEST(ServerTest, CloseBranch) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
@@ -150,8 +143,8 @@ TEST(ServerTest, CloseBranch) {
 }
 
 TEST(ServerTest, CloseBranchInvalidRegion) {
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -162,8 +155,8 @@ TEST(ServerTest, CloseBranchInvalidRegion) {
 }
 
 TEST(ServerTest, CloseBranchInvalidBid) {
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
@@ -174,8 +167,8 @@ TEST(ServerTest, CloseBranchInvalidBid) {
 }
 
 TEST(ServerTest, CheckRequest_AllContexts) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   int status;
   bool found_region = false;
 
@@ -236,8 +229,8 @@ TEST(ServerTest, CheckRequest_AllContexts) {
 }
 
 TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   int status;
   bool found_region = false;
   std::string bid = "";
@@ -361,8 +354,8 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
 }
 
 TEST(ServerTest, CheckRequest_ContextNotFound) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   int status;
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
@@ -383,8 +376,8 @@ TEST(ServerTest, CheckRequest_ContextNotFound) {
 }
 
 TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   std::map<std::string, int> result;
   std::string bid;
   bool found_region = false;
@@ -461,8 +454,8 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) {
 }
 
 TEST(ServerTest, CheckRequestByRegions_AllContexts) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   std::map<std::string, int> result;
   std::string bid;
   bool found_region = false;
@@ -528,8 +521,8 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
 }
 
 TEST(ServerTest, CheckRequestByRegions_RegionAndContextNotFound) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
   std::map<std::string, int> result;
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
@@ -552,8 +545,8 @@ TEST(ServerTest, CheckRequestByRegions_RegionAndContextNotFound) {
 
 // sanity check
 TEST(ServerTest, PreventedInconsistencies_GetZeroValue) { 
-  rendezvous::Server server(SID, _requests_collector_sleep_m, 
-    _subscribers_collector_sleep_m, _subscribers_max_wait_time_s, _wait_replica_timeout_s);
+  rendezvous::Server server(SID); 
+    
 
   long value = server.getNumPreventedInconsistencies();
   ASSERT_EQ(0, value);

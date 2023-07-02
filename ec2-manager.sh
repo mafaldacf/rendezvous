@@ -1,10 +1,10 @@
 #!/bin/bash
 
-hostname_eu="18.197.10.189"
-hostname_us="54.172.169.68"
+HOSTNAME_EU="3.71.255.200"
+HOSTNAME_US="18.233.5.140"
 
-ssh_key_eu="~/.ssh/rendezvous-eu-2.pem"
-ssh_key_us="~/.ssh/rendezvous-us-2.pem"
+SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
+SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 
 setup() {
     hostname=$1
@@ -12,10 +12,13 @@ setup() {
     region=$3
 
     scp -i "$ssh_key" rendezvous-server/config.json "ubuntu@$hostname:rendezvous/rendezvous-server"
-    echo "Copied config.json file to '$region' instance"
+    echo "Copied config files to '$region' instance"
 
-    scp -i "$ssh_key" client-process/python/config/connections-$region.yaml "ubuntu@$hostname:rendezvous/client-process/python/config"
+    scp -i "$ssh_key" subscriber-process/python/config/* "ubuntu@$hostname:rendezvous/subscriber-process/python/config"
     echo "Copied connections-$region.yaml file to '$region' instance"
+
+    scp -i "$ssh_key" -r subscriber-process/python/*.py "ubuntu@$hostname:rendezvous/subscriber-process/python"
+    echo "Copied python code to '$region' instance"
 }
 
 deploy() {
@@ -28,7 +31,7 @@ deploy() {
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started rendezvous server in '$region' instance"
 
-    cmd="cd rendezvous/client-process/python && python3 main.py -cp aws -r $region -d $datastore"
+    cmd="cd rendezvous/subscriber-process/python && python3 main.py -cp aws -r $region -d $datastore"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started client process in '$region' instance"
 }
@@ -58,13 +61,13 @@ usage() {
 }
 
 if [ "$#" -eq 1 ] && [ $1 = "setup" ]; then
-    setup $hostname_eu $ssh_key_eu eu
-    setup $hostname_us $ssh_key_us us
+    setup $HOSTNAME_EU $SSH_KEY_EU eu
+    setup $HOSTNAME_US $SSH_KEY_US us
 
 elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "eu" ]; then
     case "$3" in 
         "dynamo" | "s3" | "cache" | "mysql")
-            deploy $hostname_eu $ssh_key_eu eu $3
+            deploy $HOSTNAME_EU $SSH_KEY_EU eu $3
             ;;
         *)
             usage
@@ -74,7 +77,7 @@ elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "eu" ]; then
 elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "us" ]; then
     case "$3" in 
         "dynamo" | "s3" | "cache" | "mysql")
-            deploy $hostname_us $ssh_key_us us $3
+            deploy $HOSTNAME_US $SSH_KEY_US us $3
             ;;
         *)
             usage
@@ -82,10 +85,10 @@ elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "us" ]; then
     esac
 
 elif [ "$#" -eq 2 ] && [ $1 = "stop" ] && [ $2 = "eu" ]; then
-    stop $hostname_eu $ssh_key_eu eu 8001
+    stop $HOSTNAME_EU $SSH_KEY_EU eu 8001
 
 elif [ "$#" -eq 2 ] && [ $1 = "stop" ] && [ $2 = "us" ]; then
-    stop $hostname_us $ssh_key_us us 8002
+    stop $HOSTNAME_US $SSH_KEY_US us 8002
 
 else
     usage

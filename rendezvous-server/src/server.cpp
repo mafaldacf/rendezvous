@@ -2,18 +2,34 @@
 
 using namespace rendezvous;
 
-Server::Server(std::string sid, int requests_cleanup_sleep_m, 
-  int subscribers_cleanup_sleep_m, int subscribers_max_wait_time_s,
-  int wait_replica_timeout_s)
+Server::Server(std::string sid, json settings)
     : _next_rid(0), _prevented_inconsistencies(0), _sid(sid), 
-    _requests_cleanup_sleep_m(requests_cleanup_sleep_m),
-    _subscribers_cleanup_sleep_m(subscribers_cleanup_sleep_m),
-    _subscribers_max_wait_time_s(subscribers_max_wait_time_s),
-    _wait_replica_timeout_s(wait_replica_timeout_s) {
+    _requests_cleanup_sleep_m(settings["requests_cleanup_sleep_m"].get<int>()),
+    _subscribers_cleanup_sleep_m(settings["subscribers_cleanup_sleep_m"].get<int>()),
+    _subscribers_max_wait_time_s(settings["subscribers_max_wait_time_s"].get<int>()),
+    _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
+
+      std::cout << "- Requests cleanup sleep: " << _requests_cleanup_sleep_m << "m" << std::endl;
+      std::cout << "- Subscribers cleanup sleep: " << _subscribers_cleanup_sleep_m << "m" << std::endl;
+      std::cout << "- Subscribers max wait time: " << _subscribers_max_wait_time_s << "s" << std::endl;
+      std::cout << "- Wait replica timeout: " << _wait_replica_timeout_s << "s" << std::endl;
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
 }
+
+// testing purposes
+Server::Server(std::string sid)
+    : _next_rid(0), _prevented_inconsistencies(0), _sid(sid), 
+    _requests_cleanup_sleep_m(30),
+    _subscribers_cleanup_sleep_m(30),
+    _subscribers_max_wait_time_s(60),
+    _wait_replica_timeout_s(60) {
+    
+    _requests = std::unordered_map<std::string, metadata::Request*>();
+    _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
+}
+
 
 Server::~Server() {
   for (auto pair = _requests.begin(); pair != _requests.end(); pair++) {
@@ -314,26 +330,26 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return request->closeBranch(bid, region, service, tag);
 }
 
-int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region) {
+int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout) {
   int result;
   metadata::Subscriber * subscriber;
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitOnServiceAndRegion(service, region);
+    result = request->waitOnServiceAndRegion(service, region, timeout);
 
   else if (!service.empty())
-    result = request->waitOnService(service);
+    result = request->waitOnService(service, timeout);
 
   else if (!region.empty())
-    result = request->waitOnRegion(region);
+    result = request->waitOnRegion(region, timeout);
 
   else
-    result = request->wait();
+    result = request->wait(timeout);
 
-  /* if (result == 1) {
+  if (result == 1) {
     _prevented_inconsistencies.fetch_add(1);
-  } */
+  }
 
   return result;
 }

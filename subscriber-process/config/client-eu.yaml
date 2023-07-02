@@ -1,7 +1,7 @@
 service: post_storage
-region: us-east-1
+region: eu-central-1
 
 metadata_validity_s: 30
 close_branches_db_sleep_time_s: 35
-close_branches_db: True
+close_branches_db: False
 server_unavailable_sleep_time_s: 2

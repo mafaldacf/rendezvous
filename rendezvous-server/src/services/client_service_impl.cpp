@@ -21,9 +21,14 @@ grpc::Status ClientServiceImpl::SubscribeBranches(grpc::ServerContext * context,
 
   while (true) {
     std::string bid = subscriber->popBranch();
-    response.set_bid(bid);
-    //spdlog::trace("> subscribe branch --> sending rid: {}", bid.c_str());
-    writer->Write(response);
+    if (!bid.empty()) {
+      response.set_bid(bid);
+      //spdlog::trace("> subscribe branch --> sending rid: {}", bid.c_str());
+      writer->Write(response);
+    }
+    else {
+      // TODO: check if client is still alive!!
+    }
   }
 
   return grpc::Status::OK;
@@ -232,14 +237,19 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& region = request->region();
+  int timeout = request->timeout();
   rendezvous::RequestContext ctx = request->context();
+
+  if (timeout <= 0) {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
+  }
 
   //spdlog::trace("> wait request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
 
   metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
   rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
 
-  int result = server->waitRequest(rdv_request, service, region);
+  int result = server->waitRequest(rdv_request, service, region, timeout);
 
   // inconsistency was prevented
   if (result == 1) {

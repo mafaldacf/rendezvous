@@ -26,10 +26,8 @@ std::unique_ptr<grpc::Server> server;
 static std::string _replica_id = "replica-eu";
 static std::string _replica_addr;
 static std::vector<std::string> _replicas_addrs;
-static int _requests_cleanup_sleep_m;
-static int _subscribers_cleanup_sleep_m;
-static int _subscribers_max_wait_time_s;
-static int _wait_replica_timeout_s;
+
+static json _settings;
 
 void sigintHandler(int sig) {
   server->Shutdown();
@@ -48,9 +46,7 @@ void shutdown(std::unique_ptr<grpc::Server> &server) {
 void run() {
 
   auto rendezvous_server = std::make_shared<rendezvous::Server> (
-    _replica_id, _requests_cleanup_sleep_m, 
-    _subscribers_cleanup_sleep_m, _subscribers_max_wait_time_s,
-    _wait_replica_timeout_s);
+    _replica_id, _settings);
 
   service::ClientServiceImpl client_service(rendezvous_server, _replicas_addrs);
   service::ServerServiceImpl server_service(rendezvous_server);
@@ -84,13 +80,7 @@ void loadConfig() {
   try {
     json root;
     file >> root;
-    // load timers for garbage collector
-    _requests_cleanup_sleep_m = root["requests_cleanup_sleep_m"].get<int>();
-    _subscribers_cleanup_sleep_m = root["subscribers_cleanup_sleep_m"].get<int>();
-
-    // load timeouts for subscribers and replicas
-    _subscribers_max_wait_time_s = root["subscribers_max_wait_time_s"].get<int>();
-    _subscribers_max_wait_time_s = root["wait_replica_timeout_s"].get<int>();
+    _settings = root["local_settings"];
 
     // load replicas addresses
     for (const auto &replica : root["replicas"].items()) {

@@ -8,7 +8,6 @@ aws:
     user: antipode
     password: antipode
     db: antipode
-    table: blobs
   dynamo:
     region: eu-central-1
     table: blobs

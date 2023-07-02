@@ -25,17 +25,17 @@ std::string Subscriber::popBranch() {
     while (_subscribed_branches.size() == 0) {
         //spdlog::debug("waiting for subscribed branches...");
         status = _cond.wait_for(lock, std::chrono::seconds(_subscribers_max_wait_time_s));
-    }
-
-    if (status == std::cv_status::no_timeout) {
-        std::string bid = _subscribed_branches.front();
-        _subscribed_branches.pop();
-        //spdlog::debug("getting subscribed request {}", bid.c_str());
         
-        return bid;
+        if (status == std::cv_status::timeout) {
+            return "";
+        }
     }
 
-    return "";
+    std::string bid = _subscribed_branches.front();
+    _subscribed_branches.pop();
+    //spdlog::debug("getting subscribed request {}", bid.c_str());
+    
+    return bid;
 }
 
 std::chrono::time_point<std::chrono::system_clock> Subscriber::getLastTs() {

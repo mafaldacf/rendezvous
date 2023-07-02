@@ -24,6 +24,7 @@ class RendezvousMysql(RendezvousShim):
       autocommit=True
     )
 
+
   def find_metadata(self, bid):
     with self.conn.cursor() as cursor:
       sql = f"SELECT `bid` FROM `{MYSQL_RENDEZVOUS_TABLE}` WHERE `bid` = %s"
