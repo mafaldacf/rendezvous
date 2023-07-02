@@ -4,9 +4,6 @@ import json
 from rendezvous_shim import RendezvousShim
 import time
 
-#S3_RENDEZVOUS_PATH = os.environ['S3_RENDEZVOUS_PATH']
-S3_RENDEZVOUS_PATH = 'rendezvous'
-
 class RendezvousS3(RendezvousShim):
   def __init__(self, service, region, rendezvous_address, client_config):
     super().__init__(service, region, rendezvous_address, client_config)
@@ -14,19 +11,25 @@ class RendezvousS3(RendezvousShim):
     self.s3_client = None
     self.continuation_token = None
   
-  def init_conn(self, bucket):
+  def init_conn(self, bucket, client_path, rendezvous_path):
     self.bucket = bucket
     self.s3_client = boto3.client('s3')
+    self.client_path = client_path
+    self.rendezvous_path = rendezvous_path
+
+  def _bucket_key_client(self, key):
+    return f"{self.client_path}/{key}" if self.client_path else key
 
   def _bucket_key_rendezvous(self, bid):
-    return f"{S3_RENDEZVOUS_PATH}/{bid}"
+    return f"{self.rendezvous_path}/{bid}"
   
   def _bucket_prefix_rendezvous(self):
-    return f"{S3_RENDEZVOUS_PATH}/"
+    return f"{self.rendezvous_path}/"
+    
   
   def _find_object(self, bid, obj_key, metadata_created_at):
     try:
-      response = self.s3_client.head_object(Bucket=self.bucket, Key=obj_key)
+      response = self.s3_client.head_object(Bucket=self.bucket, Key=self._bucket_key_client(obj_key))
 
       # found the object version we were looking for with the correct bid
       if response.get('Metadata') and response['Metadata'].get('rendezvous') == bid:

@@ -240,7 +240,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   int timeout = request->timeout();
   rendezvous::RequestContext ctx = request->context();
 
-  if (timeout <= 0) {
+  if (timeout < 0) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
   }
 

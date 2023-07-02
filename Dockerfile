@@ -3,12 +3,12 @@ FROM mafaldacf/rendezvous-deps:latest
 WORKDIR /app
 COPY . .
 
-RUN cd client-process/python ;\
+RUN cd subscriber-process ;\
     pip install -r requirements.txt
 
 RUN cd client-eval ;\
     pip install -r requirements.txt
 
 RUN cd rendezvous-server ;\
-    ./start.sh clean ;\
-    ./start.sh build
+    ./rendezvous.sh clean ;\
+    ./rendezvous.sh build

@@ -8,11 +8,17 @@ aws:
     user: antipode
     password: antipode
     db: antipode
+    rendezvous_table: rendezvous
   dynamo:
     region: eu-central-1
-    table: blobs
+    client_table: blobs
+    rendezvous_table: rendezvous
   s3:
     bucket: antipode-lambda-posts-eu-rendezvous
+    client_path: null
+    rendezvous_path: rendezvous
   cache:
     host: antipode-lambda-writer-001.gwkjt4.0001.euc1.cache.amazonaws.com
     port: 6379
+    client_prefix: null
+    rendezvous_prefix: rendezvous

@@ -4,7 +4,7 @@ from rendezvous_shim import RendezvousShim
 
 #MYSQL_RENDEZVOUS_TABLE = os.environ['MYSQL_RENDEZVOUS_TABLE']
 #RENDEZVOUS_ADDRESS = os.environ['RENDEZVOUS_ADDRESS']
-MYSQL_RENDEZVOUS_TABLE = 'rendezvous'
+MYSQL_RENDEZVOUS_TABLE = 'blobs'
 
 class RendezvousMysql(RendezvousShim):
   def __init__(self, service, region, rendezvous_address, client_config):
@@ -13,7 +13,7 @@ class RendezvousMysql(RendezvousShim):
     self.offset = 0
     self.max_records = 10000
 
-  def init_conn(self, host, port, user, password, db):
+  def init_conn(self, host, port, user, password, db, rendezvous_table):
     self.conn = pymysql.connect(
       host=host,
       port=port,
@@ -23,19 +23,15 @@ class RendezvousMysql(RendezvousShim):
       connect_timeout=30,
       autocommit=True
     )
+    self.rendezvous_table = rendezvous_table
 
 
   def find_metadata(self, bid):
     with self.conn.cursor() as cursor:
-      sql = f"SELECT `bid` FROM `{MYSQL_RENDEZVOUS_TABLE}` WHERE `bid` = %s"
+      sql = f"SELECT COUNT(*) FROM `{self.rendezvous_table}` WHERE `bid` = %s"
       cursor.execute(sql, (bid,))
-      records = cursor.fetchall()
-
-      if records:
-        return records[0][0]
-      
-      self.inconsistency = True
-      return None
+      count = cursor.fetchone()[0]
+      return count > 0
 
   def _parse_metadata(self, record):
     return record
@@ -44,7 +40,7 @@ class RendezvousMysql(RendezvousShim):
     with self.conn.cursor() as cursor:
       # fetch non-expired metadata
       # is it worth ordering just to control an offset??
-      sql = f"SELECT `bid` FROM `{MYSQL_RENDEZVOUS_TABLE}` WHERE `ts` >= DATE_SUB(NOW(), INTERVAL %s SECOND) ORDER BY `ts` LIMIT %s,%s"
+      sql = f"SELECT `bid` FROM `{self.rendezvous_table}` WHERE `ts` >= DATE_SUB(NOW(), INTERVAL %s SECOND) ORDER BY `ts` LIMIT %s,%s"
       cursor.execute(sql, (self.metadata_validity_s, self.offset, self.max_records))
       records = cursor.fetchall()
       num_records = cursor.rowcount

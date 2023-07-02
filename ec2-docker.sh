@@ -44,5 +44,5 @@ ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
 cmd="sudo docker pull mafaldacf/rendezvous-deps; sudo docker pull mafaldacf/rendezvous"
 ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
 
-cmd="sudo docker-compose up --force-recreate rendezvous-${region} client-${db}-${region}"
+cmd="sudo docker-compose up --force-recreate rendezvous-${region} subscriber-${db}-${region}"
 ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd

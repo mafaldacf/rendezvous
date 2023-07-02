@@ -16,51 +16,51 @@ services:
       - 8002:8002
     entrypoint: sh -c "cd rendezvous-server && ./start.sh run server us"
 
-  client-cache-eu:
+  subscriber-cache-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d cache -r eu"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d cache -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-cache-us:
+  subscriber-cache-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d cache -r us"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d cache -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-dynamo-eu:
+  subscriber-dynamo-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d dynamo -r eu"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d dynamo -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-dynamo-us:
+  subscriber-dynamo-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d dynamo -r us"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d dynamo -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-mysql-eu:
+  subscriber-mysql-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d mysql -r eu"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d mysql -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-mysql-us:
+  subscriber-mysql-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d mysql -r us"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d mysql -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-s3-eu:
+  subscriber-s3-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d s3 -r eu"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d s3 -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  client-s3-us:
+  subscriber-s3-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd client-process/python && python3 main.py -cp aws -d s3 -r us"
+    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d s3 -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials

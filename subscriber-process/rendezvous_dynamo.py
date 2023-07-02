@@ -3,27 +3,22 @@ from rendezvous_shim import RendezvousShim
 from boto3.dynamodb.conditions import Attr
 import time
 
-#DYNAMO_RENDEZVOUS_TABLE = os.environ['DYNAMO_RENDEZVOUS_TABLE']
-#DYNAMO_POST_TABLE_NAME = os.environ['DYNAMO_POST_TABLE_NAME']
-DYNAMO_RENDEZVOUS_TABLE = 'rendezvous'
-DYNAMO_POST_TABLE_NAME = None
-
 class RendezvousDynamo(RendezvousShim):
   def __init__(self, service, region, rendezvous_address, client_config):
     super().__init__(service, region, rendezvous_address, client_config)
     self.conn = None
+    self.client_table = None
     self.rendezvous_table = None
-    self.table = None
     self.last_evaluated_key = None
 
-  def init_conn(self, region, table):
+  def init_conn(self, region, client_table, rendezvous_table):
     self.conn = boto3.resource('dynamodb', region_name=region, endpoint_url=f"http://dynamodb.{region}.amazonaws.com")
-    self.table = self.conn.Table(table)
-    self.rendezvous_table = self.conn.Table(DYNAMO_RENDEZVOUS_TABLE)
+    self.client_table = self.conn.Table(client_table)
+    self.rendezvous_table = self.conn.Table(rendezvous_table)
 
   def _find_object(self, bid, obj_key):
-    response = self.table.get_item(Key={'k': obj_key}, AttributesToGet=['rendezvous'])
-    if 'Item' in response and bid == response['Item']['rendezvous']:
+    response = self.client_table.get_item(Key={'k': obj_key}, AttributesToGet=['rdv_bid'])
+    if 'Item' in response and bid == response['Item']['rdv_bid']:
       return True
     return False
 
