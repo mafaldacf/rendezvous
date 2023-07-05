@@ -11,14 +11,10 @@ class RendezvousS3(RendezvousShim):
     self.s3_client = None
     self.continuation_token = None
   
-  def init_conn(self, bucket, client_path, rendezvous_path):
+  def init_conn(self, bucket, rendezvous_path):
     self.bucket = bucket
     self.s3_client = boto3.client('s3')
-    self.client_path = client_path
     self.rendezvous_path = rendezvous_path
-
-  def _bucket_key_client(self, key):
-    return f"{self.client_path}/{key}" if self.client_path else key
 
   def _bucket_key_rendezvous(self, bid):
     return f"{self.rendezvous_path}/{bid}"
@@ -29,10 +25,10 @@ class RendezvousS3(RendezvousShim):
   
   def _find_object(self, bid, obj_key, metadata_created_at):
     try:
-      response = self.s3_client.head_object(Bucket=self.bucket, Key=self._bucket_key_client(obj_key))
+      response = self.s3_client.head_object(Bucket=self.bucket, Key=obj_key)
 
       # found the object version we were looking for with the correct bid
-      if response.get('Metadata') and response['Metadata'].get('rendezvous') == bid:
+      if response.get('Metadata') and response['Metadata'].get('rdv_bid') == bid:
         return True
       
       # current object corresponds to a newer version
@@ -50,14 +46,16 @@ class RendezvousS3(RendezvousShim):
   def find_metadata(self, bid):
     try:
       response = self.s3_client.get_object(Bucket=self.bucket, Key=self._bucket_key_rendezvous(bid))
-      obj = json.loads(response['Body'].read())
+      obj_key = str(response['Body'].read().decode('utf-8'))
+
+      #print("got object key: ", obj_key)
 
       # wait until object (post) is available
-      if not self._find_object(bid, obj['obj_key'], response['LastModified']):
+      if not self._find_object(bid, obj_key, response['LastModified']):
         self.inconsistency = True
-        return None
+        return False
 
-      return obj['bid']
+      return True
 
     except botocore.exceptions.ClientError as e:
       if e.response['Error']['Code'] in ['NoSuchKey','404']:

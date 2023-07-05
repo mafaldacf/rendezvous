@@ -124,7 +124,7 @@ class RendezvousShim:
         reader = self.stub.SubscribeBranches(request)
         for response in reader:
           bid = response.bid
-          print("[DEBUG] Subcription: received bid=", bid, flush=True)
+          #print("[DEBUG] Subcription: received bid=", bid, flush=True)
           with lock:
             bids.add(bid)
             cond.notify_all()
@@ -143,6 +143,7 @@ class RendezvousShim:
         while len(bids) == 0 and self.running:
           #print("[DEBUG] Closure: waiting for bids...", flush=True)
           cond.wait()
+        #print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
         copy = bids.copy()
 
       closed = []

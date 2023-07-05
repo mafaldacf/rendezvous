@@ -13,7 +13,7 @@ class RendezvousMysql(RendezvousShim):
     self.offset = 0
     self.max_records = 10000
 
-  def init_conn(self, host, port, user, password, db, rendezvous_table):
+  def init_conn(self, host, port, user, password, db, client_table, rendezvous_table):
     self.conn = pymysql.connect(
       host=host,
       port=port,
@@ -23,12 +23,13 @@ class RendezvousMysql(RendezvousShim):
       connect_timeout=30,
       autocommit=True
     )
+    self.client_table = client_table
     self.rendezvous_table = rendezvous_table
 
 
   def find_metadata(self, bid):
     with self.conn.cursor() as cursor:
-      sql = f"SELECT COUNT(*) FROM `{self.rendezvous_table}` WHERE `bid` = %s"
+      sql = f"SELECT COUNT(*) FROM `{self.client_table}` WHERE `rdv_bid` = %s"
       cursor.execute(sql, (bid,))
       count = cursor.fetchone()[0]
       return count > 0

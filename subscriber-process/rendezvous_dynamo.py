@@ -1,6 +1,6 @@
 import boto3
 from rendezvous_shim import RendezvousShim
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Attr, Key
 import time
 
 class RendezvousDynamo(RendezvousShim):
@@ -24,18 +24,24 @@ class RendezvousDynamo(RendezvousShim):
 
   def find_metadata(self, bid):
     try:
-      response = self.rendezvous_table.get_item(Key={'bid': bid})
-      if 'Item' in response:
-        item = response['Item']
+      #response = self.rendezvous_table.get_item(Key={'bid': bid})
+      response = self.client_table.query(            
+        IndexName='rdv_bid-index',
+        KeyConditionExpression=Key('rdv_bid').eq(bid),     
+      )
+
+      if 'Items' in response and len(response['Items']) > 0:
+        #print("Found item!", response['Items'][0], flush=True)
+        return True
+      #if 'Item' in response:
+      #  item = response['Item']
 
         # wait until object (post) is available
-        if not self._find_object(bid, item['obj_key']):
-          return False
-
-        return True
+      #  if self._find_object(bid, item['obj_key']):
+      #    return True
     except Exception as e:
-      print(f"[ERROR] [Dynamo] {e.details()}")
-    
+      print(f"[ERROR] [Dynamo] {e}")
+    #print("[DynamoDB] Item not found :(", response)
     return False
 
   def _parse_metadata(self, item):
