@@ -11,18 +11,22 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import glob
 import sys
+import paramiko
 
 from proto import rendezvous_pb2 as pb
 from proto import rendezvous_pb2_grpc as rdv
 
+REMOTE_ADDRESS = "localhost:8001"
+SSH_KEY = "/home/leafen/.ssh/rendezvous-us-2.pem"
+
 class EvalClient():
     def __init__(self):
-        self.channel = grpc.insecure_channel("localhost:8001")
+        self.channel = grpc.insecure_channel(REMOTE_ADDRESS)
         self.stub = rdv.ClientServiceStub(self.channel)
         self.do_send = True
         self.results = {}
 
-    def gather_thread(self, responses, latencies, total, task_id):
+    def gather_thread(self, responses, latencies, task_id):
         num_responses = 0
         sum_latencies = 0
         for i, response in enumerate(responses):
@@ -103,7 +107,7 @@ class EvalClient():
     
         self.gather_thread(responses, latencies, total, task_id)
 
-    def init(self, duration, threads, rate):
+    def run(self, duration, threads, rate):
         thread_pool = []
         for i in range(threads):
             self.results[i] = None
@@ -117,30 +121,37 @@ class EvalClient():
 
         self.gather_all(duration, threads, rate)
 
-    def plot(self):
-        latencies = []
-        throughputs = []
-        plt.clf()
+    def remote(self, duration, threads, rate, start_time):
+        pass
 
-        for file_path in glob.glob("./results/" + "*.txt"):
-            with open(file_path, "r") as file:
-                for line in file:
-                    if "Results=" in line:
-                        result_values = line.split("Results=")[1].strip()
-                        avg_latency, throughput = result_values.split(";")
-                        latencies.append(float(avg_latency))
-                        throughputs.append(float(throughput))
-        
-        sorted_points = sorted(zip(latencies, throughputs))
-        sorted_latencies, sorted_throughputs = zip(*sorted_points)
-        plt.plot(sorted_latencies, sorted_throughputs, marker='o', color='blue', label='Data Points')
-        plt.title("Latency by throughput")
-        plt.xlabel("Throughput (req/s)")
-        plt.ylabel("Latency (ms)")
-        plot_name = f'plots/{time.time()}.png'
-        plt.savefig(plot_name)
-        print(f"Successfuly saved plot figure in {plot_name}!")
-                        
+    def exec_remote(self, hostname):
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            private_key = paramiko.RSAKey.from_private_key_file(private_key_path)
+            client.connect(hostname, username='ubuntu', pkey=private_key)
+            print(f"Connected to {hostname}")
+
+            sftp = client.open_sftp()
+            sftp.put(localpath='/home/leafen/Desktop/rendezvous/client-eval.py', remotepath='home/ubuntu')
+            sftp.close()
+            print(f"Copied python script")
+
+            _, stdout, _ = client.exec_command(f"python3 home/ubuntu/client-eval.py -d ")
+            results = stdout.read().decode()
+            client.close()
+
+            return results
+
+        except paramiko.AuthenticationException:
+            print(f"Authentication failed for {hostname}.")
+        except paramiko.SSHException as ssh_ex:
+            print(f"Error occurred while connecting to {hostname}: {ssh_ex}")
+        except Exception as ex:
+            print(f"An error occurred for {hostname}: {ex}")
+
+        return None
+
 
 
 # Usage: python3 client.py run -d 5 -t 15 -r 2
@@ -158,6 +169,12 @@ if __name__ == '__main__':
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
 
+    remote_parser = command_parser.add_parser('remote', help="Remote")
+    remote_parser.add_argument('-d', '--duration', type=int, default=1, help="Duration in s")
+    remote_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
+    remote_parser.add_argument('-r', '--rate', type=int, default=1, required=True, help="Throughput (rate/s)")
+    remote_parser.add_argument('-s', '--start-time', type=str, help="Time of day to start executing")
+
     args = vars(main_parser.parse_args())
     print("Arguments:", args)
     command = args.pop('command')
@@ -170,7 +187,10 @@ if __name__ == '__main__':
         #print(f"Sleeping until {target_datetime}")
         #pause.until(target_datetime)
 
-        evalClient.init(**args)
+        evalClient.run(**args)
+
+    elif command == 'remote':
+        evalClient.remote(**args)
 
     elif command == 'plot':
         evalClient.plot()

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-HOSTNAME_EU="18.197.60.247"
-HOSTNAME_US="3.83.158.201"
+HOSTNAME_EU="3.72.7.183"
+HOSTNAME_US="3.83.247.42"
 
-SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
-SSH_KEY_US="~/.ssh/rendezvous-us.pem"
+SSH_KEY_EU="~/.ssh/rendezvous-eu-2.pem"
+SSH_KEY_US="~/.ssh/rendezvous-us-2.pem"
 
 setup() {
     hostname=$1
@@ -38,11 +38,13 @@ update() {
     scp -i "$ssh_key" rendezvous-server/config.json "ubuntu@$hostname:rendezvous/rendezvous-server"
     echo "Copied config files to '$region' instance"
 
-    scp -i "$ssh_key" subscriber-process/config/* "ubuntu@$hostname:rendezvous/subscriber-process/config"
-    echo "Copied connections-$region.yaml file to '$region' instance"
+    if [ $region != "eu" ]; then
+        scp -i "$ssh_key" subscriber-process/config/* "ubuntu@$hostname:rendezvous/subscriber-process/config"
+        echo "Copied connections-$region.yaml file to '$region' instance"
 
-    scp -i "$ssh_key" -r subscriber-process/*.py "ubuntu@$hostname:rendezvous/subscriber-process"
-    echo "Copied python code to '$region' instance"
+        scp -i "$ssh_key" -r subscriber-process/*.py "ubuntu@$hostname:rendezvous/subscriber-process"
+        echo "Copied python code to '$region' instance"
+    fi
 }
 
 start() {
@@ -59,9 +61,11 @@ start() {
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started rendezvous server in '$region' instance"
 
-    cmd="cd rendezvous/subscriber-process && python3 main.py -cp aws -r $region -d $datastore"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
-    echo "Started client process in '$region' instance"
+    if [ $region != "eu" ]; then
+        cmd="cd rendezvous/subscriber-process && python3 main.py -cp aws -r $region -d $datastore"
+        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
+        echo "Started client process in '$region' instance"
+    fi
 }
 
 stop() {
@@ -74,9 +78,11 @@ stop() {
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
     echo "Killed rendezvous server process listening on port $port in '$region' instance"
 
-    cmd="pkill -9 python"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
-    echo "Killed python client process in '$region' instance"
+    if [ $region != "eu" ]; then
+        cmd="pkill -9 python"
+        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+        echo "Killed python client process in '$region' instance"
+    fi
 }
 
 usage() {
