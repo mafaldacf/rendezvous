@@ -7,7 +7,6 @@ target_link_libraries(
     rendezvous_client_lib 
     rendezvous_server_lib 
     nlohmann_json::nlohmann_json
-    tbb
     spdlog::spdlog_header_only)
 
 # UNCOMMENT to enable AddressSanitizer for detecting memory errors/leaks

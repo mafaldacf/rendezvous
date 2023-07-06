@@ -64,12 +64,13 @@ sudo rm -r ~/deps/json
 echo '(6) Installing spdlog...'
 cd ~/deps
 git clone -b v1.11.0 https://github.com/gabime/spdlog.git
-cd spdlog
+cd  
 mkdir build
 cd build
 sudo cmake ..
 sudo make -j
 sudo rm -r ~/deps/spdlog
+sudo apt-get install libspdlog-dev # idk why i need this but it only works like this
 
 # Remaining stuff
 sudo apt update
@@ -77,7 +78,7 @@ sudo apt upgrade -y
 sudo apt install build-essential -y
 
 # Install python dependencies
-cd ~/rendezvous/client-process/python
+cd ~/rendezvous/subscriber-process/python
 sudo apt install python3-pip -y
 sudo pip install -r requirements.txt
 
