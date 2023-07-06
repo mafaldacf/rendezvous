@@ -1,0 +1,6 @@
+pyyaml
+boto3
+grpcio
+grpcio-tools
+pymysql
+redis
