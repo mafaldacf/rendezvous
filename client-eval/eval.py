@@ -20,28 +20,29 @@ from proto import rendezvous_pb2_grpc as rdv
 
 from threading import Thread, Lock
 
-RESULTS_DIR = "results/second_eval"
-RENDEZVOUS_ADDRESS = "3.123.128.138:8001"
-CLIENT_SSH_KEY = "/home/leafen/.ssh/rendezvous-eu-2.pem"
-CLIENTS_IP = ["3.73.124.189", "3.120.245.63", "3.122.53.196", "3.71.196.185", "3.75.249.223"]
+RESULTS_DIR = "results/fourth_eval"
+SSH_KEY_PATH = "/home/leafen/.ssh/rendezvous-eu-2.pem"
+CLIENTS_IP = ["3.70.70.228", "3.66.235.64", "3.64.216.49", "3.77.53.5", "18.156.69.235"]
+SERVER_IP = "localhost"
+SERVER_ADDRESS = f"{SERVER_IP}:8001"
 STARTUP_DELAY_S = 2
 GATHER_DELAY_S = 1
 
 
 class EvalClient():
-    def __init__(self, rendezvous_address=None):
-        if rendezvous_address:
-            self.channel = grpc.insecure_channel(rendezvous_address)
+    def __init__(self, server_address=None):
+        if server_address:
+            self.channel = grpc.insecure_channel(server_address)
             self.stub = rdv.ClientServiceStub(self.channel)
         self.do_send = True
         self.results = {}
         self.mutex = Lock()
 
-    def get_datapoints(self, prefix):
+    def get_datapoints(self, directory, prefix=''):
         latencies = []
         throughputs = []
 
-        for file_path in glob.glob(f"{RESULTS_DIR}/{prefix}_*.txt"):
+        for file_path in glob.glob(f"{directory}/{prefix}*.txt"):
             with open(file_path, "r") as file:
                 for line in file:
                     if "Throughput" in line:
@@ -54,44 +55,93 @@ class EvalClient():
         latencies.sort()
         return sorted(zip(throughputs, latencies))
     
-    def annotate_plot(self, plt, datapoints):
+    def annotate_clients(self, plt, datapoints):
         # hard coded :(
-        if len(x) == 5:
-            xy_pos = [(-25, 5), (-30, 5), (-30, 0), (-30, 0)]
+        if len(datapoints) == 5:
+            #xy_pos = [(-25, 5), (-30, 5), (-30, 0), (-30, 0)]
+            xy_pos = [(10, 15), (-35, 5), (-30, 5), (-30, 0), (-30, 0)]
             for i, (throughput, latency) in enumerate(datapoints):
-                if i == 0:
-                    plt.annotate(f"1 client", (throughput, latency), xytext=(5, 15), textcoords='offset points', ha='center')
-                else:
-                    plt.annotate(f"{i+1} clients", (throughput, latency), xytext=xy_pos[i-1], textcoords='offset points', ha='center')
+                #if i == 0:
+                #    plt.annotate(f"1 client", (throughput, latency), xytext=(5, 15), textcoords='offset points', ha='center')
+                #else:
+                #    plt.annotate(f"{i+1} clients", (throughput, latency), xytext=xy_pos[i-1], textcoords='offset points', ha='center')
+                plt.annotate(f"{(i+1)*200} clients", (throughput, latency), xytext=xy_pos[i], textcoords='offset points', ha='center', size=8)
 
-    def plot(self):
-        # Apply the default theme
+    # Plot throughput-latency
+    # Each datapoints represents a different number of datastores (1, 5, 10, 25, 50, 75, 100)
+    def plot_line_datastores(self, directory):
+        datapoints = self.get_datapoints(directory + '/datastores')
+        data = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1]
+            } for dp in datapoints
+        ]
+        plt = self.plot_line(data)
+
+        plot_name = f'plots/line_datastores_{time.time()}.png'
+        plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
+        print(f"Successfuly saved plot figure in {plot_name}!")
+
+    # Plot throughput-latency
+    # Each datapoints represents a different number of clients (1 to 5)
+    def plot_line_clients(self, directory):
+        datapoints = self.get_datapoints(directory + '/clients')
+        data = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1]
+            } for dp in datapoints
+        ]
+
+        plt = self.plot_line(data)
+        self.annotate_clients(plt, datapoints)
+
+        plot_name = f'plots/line_clients_{time.time()}.png'
+        plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
+        print(f"Successfuly saved plot figure in {plot_name}!")
+
+    def plot_line(self, data):
         sns.set_theme(style='ticks')
         plt.rcParams["figure.figsize"] = [6,3.5] 
         plt.rcParams["figure.dpi"] = 600
         plt.rcParams['axes.labelsize'] = 'small'
 
-        plt.xlabel("Throughput (req/s)")
-        plt.ylabel("Latency (ms)")
+        df = pd.DataFrame.from_records(data)
+        pp(df)
+        ax = sns.lineplot(data=df, x="throughput", y="latency", marker='o')
+        ax.set_xlabel('Throughput (req/s)')
+        ax.set_ylabel('Latency (ms)')
+        return plt
+
+
+    
+    # Multiline plot throughput-latency
+    # 3 lines for different number of datastores (1, 10 and 100)
+    def plot_multiline(self, directory):
+        sns.set_theme(style='ticks')
+        plt.rcParams["figure.figsize"] = [6,3.5] 
+        plt.rcParams["figure.dpi"] = 600
+        plt.rcParams['axes.labelsize'] = 'small'
 
         results = {
-            '1 region': self.get_datapoints('metadata_1'),
-            '10 regions': self.get_datapoints('metadata_10'),
-            '100 regions': self.get_datapoints('metadata_100')
+            '1 datastore': self.get_datapoints(directory, 'datastores_1_'),
+            '10 datastores': self.get_datapoints(directory, 'datastores_10_'),
+            '100 datastores': self.get_datapoints(directory, 'datastores_100_')
         }
 
         data = [
             {
             'throughput': dp[0],
             'latency': dp[1],
-            'metadata': metadata,
+            'datastores': metadata,
             } for metadata, dps in results.items() for dp in dps
         ]
         
 
         df = pd.DataFrame.from_records(data)
         pp(df)
-        ax = sns.lineplot(data=df, x="throughput", y="latency", hue='metadata', marker='o')
+        ax = sns.lineplot(data=df, x="throughput", y="latency", hue='datastores', marker='o')
         # reverse order of legend
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles[::-1], labels[::-1],)
@@ -100,12 +150,10 @@ class EvalClient():
         ax.set_ylabel('Latency (ms)')
         ax.legend_.set_title(None)
 
-        #self.annotate_plot(plt, results['1 region'])
-
-        plot_name = f'plots/{time.time()}.png'
+        plot_name = f'plots/multiline_{time.time()}.png'
         plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
         print(f"Successfuly saved plot figure in {plot_name}!")
-    
+
     def gather_current_thread(self, task_id, requests, responses, latencies):
         total_latency = 0
         for i in range(responses):
@@ -145,16 +193,25 @@ class EvalClient():
         responses = 0
         latencies = []
         
-        regions = []
+        """ regions = []
         for i in range(metadata_size):
-            regions.append(f"a-very-interesting-region-{i}")
-
-        request = pb.RegisterBranchesMessage(rid=str(task_id), regions=regions, service='eval_service')
+            regions.append(f"a-very-interesting-region-{i}") """
+        
+        datastores = []
+        for i in range(metadata_size):
+            datastores.append(f"a-very-interesting-datastore-{i}")
+        
+        #request = pb.RegisterBranchesMessage(rid=str(task_id), regions=regions, service='eval_service')
+        request = pb.RegisterBranchesMessage2(rid=str(task_id), datastores=datastores, regions=["EU", "US"])
+        
         while self.do_send:
             try:
                 requests += 1
                 start_ts = datetime.utcnow().timestamp()
-                self.stub.RegisterBranches(request)
+                #self.stub.RegisterBranches(request)
+                response = self.stub.RegisterBranches2(request)
+                print(response)
+                exit(0)
                 end_ts = datetime.utcnow().timestamp()
                 latency_ms = int((end_ts - start_ts) * 1000)
                 latencies.append(latency_ms)
@@ -169,20 +226,24 @@ class EvalClient():
     
         self.gather_current_thread(task_id, requests, responses, latencies)
 
-    def run(self, rendezvous_address, duration, threads, sleep, metadata_size):
+    def run(self, server_address, duration, threads, sleep, metadata_size):
         thread_pool = []
-        for i in range(threads):
-            self.results[i] = None
-            thread_pool.append(threading.Thread(target=self.send, args=(sleep, i, metadata_size)))
 
-        for t in thread_pool:
-            t.start()
+        if threads > 1:
+            for i in range(threads):
+                self.results[i] = None
+                thread_pool.append(threading.Thread(target=self.send, args=(sleep, i, metadata_size)))
 
-        time.sleep(duration)
-        self.do_send = False
+            for t in thread_pool:
+                t.start()
 
-        for t in thread_pool:
-            t.join()
+            time.sleep(duration)
+            self.do_send = False
+
+            for t in thread_pool:
+                t.join()
+        else:
+            self.send(sleep, 0, metadata_size)
 
         self.gather(duration)
 
@@ -190,16 +251,44 @@ class EvalClient():
         for client in CLIENTS_IP:
             self.copy_remote(client)
 
-    def remote_run(self, rendezvous_address, duration, threads, sleep, clients, metadata_size):
-        print("-----------------------------------", flush=True)
-        print(f"Running eval for {clients} clients", flush=True)
+    def restart_server(self):
+        print(f"Restarting metadata server on {SERVER_ADDRESS}...")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
+        try:
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+            client.connect(SERVER_IP, username='ubuntu', pkey=private_key)
+
+            _, _, stderr = client.exec_command(f"fuser -k 8001/tcp")
+            stderr = stderr.read().decode()
+            if len(stderr) > 0 and '8001/tcp' not in stderr:
+                print(f"[ERROR] {stderr}", flush=True)
+                exit(-1)
+
+            _, _, stderr = client.exec_command(f"cd rendezvous/rendezvous-server && ./rendezvous.sh run server eu")
+            stderr = stderr.read().decode()
+            if len(stderr) > 0:
+                print(f"[ERROR] {stderr}", flush=True)
+                exit(-1)
+
+        except paramiko.AuthenticationException:
+            print(f"Authentication failed for {SERVER_IP}.", flush=True)
+            exit(-1)
+        except paramiko.SSHException as ssh_ex:
+            print(f"Error occurred while connecting to {SERVER_IP}: {ssh_ex}", flush=True)
+            exit(-1)
+        except Exception as ex:
+            print(f"An error occurred for {SERVER_IP}: {ex}", flush=True)
+            exit(-1)
+
+    def start_clients(self, server_address, duration, threads, sleep, clients, metadata_size):
         thread_results = [None] * clients
         thread_pool = []
 
         for client_id in range(clients):
             client_addr = CLIENTS_IP[client_id]
-            thread_pool.append(threading.Thread(target=self.exec_remote, args=(thread_results, client_id, client_addr, rendezvous_address, duration, threads, sleep, metadata_size)))
+            thread_pool.append(threading.Thread(target=self.exec_remote, args=(thread_results, client_id, client_addr, server_address, duration, threads, sleep, metadata_size)))
         
         for t in thread_pool:
             t.start()
@@ -209,7 +298,7 @@ class EvalClient():
         for t in thread_pool:
             t.join()
 
-        results_filename = f"metadata_{metadata_size}_clients_{clients}_duration_{duration}_threads_{threads}__{datetime.now().strftime('%Y%m%d%H%M')}.txt"
+        results_filename = f"datastores_{metadata_size}_clients_{clients}_duration_{duration}_threads_{threads}__{datetime.now().strftime('%Y%m%d%H%M')}.txt"
         with open(f"{RESULTS_DIR}/{results_filename}", 'w') as file:
         
             final_results = {'requests': 0, 'responses': 0, 'throughput (req/s)': 0.0, 'avg_latency (ms)': 0}
@@ -231,14 +320,25 @@ class EvalClient():
             file.write(f"Latency (ms): {int(final_results['avg_latency (ms)'])}\n")
 
             print(f"Final Results: {final_results}", flush=True)
-        
+
+    def remote_run(self, server_address, duration, threads, sleep, clients, max_clients, metadata_size):
+        if max_clients:
+            t = threading.Thread(target=self.restart_server)
+            t.start()
+            print("Waiting for server to start...")
+            time.sleep(5)
+            for clients in range(1, max_clients+1):
+                self.start_clients(server_address, duration, threads, sleep, clients, metadata_size)
+
+        else:
+            self.start_clients(server_address, duration, threads, sleep, clients, metadata_size)
 
     def copy_remote(self, hostname):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         try:
-            private_key = paramiko.RSAKey.from_private_key_file(CLIENT_SSH_KEY)
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
             client.connect(hostname, username='ubuntu', pkey=private_key)
             print(f"[SCP] Connected to {hostname}", flush=True)
 
@@ -248,7 +348,7 @@ class EvalClient():
                 scp.put('requirements.txt', '/home/ubuntu/client-eval')
                 scp.put('proto', '/home/ubuntu/client-eval', recursive=True)
 
-            _, stdout, stderr = client.exec_command(f"cd client-eval && sudo pip install -r requirements.txt")
+            _, _, stderr = client.exec_command(f"cd client-eval && sudo pip install -r requirements.txt")
             stderr = stderr.read().decode()
             if len(stderr) > 0:
                 print(f"[ERROR] {stderr}", flush=True)
@@ -260,16 +360,16 @@ class EvalClient():
         except Exception as ex:
             print(f"An error occurred for {hostname}: {ex}", flush=True)
 
-    def exec_remote(self, thread_results, task_id, client_address, rendezvous_address, duration, threads, sleep, metadata_size):
+    def exec_remote(self, thread_results, task_id, client_address, server_address, duration, threads, sleep, metadata_size):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         results = {}
         try:
-            private_key = paramiko.RSAKey.from_private_key_file(CLIENT_SSH_KEY)
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
             client.connect(client_address, username='ubuntu', pkey=private_key)
             print(f"[EXEC] Connected to {client_address}", flush=True)
 
-            _, stdout, stderr = client.exec_command(f"python3 client-eval/eval.py run -d {duration} -t {threads} -s {sleep} -addr {rendezvous_address} -m {metadata_size}")
+            _, stdout, stderr = client.exec_command(f"python3 client-eval/eval.py run -d {duration} -t {threads} -s {sleep} -addr {server_address} -m {metadata_size}")
             
             stderr = stderr.read().decode()
             if len(stderr) > 0:
@@ -288,19 +388,26 @@ class EvalClient():
 
         except paramiko.AuthenticationException:
             print(f"Authentication failed for {client_address}.", flush=True)
+            exit(-1)
         except paramiko.SSHException as ssh_ex:
             print(f"Error occurred while connecting to {client_address}: {ssh_ex}", flush=True)
+            exit(-1)
         except Exception as ex:
             print(f"An error occurred for {client_address}: {ex}", flush=True)
+            exit(-1)
 
         return None
                         
 
 
 # Usage: python3 eval.py run -d 5 -t 275
-# OR   : python3 eval.py remote-run -d 30 -t 275 -m 1000 -c 1
+# OR   : python3 eval.py run -d 1 -t 1 -m 1
+# OR   : python3 eval.py remote-run -d 30 -t 200 -m 10 -c 1
+# OR   : python3 eval.py remote-run -d 30 -t 200 -m 10 -mc 5
 # OR   : python3 eval.py remote-deploy
-# OR   : python3 client.py plot
+# OR   : python3 eval.py plot -t multiline
+# OR   : python3 eval.py plot -t line-clients
+# OR   : python3 eval.py plot -t line-datastores
 if __name__ == '__main__':
     main_parser = argparse.ArgumentParser()
     command_parser = main_parser.add_subparsers(help='commands', dest='command')
@@ -309,7 +416,7 @@ if __name__ == '__main__':
     run_parser.add_argument('-d', '--duration', type=int, default=2, help="Duration in s")
     run_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
     run_parser.add_argument('-s', '--sleep', type=float, default=0.0, help="Sleep between requests")
-    run_parser.add_argument('-addr', '--rendezvous_address', type=str, default=RENDEZVOUS_ADDRESS, help="Address of rendezvous metadata server")
+    run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
     run_parser.add_argument('-m', '--metadata_size', type=int, default=1, help="Metadata size (number of regions)")
 
     remote_deploy_parser = command_parser.add_parser('remote-deploy', help="Remote Deploy")
@@ -319,17 +426,21 @@ if __name__ == '__main__':
     remote_run_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
     remote_run_parser.add_argument('-s', '--sleep', type=float, default=0.0, help="Sleep between requests")
     remote_run_parser.add_argument('-c', '--clients', type=int, default=len(CLIENTS_IP), help="Number of clients")
-    remote_run_parser.add_argument('-addr', '--rendezvous_address', type=str, default=RENDEZVOUS_ADDRESS, help="Address of rendezvous metadata server")
+    remote_run_parser.add_argument('-mc', '--max_clients', type=int, default=None, help="Maximum number of clients")
+    remote_run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
     remote_run_parser.add_argument('-m', '--metadata_size', type=int, default=1, help="Metadata size (number of regions)")
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
+    plot_parser.add_argument('-t', '--type', type=str, choices=['multiline', 'line-clients', 'line-datastores'], help="Type of plot")
+    plot_parser.add_argument('-d', '--directory', type=str, default=RESULTS_DIR, help="Base directory of results")
+
 
     args = vars(main_parser.parse_args())
     print("Arguments:", args, flush=True)
     command = args.pop('command')
 
-    if 'rendezvous_address' in args:
-        evalClient = EvalClient(args['rendezvous_address'])
+    if 'server_address' in args:
+        evalClient = EvalClient(args['server_address'])
     else:
         evalClient = EvalClient()
 
@@ -342,13 +453,19 @@ if __name__ == '__main__':
         print(f"Starting evaluation", flush=True)
         evalClient.run(**args)
 
-    elif command in ['remote-run', 'remote-deploy', 'plot']:
+    elif command in ['remote-run', 'remote-deploy']:
 
         if command == 'remote-run' and args['clients'] > len(CLIENTS_IP):
             print(f"Invalid number of clients! Max value = {len(CLIENTS_IP)}")
             exit(-1)
 
         function_name = command.replace('-', '_')
+        function = getattr(evalClient, function_name, None)
+        function(**args)
+    
+    elif command == 'plot' and args['type']:
+        plot_type = args.pop('type')
+        function_name = command.replace('-', '_') + '_' + plot_type.replace('-', '_')
         function = getattr(evalClient, function_name, None)
         function(**args)
 

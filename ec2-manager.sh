@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTNAME_EU="3.123.128.138"
+HOSTNAME_EU="18.192.63.89"
 HOSTNAME_US="52.87.244.150"
 
 SSH_KEY_EU="~/.ssh/rendezvous-eu-2.pem"
@@ -15,7 +15,7 @@ setup() {
     echo "Cleaned local cmake files"
 
     cmd="rm -rf rendezvous && mkdir rendezvous"
-    ssh -o StrfictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
     echo "Cleaned EC2 instance workspace"
 
     scp -i "$ssh_key" -r rendezvous-server/ subscriber-process/  "ubuntu@$hostname:rendezvous"
