@@ -280,8 +280,7 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
 
   // register request 
-  replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry(_wait_replica_timeout_s);
-  metadata::Request * request = new metadata::Request(rid, versionsRegistry);
+  metadata::Request * request = new metadata::Request(rid);
   _requests.insert({rid, request});
 
   return request;

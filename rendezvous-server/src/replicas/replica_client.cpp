@@ -30,6 +30,8 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
 }
 
 void ReplicaClient::sendRegisterRequest(const std::string& rid) {
+    if (_servers.size() == 0) return;
+
     std::thread([this, rid]() {
         struct RequestHelper req_helper;
 
@@ -57,8 +59,12 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
      }).detach();
 }
 
-void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, const std::string& id, const int& version) {
-    std::thread([this, rid, bid, service, region, id, version]() {
+void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, 
+const std::string& service, const std::string& region, const std::string& id) {
+
+    if (_servers.size() == 0) return;
+
+    std::thread([this, rid, bid, service, region, id]() {
         struct RequestHelper req_helper;
 
         for (const auto& server : _servers) {
@@ -73,7 +79,6 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
 
             rendezvous_server::ReplicaRequestContext ctx;
             ctx.set_replica_id(id);
-            ctx.set_request_version(version);
 
             rendezvous_server::RegisterBranchMessage request;
             request.set_rid(rid);
@@ -93,8 +98,12 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
     }).detach();
 }
 
-void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, const std::string& id, const int& version) {
-    std::thread([this, rid, bid, service, regions, id, version]() {
+void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, 
+const google::protobuf::RepeatedPtrField<std::string>& regions, const std::string& id) {
+
+    if (_servers.size() == 0) return;
+
+    std::thread([this, rid, bid, service, regions, id]() {
         struct RequestHelper req_helper;
 
         for (const auto& server : _servers) {
@@ -109,7 +118,6 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
 
             rendezvous_server::ReplicaRequestContext ctx;
             ctx.set_replica_id(id);
-            ctx.set_request_version(version);
 
             rendezvous_server::RegisterBranchesMessage request;
             request.set_rid(rid);
@@ -130,6 +138,9 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
 }
 
 void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region) {
+
+    if (_servers.size() == 0) return;
+    
     std::thread([this, bid, region]() {
         struct RequestHelper req_helper;
 

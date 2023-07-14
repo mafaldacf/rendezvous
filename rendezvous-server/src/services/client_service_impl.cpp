@@ -92,10 +92,6 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   rdv_request = server->getOrRegisterRequest(rid);
   response->set_rid(rdv_request->getRid());
 
-  // initialize empty metadata
-  rendezvous::RequestContext ctx;
-  response->mutable_context()->CopyFrom(ctx);
-
 
   _replica_client.sendRegisterRequest(rdv_request->getRid());
 
@@ -113,7 +109,6 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& service = request->service();
   const std::string& region = request->region();
   const std::string& tag = request->tag();
-  rendezvous::RequestContext ctx = request->context();
   metadata::Request * rdv_request;
 
   //spdlog::trace("> registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
@@ -131,15 +126,12 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   }
   
   std::string sid = server->getSid();
-  int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-  ctx.mutable_versions()->insert({sid, version});
 
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
-  response->mutable_context()->CopyFrom(ctx);
 
 
-  _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region, sid, version);
+  _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region, sid);
 
   //spdlog::trace("< registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
@@ -154,7 +146,6 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
-  rendezvous::RequestContext ctx = request->context();
   metadata::Request * rdv_request;
 
   int num = request->regions().size();
@@ -175,15 +166,12 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   }
 
   std::string sid = server->getSid();
-  int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-  ctx.mutable_versions()->insert({sid, version});
   
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
-  response->mutable_context()->CopyFrom(ctx);
 
 
-  _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions, sid, version);
+  _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions, sid);
 
   //spdlog::trace("Registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
 
@@ -238,7 +226,6 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   const std::string& service = request->service();
   const std::string& region = request->region();
   int timeout = request->timeout();
-  rendezvous::RequestContext ctx = request->context();
 
   if (timeout < 0) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
@@ -247,7 +234,6 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   //spdlog::trace("> wait request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
 
   metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
 
   int result = server->waitRequest(rdv_request, service, region, timeout);
 
@@ -277,12 +263,10 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& region = request->region();
-  rendezvous::RequestContext ctx = request->context();
 
   //spdlog::trace("> check request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
 
   metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  //rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
 
   int result = server->checkRequest(rdv_request, service, region);
 
@@ -300,12 +284,10 @@ grpc::Status ClientServiceImpl::CheckRequestByRegions(grpc::ServerContext* conte
   
   const std::string& rid = request->rid();
   const std::string& service = request->service();
-  rendezvous::RequestContext ctx = request->context();
 
   //spdlog::trace("> check request by regions call for request '{}' on service='{}'", rid.c_str(), service.c_str());
 
   metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  //rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
 
   std::map<std::string, int> result = server->checkRequestByRegions(rdv_request, service);
 

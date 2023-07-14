@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTNAME_EU="18.195.52.3"
+HOSTNAME_EU="3.123.128.138"
 HOSTNAME_US="52.87.244.150"
 
 SSH_KEY_EU="~/.ssh/rendezvous-eu-2.pem"

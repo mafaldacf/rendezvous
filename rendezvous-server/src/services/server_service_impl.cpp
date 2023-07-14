@@ -31,8 +31,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& service = request->service();
   const std::string& tag = request->tag();
   const std::string& region = request->region();
-  const std::string& replica_id = request->context().replica_id();
-  const int& request_version = request->context().request_version();
+  //const std::string& replica_id = request->context().replica_id();
   metadata::Request * rdv_request;
 
   //spdlog::trace("[REPLICA] > registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
@@ -47,7 +46,6 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   //spdlog::trace("[REPLICA] < registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
 
-  rdv_request->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
   return grpc::Status::OK;
 }
 
@@ -61,8 +59,7 @@ grpc::Status ServerServiceImpl::RegisterBranches(grpc::ServerContext* context,
   const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
-  const std::string& replica_id = request->context().replica_id();
-  const int& request_version = request->context().request_version();
+  //const std::string& replica_id = request->context().replica_id();
   metadata::Request * rdv_request;
 
   const auto& regions = request->regions();
@@ -80,7 +77,6 @@ grpc::Status ServerServiceImpl::RegisterBranches(grpc::ServerContext* context,
 
   //spdlog::trace("[REPLICA] Registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
 
-  rdv_request->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
 
   return grpc::Status::OK;
 }

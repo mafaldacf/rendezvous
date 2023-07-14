@@ -2,8 +2,8 @@
 
 using namespace metadata;
 
-Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
-    : _rid(rid), _next_id(0), _num_branches(0), _versions_registry(versions_registry) {
+Request::Request(std::string rid)
+    : _rid(rid), _next_id(0), _num_branches(0) {
     
     _init_ts = std::chrono::system_clock::now();
     _last_ts = _init_ts;
@@ -20,7 +20,6 @@ Request::~Request() {
     for (const auto& branch_it : _branches) {
         delete branch_it.second;
     }
-    delete _versions_registry;
 }
 
 json Request::toJson() const {
@@ -61,10 +60,6 @@ void Request::refreshLastTs() {
 
 std::string Request::getRid() {
     return _rid;
-}
-
-replicas::VersionRegistry * Request::getVersionsRegistry() {
-    return _versions_registry;
 }
 
 std::string Request::genId() {

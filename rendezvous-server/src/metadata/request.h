@@ -46,9 +46,6 @@ namespace metadata {
             std::chrono::time_point<std::chrono::system_clock> _init_ts;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
 
-            /* replicas versioning */
-            replicas::VersionRegistry * _versions_registry;
-
             /* branching management */
 
             // <bid, branch>
@@ -74,7 +71,7 @@ namespace metadata {
 
         public:
 
-            Request(std::string rid, replicas::VersionRegistry * versions_registry);
+            Request(std::string rid);
             ~Request();
 
             /**
@@ -101,13 +98,6 @@ namespace metadata {
              * @return rid
              */
             std::string getRid();
-
-            /**
-             * Get versions registry
-             * 
-             * @return registry's pointer
-             */
-            replicas::VersionRegistry * getVersionsRegistry();
 
             /**
              * Generate a new identifier
