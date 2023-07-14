@@ -17,3 +17,4 @@ subscriber-process/__pycache__
 subscriber-process/proto/__pycache__
 client-eval/plots/**
 client-eval/results/**
+client-eval/proto/__pycache__/**

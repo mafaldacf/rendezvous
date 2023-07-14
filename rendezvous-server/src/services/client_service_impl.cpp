@@ -178,6 +178,48 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
+grpc::Status ClientServiceImpl::RegisterBranches2(grpc::ServerContext* context, 
+  const rendezvous::RegisterBranchesMessage2* request, 
+  rendezvous::RegisterBranchesResponse2* response) {
+
+  if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  
+  const std::string& rid = request->rid();
+  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
+
+  // client specifies different regions for each datastores using the DatastoreBranching type
+  if (request->branches().size() > 0){
+    for (const auto& branches : request->branches()) {
+      const std::string& datastore = branches.datastore();
+      const auto& regions = branches.regions();
+      std::string bid = server->registerBranches(rdv_request, datastore, regions, "");
+      if (bid.empty()) {
+        return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
+      }
+      response->add_bids(bid);
+    }
+  }
+
+  // client uses same set of regions for all datastores
+  else if (request->datastores().size() > 0 && request->regions().size() > 0) {
+    const auto& regions = request->regions();
+    for (const auto& datastore: request->datastores()) {
+      std::string bid = server->registerBranches(rdv_request, datastore, regions, "");
+      if (bid.empty()) {
+        return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
+      }
+      response->add_bids(bid);
+    }
+  }
+
+  else {
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "TODO");
+  }
+  
+  response->set_rid(rdv_request->getRid());
+  return grpc::Status::OK;
+}
+
 grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context, 
   const rendezvous::CloseBranchMessage* request, 
   rendezvous::Empty* response) {

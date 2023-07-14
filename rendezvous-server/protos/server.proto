@@ -34,7 +34,7 @@ message RegisterBranchMessage {
   string service = 3;
   string tag = 4;
   string region = 5;
-  ReplicaRequestContext context = 6;
+  //ReplicaRequestContext context = 6;
 }
 
 /* Registers Branches */
@@ -45,7 +45,7 @@ message RegisterBranchesMessage {
   string service = 3;
   string tag = 4;
   repeated string regions = 5;
-  ReplicaRequestContext context = 6;
+  //ReplicaRequestContext context = 6;
 }
 
 /* Close Branch */

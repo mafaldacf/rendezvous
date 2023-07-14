@@ -77,15 +77,15 @@ const std::string& service, const std::string& region, const std::string& id) {
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
             req_helper.responses.emplace_back(response);
 
-            rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replica_id(id);
+            //rendezvous_server::ReplicaRequestContext ctx;
+            //ctx.set_replica_id(id);
 
             rendezvous_server::RegisterBranchMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
             request.set_region(region);
-            request.mutable_context()->CopyFrom(ctx);
+            //request.mutable_context()->CopyFrom(ctx);
 
             req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
@@ -116,15 +116,15 @@ const google::protobuf::RepeatedPtrField<std::string>& regions, const std::strin
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
             req_helper.responses.emplace_back(response);
 
-            rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replica_id(id);
+            //rendezvous_server::ReplicaRequestContext ctx;
+            //ctx.set_replica_id(id);
 
             rendezvous_server::RegisterBranchesMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
             request.mutable_regions()->CopyFrom(regions);
-            request.mutable_context()->CopyFrom(ctx);
+            //request.mutable_context()->CopyFrom(ctx);
 
             req_helper.rpcs.emplace_back(server->AsyncRegisterBranches(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);

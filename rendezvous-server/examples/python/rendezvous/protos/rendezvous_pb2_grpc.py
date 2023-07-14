@@ -39,6 +39,11 @@ class ClientServiceStub(object):
                 request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage.SerializeToString,
                 response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse.FromString,
                 )
+        self.RegisterBranches2 = channel.unary_unary(
+                '/rendezvous.ClientService/RegisterBranches2',
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage2.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse2.FromString,
+                )
         self.CloseBranch = channel.unary_unary(
                 '/rendezvous.ClientService/CloseBranch',
                 request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
@@ -101,6 +106,12 @@ class ClientServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RegisterBranches2(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CloseBranch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -158,6 +169,11 @@ def add_ClientServiceServicer_to_server(servicer, server):
                     servicer.RegisterBranches,
                     request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage.FromString,
                     response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse.SerializeToString,
+            ),
+            'RegisterBranches2': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterBranches2,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage2.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse2.SerializeToString,
             ),
             'CloseBranch': grpc.unary_unary_rpc_method_handler(
                     servicer.CloseBranch,
@@ -276,6 +292,23 @@ class ClientService(object):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranches',
             rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage.SerializeToString,
             rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RegisterBranches2(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranches2',
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage2.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse2.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
