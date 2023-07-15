@@ -22,8 +22,8 @@ from threading import Thread, Lock
 
 RESULTS_DIR = "results/fourth_eval"
 SSH_KEY_PATH = "/home/leafen/.ssh/rendezvous-eu-2.pem"
-CLIENTS_IP = ["3.70.70.228", "3.66.235.64", "3.64.216.49", "3.77.53.5", "18.156.69.235"]
-SERVER_IP = "localhost"
+CLIENTS_IP = ["3.70.158.94", "3.75.228.242", "3.121.234.31", "18.192.42.128", "3.65.197.186"]
+SERVER_IP = "3.76.203.3"
 SERVER_ADDRESS = f"{SERVER_IP}:8001"
 STARTUP_DELAY_S = 2
 GATHER_DELAY_S = 1
@@ -51,21 +51,25 @@ class EvalClient():
                     elif "Latency" in line:
                         latency = line.split(":")[1].strip()
                         latencies.append(int(latency))
-        throughputs.sort()
-        latencies.sort()
         return sorted(zip(throughputs, latencies))
     
     def annotate_clients(self, plt, datapoints):
         # hard coded :(
         if len(datapoints) == 5:
-            #xy_pos = [(-25, 5), (-30, 5), (-30, 0), (-30, 0)]
-            xy_pos = [(10, 15), (-35, 5), (-30, 5), (-30, 0), (-30, 0)]
+            #shift = [(10, 15), (-35, 5), (-30, 5), (-30, 0), (-30, 0)]
+            shift = [(5, 10), (-7, 5), (-15, 5), (-15, 0), (-17, -1)]
             for i, (throughput, latency) in enumerate(datapoints):
-                #if i == 0:
-                #    plt.annotate(f"1 client", (throughput, latency), xytext=(5, 15), textcoords='offset points', ha='center')
-                #else:
-                #    plt.annotate(f"{i+1} clients", (throughput, latency), xytext=xy_pos[i-1], textcoords='offset points', ha='center')
-                plt.annotate(f"{(i+1)*200} clients", (throughput, latency), xytext=xy_pos[i], textcoords='offset points', ha='center', size=8)
+                #plt.annotate(f"{(i+1)*200} clients", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=8)
+                plt.annotate(f"{(i+1)*200}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
+
+    def annotate_datastores(self, plt, datapoints):
+        # hard coded :(
+        if len(datapoints) == 7:
+            shift = [(15, -2), (10, 0), (5, 5), (5, 5), (5, 5), (5, 5), (0, 5)]
+            num_datastores = [100, 90, 70, 60, 50, 20, 1]
+            for i, (throughput, latency) in enumerate(datapoints):
+                plt.annotate(f"{num_datastores[i]}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
+
 
     # Plot throughput-latency
     # Each datapoints represents a different number of datastores (1, 5, 10, 25, 50, 75, 100)
@@ -78,6 +82,7 @@ class EvalClient():
             } for dp in datapoints
         ]
         plt = self.plot_line(data)
+        self.annotate_datastores(plt, datapoints)
 
         plot_name = f'plots/line_datastores_{time.time()}.png'
         plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
@@ -90,7 +95,7 @@ class EvalClient():
         data = [
             {
             'throughput': dp[0],
-            'latency': dp[1]
+            'latency': dp[1],
             } for dp in datapoints
         ]
 
@@ -113,8 +118,109 @@ class EvalClient():
         ax.set_xlabel('Throughput (req/s)')
         ax.set_ylabel('Latency (ms)')
         return plt
+    
+    def plot_double_line(self, directory):
+        sns.set_theme(style='ticks')
+        plt.rcParams["figure.figsize"] = [6, 3] 
+        plt.rcParams["figure.dpi"] = 600
+        plt.rcParams['axes.labelsize'] = 'small'
 
+        datapoints = self.get_datapoints(directory + '/clients')
+        data_by_clients = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1],
+            'variation': '# clients'
+            } for dp in datapoints
+        ]
 
+        datapoints = self.get_datapoints(directory + '/datastores')
+        data_by_datastores = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1],
+            'variation': '# datastores'
+            } for dp in datapoints
+        ]
+
+        data = data_by_clients + data_by_datastores
+        df = pd.DataFrame.from_records(data)
+        pp(df)
+        ax = sns.lineplot(data=df, x="throughput", y="latency", dashes=False, hue='variation', style='variation', markers=['o', 'o'])
+
+        # reverse order of legend
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles[::-1], labels[::-1],)
+
+        ax.set_xlabel('Throughput (req/s)')
+        ax.set_ylabel('Latency (ms)')
+        ax.legend_.set_title(None)
+
+        
+
+        plot_name = f'plots/double_line_{time.time()}.png'
+        plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
+        print(f"Successfuly saved plot figure in {plot_name}!")
+
+    def plot_double_sub_plots(self, directory):
+        sns.set_theme(style='ticks')
+        plt.rcParams["figure.figsize"] = [6, 3.5] 
+        plt.rcParams["figure.dpi"] = 600
+        plt.rcParams['axes.labelsize'] = 'small'
+
+        datapoints_by_clients = self.get_datapoints(directory + '/clients')
+        data_by_clients = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1],
+            'variation': '# clients'
+            } for dp in datapoints_by_clients
+        ]
+
+        datapoints_by_datastores = self.get_datapoints(directory + '/datastores')
+        data_by_datastores = [
+            {
+            'throughput': dp[0],
+            'latency': dp[1],
+            'variation': '# datastores'
+            } for dp in datapoints_by_datastores
+        ]
+
+        cl_df = pd.DataFrame.from_records(data_by_clients)
+        pp(cl_df)
+        ds_df = pd.DataFrame.from_records(data_by_datastores)
+        pp(ds_df)
+
+        # create figure for both plots
+        fig, axes = plt.subplots(1, 2)
+
+        # plot datapoints with client variation
+        cl_ax = sns.lineplot(data=cl_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[0])
+        cl_ax.set_xlabel(None)
+        cl_ax.set_ylabel(None)
+        cl_ax.legend_.set_title(None)
+        self.annotate_clients(cl_ax, datapoints_by_clients)
+
+        # plot datapoints with datastore variation and force secondary color of searborn palette
+        ds_ax = sns.lineplot(data=ds_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[1], palette=[sns.color_palette()[1]])
+        ds_ax.set_xlabel(None)
+        ds_ax.set_ylabel(None)
+        ds_ax.legend_.set_title(None)
+        self.annotate_datastores(ds_ax, datapoints_by_datastores)
+
+        # set common x and y labels
+        fig.text(0.5, -0.03, 'Throughput (req/s)', ha='center')
+        fig.text(0.02, 0.5, 'Latency (ms)', va='center', rotation='vertical')
+
+        # Reverse order of legend for both subplots
+        handles, labels = cl_ax.get_legend_handles_labels()
+        cl_ax.legend(handles[::-1], labels[::-1])
+        handles, labels = ds_ax.get_legend_handles_labels()
+        ds_ax.legend(handles[::-1], labels[::-1])
+
+        plot_name = f'plots/double_sub_plots_{time.time()}.png'
+        plt.savefig(plot_name, bbox_inches='tight', pad_inches=0.1)
+        print(f"Successfuly saved plot figure in {plot_name}!")
     
     # Multiline plot throughput-latency
     # 3 lines for different number of datastores (1, 10 and 100)
@@ -173,18 +279,13 @@ class EvalClient():
             avg_latency += v[2]
         
         throughput = num_requests/duration
-        avg_latency = int(avg_latency/len(self.results))
+        avg_latency = avg_latency/len(self.results)
+        avg_latency_round = int(avg_latency)
 
-        #with open(f"./results/duration_{duration}.txt", "w") as file:
-        #    file.write(f"Responses: {num_responses}/{num_requests}\n")
-        #    file.write(f"Throughput (req/s): {throughput}\n")
-        #    file.close()
-
-        #print("\n-------------------------------------------------------", flush=True)
         print(f"requests: {num_requests}", flush=True)
         print(f"responses: {num_responses}", flush=True)
         print(f"throughput: {throughput}", flush=True)
-        print(f"avg_latency: {avg_latency}", flush=True)
+        print(f"avg_latency: {avg_latency_round}", flush=True)
 
 
 
@@ -209,9 +310,7 @@ class EvalClient():
                 requests += 1
                 start_ts = datetime.utcnow().timestamp()
                 #self.stub.RegisterBranches(request)
-                response = self.stub.RegisterBranches2(request)
-                print(response)
-                exit(0)
+                self.stub.RegisterBranches2(request)
                 end_ts = datetime.utcnow().timestamp()
                 latency_ms = int((end_ts - start_ts) * 1000)
                 latencies.append(latency_ms)
@@ -229,21 +328,18 @@ class EvalClient():
     def run(self, server_address, duration, threads, sleep, metadata_size):
         thread_pool = []
 
-        if threads > 1:
-            for i in range(threads):
-                self.results[i] = None
-                thread_pool.append(threading.Thread(target=self.send, args=(sleep, i, metadata_size)))
+        for i in range(threads):
+            self.results[i] = None
+            thread_pool.append(threading.Thread(target=self.send, args=(sleep, i, metadata_size)))
 
-            for t in thread_pool:
-                t.start()
+        for t in thread_pool:
+            t.start()
 
-            time.sleep(duration)
-            self.do_send = False
+        time.sleep(duration)
+        self.do_send = False
 
-            for t in thread_pool:
-                t.join()
-        else:
-            self.send(sleep, 0, metadata_size)
+        for t in thread_pool:
+            t.join()
 
         self.gather(duration)
 
@@ -377,6 +473,7 @@ class EvalClient():
             
             stdout = stdout.read().decode()
             lines = stdout.strip().split('\n')
+            print(lines)
             for line in lines:
                 for key, value_type in {'requests': int, 'responses': int, 'throughput': float, 'avg_latency': int}.items():
                     if line.lower().startswith(key + ':'):
@@ -395,19 +492,19 @@ class EvalClient():
         except Exception as ex:
             print(f"An error occurred for {client_address}: {ex}", flush=True)
             exit(-1)
-
-        return None
                         
 
 
 # Usage: python3 eval.py run -d 5 -t 275
 # OR   : python3 eval.py run -d 1 -t 1 -m 1
+# OR   : python3 eval.py remote-deploy
 # OR   : python3 eval.py remote-run -d 30 -t 200 -m 10 -c 1
 # OR   : python3 eval.py remote-run -d 30 -t 200 -m 10 -mc 5
-# OR   : python3 eval.py remote-deploy
 # OR   : python3 eval.py plot -t multiline
 # OR   : python3 eval.py plot -t line-clients
 # OR   : python3 eval.py plot -t line-datastores
+# OR   : python3 eval.py plot -t double-line
+# OR   : python3 eval.py plot -t double-sub-plots
 if __name__ == '__main__':
     main_parser = argparse.ArgumentParser()
     command_parser = main_parser.add_subparsers(help='commands', dest='command')
@@ -431,7 +528,7 @@ if __name__ == '__main__':
     remote_run_parser.add_argument('-m', '--metadata_size', type=int, default=1, help="Metadata size (number of regions)")
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
-    plot_parser.add_argument('-t', '--type', type=str, choices=['multiline', 'line-clients', 'line-datastores'], help="Type of plot")
+    plot_parser.add_argument('-t', '--type', type=str, choices=['multiline', 'line-clients', 'line-datastores', 'double-line', 'double-sub-plots'], help="Type of plot")
     plot_parser.add_argument('-d', '--directory', type=str, default=RESULTS_DIR, help="Base directory of results")
 
 
