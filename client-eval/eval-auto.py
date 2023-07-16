@@ -14,19 +14,30 @@ import glob
 import paramiko
 import seaborn as sns
 from scp import SCPClient
+import os
 
 from proto import rendezvous_pb2 as pb
 from proto import rendezvous_pb2_grpc as rdv
 
 from threading import Thread, Lock
 
-RESULTS_DIR = "results/eval_5"
+# machines
 SSH_KEY_PATH = "/home/leafen/.ssh/rendezvous-eu-2.pem"
-CLIENTS_IP = ["3.72.8.251"]
-SERVER_IP = "3.77.54.244"
+SERVER_IP = "   "
+CLIENTS_IP = ["3.122.112.173", "18.159.51.90", "18.192.212.195", "3.121.235.54", "52.28.84.184"]
 SERVER_ADDRESS = f"{SERVER_IP}:8001"
+
+# sleep time
 STARTUP_DELAY_S = 2
 GATHER_DELAY_S = 1
+RESTART_SERVER_DELAY_S = 5
+
+# eval results and parameters
+RESULTS_DIR = "results/eval_5"
+NUM_CLIENTS = [1, 2, 3, 4, 5]
+NUM_DATASTORES = [1, 20, 50, 60, 70, 90, 100]
+DEFAULT_NUM_DATASTORES = 1
+DEFAULT_NUM_CLIENTS = 1
 
 
 class EvalClient():
@@ -54,21 +65,17 @@ class EvalClient():
         return sorted(zip(throughputs, latencies))
     
     def annotate_clients(self, plt, datapoints):
-        # hard coded :(
-        if len(datapoints) == 5:
-            #shift = [(10, 15), (-35, 5), (-30, 5), (-30, 0), (-30, 0)]
-            shift = [(5, 8), (-7, 5), (-14, 3), (-15, 0), (-17, -1)]
+        if len(datapoints) == 5 and len(datapoints) == len(NUM_CLIENTS):
+            shift = [(5, 10), (-7, 5), (-15, 5), (-15, 0), (-17, -1)]
             for i, (throughput, latency) in enumerate(datapoints):
-                #plt.annotate(f"{(i+1)*200} clients", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=8)
-                plt.annotate(f"{(i+1)*200}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
+                plt.annotate(f"{NUM_CLIENTS[i]*200}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
 
     def annotate_datastores(self, plt, datapoints):
-        # hard coded :(
-        if len(datapoints) == 7:
-            shift = [(10, 5), (10, 0), (5, 5), (5, 5), (5, 5), (5, 5), (0, 5)]
-            num_datastores = [100, 90, 70, 60, 50, 20, 1]
+        if len(datapoints) == 7 and len(datapoints) == len(NUM_DATASTORES):
+            shift = [(15, -2), (10, 0), (5, 5), (5, 5), (5, 5), (5, 5), (0, 5)]
+            NUM_DATASTORES.reverse()
             for i, (throughput, latency) in enumerate(datapoints):
-                plt.annotate(f"{num_datastores[i]}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
+                plt.annotate(f"{NUM_DATASTORES[i]}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
 
 
     # Plot throughput-latency
@@ -156,15 +163,13 @@ class EvalClient():
         ax.set_ylabel('Latency (ms)')
         ax.legend_.set_title(None)
 
-        
-
         plot_name = f'plots/double_line_{time.time()}.png'
         plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
         print(f"Successfuly saved plot figure in {plot_name}!")
 
     def plot_double_sub_plots(self, directory):
         sns.set_theme(style='ticks')
-        plt.rcParams["figure.figsize"] = [6, 2.5] 
+        plt.rcParams["figure.figsize"] = [6, 3.5] 
         plt.rcParams["figure.dpi"] = 600
         plt.rcParams['axes.labelsize'] = 'small'
 
@@ -194,29 +199,22 @@ class EvalClient():
         # create figure for both plots
         fig, axes = plt.subplots(1, 2)
 
-        # plot datapoints with datastore variation and force secondary color of searborn palette
-        ds_ax = sns.lineplot(data=ds_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[0])
-        ds_ax.set_xlabel(None)
-        ds_ax.set_ylabel(None)
-        ds_ax.legend_.set_title(None)
-        ds_ax.set_xlim(right=5100)
-        # use same y limits for both subplots
-        ds_ax.set_ylim(top=138, bottom=35)
-        self.annotate_datastores(ds_ax, datapoints_by_datastores)
-
         # plot datapoints with client variation
-        cl_ax = sns.lineplot(data=cl_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[1], palette=[sns.color_palette()[1]])
+        cl_ax = sns.lineplot(data=cl_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[0])
         cl_ax.set_xlabel(None)
         cl_ax.set_ylabel(None)
         cl_ax.legend_.set_title(None)
-        # use same y limits for both subplots
-        cl_ax.set_ylim(top=138, bottom=35) # use same y limits for both subplots
         self.annotate_clients(cl_ax, datapoints_by_clients)
-        # remove y numeration since it is already present in the first subplot on the left side
-        cl_ax.set_yticklabels([])
+
+        # plot datapoints with datastore variation and force secondary color of searborn palette
+        ds_ax = sns.lineplot(data=ds_df, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[1], palette=[sns.color_palette()[1]])
+        ds_ax.set_xlabel(None)
+        ds_ax.set_ylabel(None)
+        ds_ax.legend_.set_title(None)
+        self.annotate_datastores(ds_ax, datapoints_by_datastores)
 
         # set common x and y labels
-        fig.text(0.5, -0.10, 'Throughput (req/s)', ha='center')
+        fig.text(0.5, -0.03, 'Throughput (req/s)', ha='center')
         fig.text(0.02, 0.5, 'Latency (ms)', va='center', rotation='vertical')
 
         # Reverse order of legend for both subplots
@@ -267,39 +265,6 @@ class EvalClient():
         plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
         print(f"Successfuly saved plot figure in {plot_name}!")
 
-    def plot_four(self, directory):
-        sns.set_theme(style='ticks')
-        plt.rcParams["figure.figsize"] = [6,3.5] 
-        plt.rcParams["figure.dpi"] = 600
-        plt.rcParams['axes.labelsize'] = 'small'
-
-        data = []
-
-        dps = self.get_datapoints(directory + '/both', 'datastores_10_clients_1')
-        data += [{'throughput': dp[0], 'latency': dp[1], 'params': '200 clients - 10 datastores'} for dp in dps]
-
-        dps = self.get_datapoints(directory + '/both', 'datastores_100_clients_1')
-        data += [{'throughput': dp[0], 'latency': dp[1], 'params': '200 clients - 100 datastores'} for dp in dps]
-
-        dps = self.get_datapoints(directory + '/both', 'datastores_10_clients_5')
-        data += [{'throughput': dp[0], 'latency': dp[1], 'params': '1000 clients - 10 datastores'} for dp in dps]
-
-        dps = self.get_datapoints(directory + '/both', 'datastores_100_clients_5')
-        data += [{'throughput': dp[0], 'latency': dp[1], 'params': '1000 clients - 100 datastores'} for dp in dps]
-
-        df = pd.DataFrame.from_records(data)
-        pp(df)
-        ax = sns.scatterplot(data=df, x="throughput", y="latency", hue='params', marker='o')
-
-        ax.set_xlabel('Throughput (req/s)')
-        ax.set_ylabel('Latency (ms)')
-        ax.legend_.set_title(None)
-
-        plot_name = f'plots/four_{time.time()}.png'
-        plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
-        print(f"Successfuly saved plot figure in {plot_name}!")
-
-
     def gather_current_thread(self, task_id, requests, responses, latencies):
         total_latency = 0
         for i in range(responses):
@@ -326,27 +291,23 @@ class EvalClient():
         print(f"responses: {num_responses}", flush=True)
         print(f"throughput: {throughput}", flush=True)
         print(f"avg_latency: {avg_latency_round}", flush=True)
-        
-        with open(f"results.txt", 'w') as file:
-            file.write(f"requests: {num_requests}\n")
-            file.write(f"responses: {num_responses}\n")
-            file.write(f"throughput: {throughput}\n")
-            file.write(f"avg_latency: {avg_latency_round}\n")
 
 
 
-    def send(self, sleep, task_id, metadata_size):
+    def send(self, task_id, variation):
         requests = 0
         responses = 0
         latencies = []
-        
-        """ regions = []
-        for i in range(metadata_size):
-            regions.append(f"a-very-interesting-region-{i}") """
-        
+
         datastores = []
-        for i in range(metadata_size):
-            datastores.append(f"a-very-interesting-datastore-{i}")
+        # we vary clients so number of datastores is the (fixed) default
+        if variation == 'clients':
+            for i in range(DEFAULT_NUM_DATASTORES):
+                datastores.append(f"a-very-interesting-datastore-{i}")
+        # vary datastores
+        elif variation == 'datastores':
+            for i in range(len(NUM_DATASTORES)):
+                datastores.append(f"a-very-interesting-datastore-{i}")
         
         #request = pb.RegisterBranchesMessage(rid=str(task_id), regions=regions, service='eval_service')
         request = pb.RegisterBranchesMessage2(rid=str(task_id), datastores=datastores, regions=["EU", "US"])
@@ -356,7 +317,7 @@ class EvalClient():
                 requests += 1
                 start_ts = datetime.utcnow().timestamp()
                 #self.stub.RegisterBranches(request)
-                self.stub.RegisterBranches2(request, timeout=30)
+                self.stub.RegisterBranches2(request)
                 end_ts = datetime.utcnow().timestamp()
                 latency_ms = int((end_ts - start_ts) * 1000)
                 latencies.append(latency_ms)
@@ -364,19 +325,18 @@ class EvalClient():
 
             except grpc.RpcError as e:
                 print("[ERROR]", e.details(), flush=True)
-                
-            time.sleep(sleep)
+
             
         time.sleep(GATHER_DELAY_S)
     
         self.gather_current_thread(task_id, requests, responses, latencies)
 
-    def run(self, server_address, duration, threads, sleep, metadata_size):
+    def run(self, server_address, duration, threads, variation):
         thread_pool = []
 
         for i in range(threads):
             self.results[i] = None
-            thread_pool.append(threading.Thread(target=self.send, args=(sleep, i, metadata_size)))
+            thread_pool.append(threading.Thread(target=self.send, args=(i, variation)))
 
         for t in thread_pool:
             t.start()
@@ -393,8 +353,27 @@ class EvalClient():
         for client in CLIENTS_IP:
             self.copy_remote(client)
 
+    def setup_server(self):
+        print(f"Installing and building project on {SERVER_IP}...")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+            client.connect(SERVER_IP, username='ubuntu', pkey=private_key)
+
+            _, stdout, stderr = client.exec_command(f"cd rendezvous/rendezvous-server && ./rendezvous.sh build")
+            stderr = stderr.read().decode()
+            if len(stderr) > 0 and '[INFO] Building' not in stderr:
+                print(f"[ERROR] {stderr}", flush=True)
+            print("done!")
+
+        except Exception as ex:
+            print(f"An error occurred for {SERVER_IP}: {ex}", flush=True)
+            exit(-1)
+
     def restart_server(self):
-        print(f"Restarting metadata server on {SERVER_ADDRESS}...")
+        print(f"Restarting metadata server on {SERVER_IP}...")
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -407,30 +386,22 @@ class EvalClient():
             if len(stderr) > 0 and '8001/tcp' not in stderr:
                 print(f"[ERROR] {stderr}", flush=True)
                 exit(-1)
+            
+            # start server but do not wait for command to be executed
+            _, stdout, stderr = client.exec_command(f"cd rendezvous/rendezvous-server && ./rendezvous.sh run server eu", get_pty=True)
 
-            _, _, stderr = client.exec_command(f"cd rendezvous/rendezvous-server && ./rendezvous.sh run server eu")
-            stderr = stderr.read().decode()
-            if len(stderr) > 0:
-                print(f"[ERROR] {stderr}", flush=True)
-                exit(-1)
 
-        except paramiko.AuthenticationException:
-            print(f"Authentication failed for {SERVER_IP}.", flush=True)
-            exit(-1)
-        except paramiko.SSHException as ssh_ex:
-            print(f"Error occurred while connecting to {SERVER_IP}: {ssh_ex}", flush=True)
-            exit(-1)
         except Exception as ex:
             print(f"An error occurred for {SERVER_IP}: {ex}", flush=True)
             exit(-1)
 
-    def start_client_threads(self, server_address, duration, threads, sleep, clients, metadata_size):
+    def start_clients(self, server_address, duration, threads, clients, num_datastores, variation):
         thread_results = [None] * clients
         thread_pool = []
 
         for client_id in range(clients):
             client_addr = CLIENTS_IP[client_id]
-            thread_pool.append(threading.Thread(target=self.exec_remote, args=(thread_results, client_id, client_addr, server_address, duration, threads, sleep, metadata_size)))
+            thread_pool.append(threading.Thread(target=self.exec_remote, args=(thread_results, client_id, client_addr, server_address, duration, threads)))
         
         for t in thread_pool:
             t.start()
@@ -440,8 +411,11 @@ class EvalClient():
         for t in thread_pool:
             t.join()
 
-        results_filename = f"datastores_{metadata_size}_clients_{clients}_duration_{duration}_threads_{threads}__{datetime.now().strftime('%Y%m%d%H%M')}.txt"
-        with open(f"{RESULTS_DIR}/{results_filename}", 'w') as file:
+        results_filename = f"datastores_{num_datastores}_clients_{clients}_duration_{duration}_threads_{threads}__{datetime.now().strftime('%Y%m%d%H%M')}.txt"
+        results_dir = f"{RESULTS_DIR}/{variation}"
+        # create directory if it does not exist
+        os.makedirs(results_dir, exist_ok=True)
+        with open(f"{results_dir}/{results_filename}", 'w') as file:
         
             final_results = {'requests': 0, 'responses': 0, 'throughput (req/s)': 0.0, 'avg_latency (ms)': 0}
             for client_id, result in enumerate(thread_results):
@@ -457,24 +431,31 @@ class EvalClient():
             file.write(f"Clients: {clients}\n")
             file.write(f"Threads per Client: {threads}\n")
             file.write(f"Requests: {final_results['requests']}\n")
-            file.write(f"Responses: {final_results['responses']} ({(final_results['responses']/final_results['requests'])*100}%)\n")
+            file.write(f"Responses: {final_results['responses']} ({(final_results['requests']/final_results['responses'])*100}%)\n")
             file.write(f"Throughput (req/s): {int(final_results['throughput (req/s)'])}\n")
             file.write(f"Latency (ms): {int(final_results['avg_latency (ms)'])}\n")
 
             print(f"Final Results: {final_results}", flush=True)
 
-    def remote_run(self, server_address, duration, threads, sleep, clients, max_clients, metadata_size):
-        if max_clients:
-            t = threading.Thread(target=self.restart_server)
-            t.start()
-            print("Waiting for server to start...")
-            time.sleep(5)
-            for clients in range(1, max_clients+1):
-                self.start_client_threads(server_address, duration, threads, sleep, clients, metadata_size)
+    def remote_run(self, server_address, duration, threads, variation):
+        if variation == 'clients':
+            # REMINDER: this is not working, needs to be done manually
+            # self.setup_server()
+            for clients in NUM_CLIENTS:
+                self.restart_server()
+                print("Waiting for server to start...")
+                time.sleep(RESTART_SERVER_DELAY_S)
+                self.start_clients(server_address, duration, threads, clients, DEFAULT_NUM_DATASTORES, variation)
 
-        else:
-            self.start_client_threads(server_address, duration, threads, sleep, clients, metadata_size)
-
+        elif variation == 'datastores':
+            # REMINDER: this is not working, needs to be done manually
+            # self.setup_server()
+            for datastores in NUM_DATASTORES:
+                self.restart_server()
+                print("Waiting for server to start...")
+                time.sleep(RESTART_SERVER_DELAY_S)
+                self.start_clients(server_address, duration, threads, DEFAULT_NUM_CLIENTS, datastores, variation)
+    
     def copy_remote(self, hostname):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -502,7 +483,7 @@ class EvalClient():
         except Exception as ex:
             print(f"An error occurred for {hostname}: {ex}", flush=True)
 
-    def exec_remote(self, thread_results, task_id, client_address, server_address, duration, threads, sleep, metadata_size):
+    def exec_remote(self, thread_results, task_id, client_address, server_address, duration, threads):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         results = {}
@@ -511,14 +492,12 @@ class EvalClient():
             client.connect(client_address, username='ubuntu', pkey=private_key)
             print(f"[EXEC] Connected to {client_address}", flush=True)
 
-            _, stdout, stderr = client.exec_command(f"python3 client-eval/eval.py run -d {duration} -t {threads} -s {sleep} -addr {server_address} -m {metadata_size}", get_pty=True)
+            _, stdout, stderr = client.exec_command(f"python3 client-eval/eval.py run -d {duration} -t {threads} -addr {server_address}")
             
-            #stderr = stderr.read().decode()
-            #if len(stderr) > 0:
-            #    print(f"[ERROR] {stderr}", flush=True)
-            print(f"[INFO] Waiting for results file in remote for {duration+5} seconds")
-            time.sleep(duration + 5)
-            _, stdout, _ = client.exec_command("cat results.txt")
+            stderr = stderr.read().decode()
+            if len(stderr) > 0:
+                print(f"[ERROR] {stderr}", flush=True)
+            
             stdout = stdout.read().decode()
             lines = stdout.strip().split('\n')
             print(lines)
@@ -543,40 +522,36 @@ class EvalClient():
                         
 
 
-# Usage: python3 eval.py run -d 5 -t 275
-# OR   : python3 eval.py run -d 1 -t 1 -m 1
-# OR   : python3 eval.py remote-deploy
-# OR   : python3 eval.py remote-run -d 30 -t 200 -m 100 -c 1
-# OR   : python3 eval.py remote-run -d 30 -t 200 -m 10 -mc 5
-# OR   : python3 eval.py plot -t multiline
-# OR   : python3 eval.py plot -t line-clients
-# OR   : python3 eval.py plot -t line-datastores
-# OR   : python3 eval.py plot -t double-line
-# OR   : python3 eval.py plot -t double-sub-plots
+# > USAGE:
+# - python3 eval.py run -d 1 -t 1
+# - python3 eval.py remote-deploy
+# - python3 eval.py remote-run -d 30 -t 200 -v clients
+# - python3 eval.py plot -t multiline
+# - python3 eval.py plot -t line-clients
+# - python3 eval.py plot -t line-datastores
+# - python3 eval.py plot -t double-line
+# - python3 eval.py plot -t double-sub-plots
+
 if __name__ == '__main__':
     main_parser = argparse.ArgumentParser()
     command_parser = main_parser.add_subparsers(help='commands', dest='command')
 
     run_parser = command_parser.add_parser('run', help="Run")
+    run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
     run_parser.add_argument('-d', '--duration', type=int, default=2, help="Duration in s")
     run_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
-    run_parser.add_argument('-s', '--sleep', type=float, default=0.0, help="Sleep between requests")
-    run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
-    run_parser.add_argument('-m', '--metadata_size', type=int, default=1, help="Metadata size (number of regions)")
+    run_parser.add_argument('-v', '--variation', type=str, choices=['clients', 'datastores'], help="Variation type for datapoints")
 
     remote_deploy_parser = command_parser.add_parser('remote-deploy', help="Remote Deploy")
 
     remote_run_parser = command_parser.add_parser('remote-run', help="Remote Run")
+    remote_run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
     remote_run_parser.add_argument('-d', '--duration', type=int, default=1, help="Duration in s")
     remote_run_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
-    remote_run_parser.add_argument('-s', '--sleep', type=float, default=0.0, help="Sleep between requests")
-    remote_run_parser.add_argument('-c', '--clients', type=int, default=len(CLIENTS_IP), help="Number of clients")
-    remote_run_parser.add_argument('-mc', '--max_clients', type=int, default=None, help="Maximum number of clients")
-    remote_run_parser.add_argument('-addr', '--server_address', type=str, default=SERVER_ADDRESS, help="Address of rendezvous metadata server")
-    remote_run_parser.add_argument('-m', '--metadata_size', type=int, default=1, help="Metadata size (number of regions)")
+    remote_run_parser.add_argument('-v', '--variation', type=str, choices=['clients', 'datastores'], help="Variation type for datapoints")
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
-    plot_parser.add_argument('-t', '--type', type=str, choices=['multiline', 'line-clients', 'line-datastores', 'double-line', 'double-sub-plots', 'four'], help="Type of plot")
+    plot_parser.add_argument('-t', '--type', type=str, choices=['multiline', 'line-clients', 'line-datastores', 'double-line', 'double-sub-plots'], help="Type of plot")
     plot_parser.add_argument('-d', '--directory', type=str, default=RESULTS_DIR, help="Base directory of results")
 
 
@@ -589,20 +564,16 @@ if __name__ == '__main__':
     else:
         evalClient = EvalClient()
 
-    print("---------------------------------")
-    print(f"CURRENT TIME: {datetime.now()}")
-    print("---------------------------------")
-
     if command == 'run':
+        current_time = datetime.now()
+        target_datetime = current_time + timedelta(seconds=STARTUP_DELAY_S)
+        print(f"Sleeping for {STARTUP_DELAY_S} seconds, until {target_datetime}...", flush=True)
+
+        pause.until(target_datetime)
         print(f"Starting evaluation", flush=True)
         evalClient.run(**args)
 
     elif command in ['remote-run', 'remote-deploy']:
-
-        if command == 'remote-run' and args['clients'] > len(CLIENTS_IP):
-            print(f"Invalid number of clients! Max value = {len(CLIENTS_IP)}")
-            exit(-1)
-
         function_name = command.replace('-', '_')
         function = getattr(evalClient, function_name, None)
         function(**args)
@@ -612,8 +583,3 @@ if __name__ == '__main__':
         function_name = command.replace('-', '_') + '_' + plot_type.replace('-', '_')
         function = getattr(evalClient, function_name, None)
         function(**args)
-
-    else:
-        print("Invalid arguments!")
-        print("Usage: eval.py {run, remote-run, remote-deploy, plot} -d <duration_s> -t <#threads> -s <time_s> -addr <rdv_addr>")
-        exit(-1)

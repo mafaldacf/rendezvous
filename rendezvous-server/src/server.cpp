@@ -317,6 +317,8 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
     return "";
   }
 
+  //spdlog::trace("[bid = {}]Opened {} branches for datastore {}", bid, regions.size(), service);
+
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, bid);
   }
