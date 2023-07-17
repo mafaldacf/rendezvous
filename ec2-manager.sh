@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTNAME_EU="3.77.54.244"
+HOSTNAME_EU="18.184.132.153"
 HOSTNAME_US="52.87.244.150"
 
 SSH_KEY_EU="~/.ssh/rendezvous-eu-2.pem"
@@ -90,8 +90,9 @@ usage() {
     echo "Usage:"
     echo "(0) ./start-ec2.sh setup {eu, us}"
     echo "(1) ./start-ec2.sh update {eu, us}"
-    echo "(2) ./start-ec2.sh start {eu, us} {dynamo, s3, cache, mysql}"
-    echo "(3) ./start-ec2.sh stop {eu, us}"
+    echo "(2) ./start-ec2.sh start eu"
+    echo "(3) ./start-ec2.sh start us {dynamo, s3, cache, mysql}"
+    echo "(4) ./start-ec2.sh stop {eu, us}"
     exit 1
 }
 
@@ -107,15 +108,8 @@ elif [ "$#" -eq 2 ] && [ $1 = "update" ] && [ $2 = "eu" ]; then
 elif [ "$#" -eq 2 ] && [ $1 = "update" ] && [ $2 = "us" ]; then
     update $HOSTNAME_US $SSH_KEY_US us
 
-elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "eu" ]; then
-    case "$3" in 
-        "dynamo" | "s3" | "cache" | "mysql")
-            start $HOSTNAME_EU $SSH_KEY_EU eu $3
-            ;;
-        *)
-            usage
-            ;;
-    esac
+elif [ "$#" -eq 2 ] && [ "$1" = "start" ] && [ "$2" = "eu" ]; then
+    start $HOSTNAME_EU $SSH_KEY_EU eu
 
 elif [ "$#" -eq 3 ] && [ "$1" = "start" ] && [ "$2" = "us" ]; then
     case "$3" in 

@@ -14,6 +14,8 @@ import glob
 import paramiko
 import seaborn as sns
 from scp import SCPClient
+from tqdm import tqdm
+import time
 
 from proto import rendezvous_pb2 as pb
 from proto import rendezvous_pb2_grpc as rdv
@@ -22,8 +24,8 @@ from threading import Thread, Lock
 
 RESULTS_DIR = "results/eval_5"
 SSH_KEY_PATH = "/home/leafen/.ssh/rendezvous-eu-2.pem"
-CLIENTS_IP = ["3.72.8.251"]
-SERVER_IP = "3.77.54.244"
+CLIENTS_IP = ["18.192.63.137", "18.196.239.101", "3.122.56.149", "18.195.203.9", "3.70.234.216"]
+SERVER_IP = "18.184.132.153"
 SERVER_ADDRESS = f"{SERVER_IP}:8001"
 STARTUP_DELAY_S = 2
 GATHER_DELAY_S = 1
@@ -65,8 +67,8 @@ class EvalClient():
     def annotate_datastores(self, plt, datapoints):
         # hard coded :(
         if len(datapoints) == 7:
-            shift = [(10, 5), (10, 0), (5, 5), (5, 5), (5, 5), (5, 5), (0, 5)]
-            num_datastores = [100, 90, 70, 60, 50, 20, 1]
+            shift = [(10, 5), (5, 5), (5, 5), (5, 5), (5, 5), (5, 5), (5, 5)]
+            num_datastores = [100, 80, 70, 60, 50, 30, 1]
             for i, (throughput, latency) in enumerate(datapoints):
                 plt.annotate(f"{num_datastores[i]}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
 
@@ -350,12 +352,17 @@ class EvalClient():
         
         #request = pb.RegisterBranchesMessage(rid=str(task_id), regions=regions, service='eval_service')
         request = pb.RegisterBranchesMessage2(rid=str(task_id), datastores=datastores, regions=["EU", "US"])
-        
+        base_request_id = 5000
+        request_id = 5000
+
         while self.do_send:
+            if requests > request_id:
+                request_id += base_request_id
             try:
                 requests += 1
                 start_ts = datetime.utcnow().timestamp()
                 #self.stub.RegisterBranches(request)
+                request.rid = f'{task_id}-{request_id}'
                 self.stub.RegisterBranches2(request, timeout=30)
                 end_ts = datetime.utcnow().timestamp()
                 latency_ms = int((end_ts - start_ts) * 1000)
@@ -483,8 +490,10 @@ class EvalClient():
             private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
             client.connect(hostname, username='ubuntu', pkey=private_key)
             print(f"[SCP] Connected to {hostname}", flush=True)
-
-            client.exec_command(f"mkdir -p client-eval")
+            # kill existing python programs from previous interrupted executions
+            client.exec_command("pkill -9 python")
+            # clean previous results and code
+            client.exec_command("rm -rf results.txt && mkdir -p client-eval")
             with SCPClient(client.get_transport()) as scp:
                 scp.put('eval.py', '/home/ubuntu/client-eval')
                 scp.put('requirements.txt', '/home/ubuntu/client-eval')
@@ -516,8 +525,15 @@ class EvalClient():
             #stderr = stderr.read().decode()
             #if len(stderr) > 0:
             #    print(f"[ERROR] {stderr}", flush=True)
-            print(f"[INFO] Waiting for results file in remote for {duration+5} seconds")
-            time.sleep(duration + 5)
+
+            waiting_time = duration + 5
+            print(f"[INFO] Waiting for results file in remote for {waiting_time} seconds")
+            progress_bar = tqdm(total=waiting_time, desc='Progress', bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}')
+            for _ in range(waiting_time):
+                time.sleep(1)  # Sleep for 1 second
+                progress_bar.update(1)  # Increment the progress bar by 1
+            progress_bar.close()
+                
             _, stdout, _ = client.exec_command("cat results.txt")
             stdout = stdout.read().decode()
             lines = stdout.strip().split('\n')
@@ -539,6 +555,29 @@ class EvalClient():
             exit(-1)
         except Exception as ex:
             print(f"An error occurred for {client_address}: {ex}", flush=True)
+            exit(-1)
+
+    def restart_server(self):
+        print(f"Restarting metadata server on {SERVER_IP}...")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        try:
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+            client.connect(SERVER_IP, username='ubuntu', pkey=private_key)
+
+            _, _, stderr = client.exec_command(f"fuser -k 8001/tcp")
+            stderr = stderr.read().decode()
+            if len(stderr) > 0 and '8001/tcp' not in stderr:
+                print(f"[ERROR] {stderr}", flush=True)
+                exit(-1)
+            
+            # start server but do not wait for command to be executed
+            _, stdout, stderr = client.exec_command(f"cd rendezvous/rendezvous-server && ./rendezvous.sh run server eu", get_pty=True)
+
+
+        except Exception as ex:
+            print(f"An error occurred for {SERVER_IP}: {ex}", flush=True)
             exit(-1)
                         
 
@@ -584,14 +623,11 @@ if __name__ == '__main__':
     print("Arguments:", args, flush=True)
     command = args.pop('command')
 
-    if 'server_address' in args:
-        evalClient = EvalClient(args['server_address'])
-    else:
-        evalClient = EvalClient()
+    evalClient = EvalClient(args.get('server_address'))
 
-    print("---------------------------------")
-    print(f"CURRENT TIME: {datetime.now()}")
-    print("---------------------------------")
+    print("------------------------------------")
+    print(f"EVAL START TIME: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("------------------------------------")
 
     if command == 'run':
         print(f"Starting evaluation", flush=True)

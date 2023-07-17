@@ -24,12 +24,12 @@ namespace utils {
 
     // log mode
     #ifndef LOG_REQUESTS
-    #define LOG_REQUESTS 1
+    #define LOG_REQUESTS 0
     #endif
 
     // subscribed requests
     #ifndef TRACK_SUBSCRIBED_BRANCHES
-    #define TRACK_SUBSCRIBED_BRANCHES 1
+    #define TRACK_SUBSCRIBED_BRANCHES 0
     #endif
 
     // measure overhead of API without any consistency checks

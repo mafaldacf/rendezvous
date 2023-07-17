@@ -1,0 +1,9 @@
+Client 18.192.63.137: {'requests': 404410, 'responses': 404410, 'throughput': 3370.0833333333335, 'avg_latency': 58}
+----------------------------
+Duration: 120
+Clients: 1
+Threads per Client: 200
+Requests: 404410
+Responses: 404410 (100.0%)
+Throughput (req/s): 3370
+Latency (ms): 58

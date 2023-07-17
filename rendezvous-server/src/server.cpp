@@ -96,7 +96,7 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
 void Server::initSubscribersCleanup() {
   std::thread([this]() {
     while (true) {
-      break; //TODO: REMOVE
+      break;
       std::this_thread::sleep_for(std::chrono::minutes(_subscribers_cleanup_sleep_m));
 
       auto now = std::chrono::system_clock::now();
@@ -131,47 +131,42 @@ void Server::initSubscribersCleanup() {
 
 void Server::initRequestsCleanup() {
   std::thread([this]() {
-
     while (true) {
-      break; //TODO: REMOVE
-      std::this_thread::sleep_for(std::chrono::minutes(_requests_cleanup_sleep_m));
+      break;
+      std::this_thread::sleep_for(std::chrono::seconds(90));
 
       int num = 0;
       auto now = std::chrono::system_clock::now();
-      std::cout << "[INFO] initializing clean requests procedure..." << std::endl;
+      spdlog::info("[GC] initializing requests garbage collector...");
 
-      std::vector<metadata::Request*> requests;
       std::vector<metadata::Request*> old_requests;
 
       // copy requests
       std::shared_lock<std::shared_mutex> read_lock(_mutex_requests);
-      std::transform(_requests.begin(), _requests.end(), requests.begin(),
-                   [](const auto& pair){ return pair.second; });
-      read_lock.unlock();
-
-      // target old requests
-      for (const auto & request : requests) {
-        auto last_ts = request->getLastTs();
-        auto time_since = now - last_ts;
-        if (time_since > std::chrono::minutes(_requests_cleanup_sleep_m)) {
-          old_requests.emplace_back(request);
+      //spdlog::info("[GC] initial number of requests = {}", _requests.size());
+      for (const auto& pair: _requests) {
+        if (now - pair.second->getLastTs() > std::chrono::seconds(60)) {
+          old_requests.emplace_back(pair.second);
         }
       }
+      read_lock.unlock();
 
       // remove and delete old requests
       std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
-      for (const auto & request : old_requests) {
+      for (metadata::Request * request : old_requests) {
         _requests.erase(request->getRid());
-
-        if (!LOG_REQUESTS) {
-          delete request;
-        }
       }
+      //spdlog::info("[GC] final number of requests = {} (cleaned {})", _requests.size(), old_requests.size());
       write_lock.unlock();
+
+      for (metadata::Request * request : old_requests) {
+          delete request;
+      }
+      spdlog::info("[GC] collected {} old requests", old_requests.size());
 
 
       // log requests to output file and only delete after
-      if (LOG_REQUESTS) {
+      /* if (LOG_REQUESTS) {
         json j;
         for (const auto& request : old_requests) {
           j["requests"].push_back(request->toJson());
@@ -200,7 +195,7 @@ void Server::initRequestsCleanup() {
         }
 
         std::cout << "[INFO] successfully cleaned " << num << " requests!" << std::endl;
-      }
+      } */
     }
     
   }).detach();
@@ -311,6 +306,7 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
   if (bid.empty()) {
     bid = genBid(request);
   }
+
   metadata::Branch * branch = request->registerBranches(bid, service, tag, regions);
 
   if (!branch) {

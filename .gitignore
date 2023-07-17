@@ -15,6 +15,6 @@ examples/python/rendezvous/protos/rendezvous_pb2_grpc.py
 protos/rendezvous.proto
 subscriber-process/__pycache__
 subscriber-process/proto/__pycache__
-client-eval/plots/**
-client-eval/results/**
+#client-eval/plots/**
+#client-eval/results/**
 client-eval/proto/__pycache__/**
