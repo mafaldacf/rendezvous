@@ -1,0 +1,9 @@
+Client 3.70.158.94: {'requests': 130090, 'responses': 130090, 'throughput': 4336.333333333333, 'avg_latency': 45}
+----------------------------
+Duration: 30
+Clients: 1
+Threads per Client: 200
+Requests: 130090
+Responses: 130090 (100.0%)
+Throughput (req/s): 4336
+Latency (ms): 45

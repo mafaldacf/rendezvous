@@ -1,0 +1,13 @@
+Client 3.70.70.228: {'requests': 49115, 'responses': 49115, 'throughput': 1637.1666666666667, 'avg_latency': 121}
+Client 3.66.235.64: {'requests': 49300, 'responses': 49300, 'throughput': 1643.3333333333333, 'avg_latency': 121}
+Client 3.64.216.49: {'requests': 47038, 'responses': 47038, 'throughput': 1567.9333333333334, 'avg_latency': 127}
+Client 3.77.53.5: {'requests': 46710, 'responses': 46710, 'throughput': 1557.0, 'avg_latency': 128}
+Client 18.156.69.235: {'requests': 48905, 'responses': 48905, 'throughput': 1630.1666666666667, 'avg_latency': 122}
+----------------------------
+Duration: 30
+Clients: 5
+Threads per Client: 200
+Requests: 241068
+Responses: 241068 (100.0%)
+Throughput (req/s): 8035
+Latency (ms): 123
