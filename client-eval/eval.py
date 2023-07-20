@@ -52,10 +52,8 @@ class EvalClient():
     def annotate_clients(self, plt, datapoints):
         # hard coded :(
         if len(datapoints) == 5:
-            #shift = [(10, 15), (-35, 5), (-30, 5), (-30, 0), (-30, 0)]
             shift = [(5, 8), (-7, 5), (-14, 3), (-15, 0), (-17, -1)]
             for i, (throughput, latency) in enumerate(datapoints):
-                #plt.annotate(f"{(i+1)*200} clients", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=8)
                 plt.annotate(f"{(i+1)*200}", (throughput, latency), xytext=shift[i], textcoords='offset points', ha='center', size=10)
 
     def annotate_datastores(self, plt, datapoints):
