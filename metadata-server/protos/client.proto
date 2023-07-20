@@ -15,7 +15,6 @@ service ClientService {
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
   rpc CheckRequest(CheckRequestMessage) returns (CheckRequestResponse);
   rpc CheckRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
-  rpc GetNumPreventedInconsistencies(Empty) returns (GetNumPreventedInconsistenciesResponse);
 }
 
 /* Helpers */
@@ -134,10 +133,4 @@ message CheckRequestByRegionsMessage {
 
 message CheckRequestByRegionsResponse {
   map<string, RequestStatus> statuses = 1;
-}
-
-/* Get Prevented Inconsistencies */
-
-message GetNumPreventedInconsistenciesResponse {
-  int64 inconsistencies = 1;
 }

@@ -6,7 +6,6 @@
 #include "../utils.h"
 #include <iostream>
 #include <map>
-#include <nlohmann/json.hpp>
 #include <memory>
 #include <atomic>
 #include <unordered_map>
@@ -21,10 +20,6 @@
 #include <chrono>
 #include <sstream>
 #include <thread>
-#include "spdlog/spdlog.h"
-#include "spdlog/fmt/ostr.h"
-
-using json = nlohmann::json;
 
 namespace metadata {
 
@@ -76,13 +71,6 @@ namespace metadata {
 
             Request(std::string rid, replicas::VersionRegistry * versions_registry);
             ~Request();
-
-            /**
-             * Stores request info in json format
-             * 
-             * @return json 
-             */
-            json toJson() const;
 
             /**
              * Return timestamp of last modification

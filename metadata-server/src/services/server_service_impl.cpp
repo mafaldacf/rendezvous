@@ -12,11 +12,11 @@ grpc::Status ServerServiceImpl::RegisterRequest(grpc::ServerContext* context, co
 
   metadata::Request * rdv_request;
 
-  //spdlog::trace("[REPLICA] > registering request '{}'", rid.c_str());
+  spdlog::trace("[REPLICA] > registering request '{}'", rid.c_str());
 
   server->getOrRegisterRequest(rid);
 
-  //spdlog::trace("[REPLICA] < registered request '{}'", rid.c_str());
+  spdlog::trace("[REPLICA] < registered request '{}'", rid.c_str());
   return grpc::Status::OK;
 }
 
@@ -35,7 +35,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const int& request_version = request->context().request_version();
   metadata::Request * rdv_request;
 
-  //spdlog::trace("[REPLICA] > registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
+  spdlog::trace("[REPLICA] > registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
 
   rdv_request = server->getOrRegisterRequest(rid);
   std::string res = server->registerBranch(rdv_request, service, region, tag, bid);
@@ -45,7 +45,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::ABORTED, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
   }
 
-  //spdlog::trace("[REPLICA] < registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
+  spdlog::trace("[REPLICA] < registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
 
   rdv_request->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
   return grpc::Status::OK;
@@ -68,7 +68,7 @@ grpc::Status ServerServiceImpl::RegisterBranches(grpc::ServerContext* context,
   const auto& regions = request->regions();
   int num = request->regions().size();
 
-  //spdlog::trace("[REPLICA] Registering {} branches for request '{}' on service '{}'", num, rid, service);
+  spdlog::trace("[REPLICA] Registering {} branches for request '{}' on service '{}'", num, rid, service);
 
   rdv_request = server->getOrRegisterRequest(rid);
   std::string res = server->registerBranches(rdv_request, service, regions, tag, bid);
@@ -78,7 +78,7 @@ grpc::Status ServerServiceImpl::RegisterBranches(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::ABORTED, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
   }
 
-  //spdlog::trace("[REPLICA] Registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
+  spdlog::trace("[REPLICA] Registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
 
   rdv_request->getVersionsRegistry()->updateRemoteVersion(replica_id, request_version);
 
@@ -99,7 +99,7 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
   }
 
-  //spdlog::trace("[REPLICA] > closing branch '{} 'for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
+  spdlog::trace("[REPLICA] > closing branch '{} 'for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
 
   metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
 
@@ -112,6 +112,6 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
   
-  //spdlog::trace("[REPLICA] < closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
+  spdlog::trace("[REPLICA] < closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
   return grpc::Status::OK;
 }

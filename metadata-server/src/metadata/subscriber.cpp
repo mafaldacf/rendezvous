@@ -10,7 +10,7 @@ Subscriber::Subscriber(int subscribers_max_wait_time_s)
 
 void Subscriber::pushBranch(const std::string& bid) {
     _mutex.lock();
-    //spdlog::debug("adding subscribed branch {}", bid.c_str());
+    spdlog::debug("adding subscribed branch {}", bid.c_str());
     _subscribed_branches.push(bid);
     _cond.notify_all();
     _mutex.unlock();
@@ -23,7 +23,7 @@ std::string Subscriber::popBranch() {
     std::cv_status status = std::cv_status::no_timeout;
     std::unique_lock<std::mutex> lock(_mutex);
     while (_subscribed_branches.size() == 0) {
-        //spdlog::debug("waiting for subscribed branches...");
+        spdlog::debug("waiting for subscribed branches...");
         status = _cond.wait_for(lock, std::chrono::seconds(_subscribers_max_wait_time_s));
         
         if (status == std::cv_status::timeout) {
@@ -33,7 +33,7 @@ std::string Subscriber::popBranch() {
 
     std::string bid = _subscribed_branches.front();
     _subscribed_branches.pop();
-    //spdlog::debug("getting subscribed request {}", bid.c_str());
+    spdlog::debug("getting subscribed request {}", bid.c_str());
     
     return bid;
 }

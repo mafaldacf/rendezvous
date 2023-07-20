@@ -23,8 +23,8 @@ class RendezvousCache(RendezvousShim):
     return f"{self.rendezvous_prefix}:*"
 
   def find_metadata(self, bid):
-    #item = self.conn.get(self._cache_key_rendezvous(bid))
-    item = self.conn.hget('post:k0', 'rdv_bid')
+    item = self.conn.get(self._cache_key_rendezvous(bid))
+    print("[DEBUG] Got item: ", item, flush=True)
     if item:
       return True
     return False

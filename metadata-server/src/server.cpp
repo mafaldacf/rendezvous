@@ -3,7 +3,7 @@
 using namespace rendezvous;
 
 Server::Server(std::string sid, json settings)
-    : _next_rid(0), _prevented_inconsistencies(0), _sid(sid), 
+    : _next_rid(0), _sid(sid), 
     _requests_cleanup_sleep_m(settings["requests_cleanup_sleep_m"].get<int>()),
     _subscribers_cleanup_sleep_m(settings["subscribers_cleanup_sleep_m"].get<int>()),
     _subscribers_max_wait_time_s(settings["subscribers_max_wait_time_s"].get<int>()),
@@ -20,7 +20,7 @@ Server::Server(std::string sid, json settings)
 
 // testing purposes
 Server::Server(std::string sid)
-    : _next_rid(0), _prevented_inconsistencies(0), _sid(sid), 
+    : _next_rid(0), _sid(sid), 
     _requests_cleanup_sleep_m(30),
     _subscribers_cleanup_sleep_m(30),
     _subscribers_max_wait_time_s(60),
@@ -76,7 +76,7 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
   metadata::Subscriber * subscriber;
   const std::string& subscriber_id = computeSubscriberId(service, tag);
 
-  //spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
+  spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
   
   std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
   auto it_regions = _subscribers.find(subscriber_id);
@@ -94,9 +94,11 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
 //------------------
 
 void Server::initSubscribersCleanup() {
+  if (_subscribers_cleanup_sleep_m == -1) {
+    return;
+  }
   std::thread([this]() {
     while (true) {
-      break; //TODO: REMOVE
       std::this_thread::sleep_for(std::chrono::minutes(_subscribers_cleanup_sleep_m));
 
       auto now = std::chrono::system_clock::now();
@@ -130,77 +132,41 @@ void Server::initSubscribersCleanup() {
 }
 
 void Server::initRequestsCleanup() {
+  if (_requests_cleanup_sleep_m == -1) {
+    return;
+  }
   std::thread([this]() {
-
     while (true) {
-      break; //TODO: REMOVE
       std::this_thread::sleep_for(std::chrono::minutes(_requests_cleanup_sleep_m));
 
       int num = 0;
       auto now = std::chrono::system_clock::now();
-      std::cout << "[INFO] initializing clean requests procedure..." << std::endl;
+      spdlog::info("[GC] initializing requests garbage collector...");
 
-      std::vector<metadata::Request*> requests;
       std::vector<metadata::Request*> old_requests;
 
       // copy requests
       std::shared_lock<std::shared_mutex> read_lock(_mutex_requests);
-      std::transform(_requests.begin(), _requests.end(), requests.begin(),
-                   [](const auto& pair){ return pair.second; });
-      read_lock.unlock();
-
-      // target old requests
-      for (const auto & request : requests) {
-        auto last_ts = request->getLastTs();
-        auto time_since = now - last_ts;
-        if (time_since > std::chrono::minutes(_requests_cleanup_sleep_m)) {
-          old_requests.emplace_back(request);
+      spdlog::info("[GC] initial number of requests = {}", _requests.size());
+      for (const auto& pair: _requests) {
+        if (now - pair.second->getLastTs() > std::chrono::minutes(_requests_cleanup_sleep_m)) {
+          old_requests.emplace_back(pair.second);
         }
       }
+      read_lock.unlock();
 
       // remove and delete old requests
       std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
-      for (const auto & request : old_requests) {
+      for (metadata::Request * request : old_requests) {
         _requests.erase(request->getRid());
-
-        if (!LOG_REQUESTS) {
-          delete request;
-        }
       }
+      spdlog::info("[GC] final number of requests = {} (cleaned {})", _requests.size(), old_requests.size());
       write_lock.unlock();
 
-
-      // log requests to output file and only delete after
-      if (LOG_REQUESTS) {
-        json j;
-        for (const auto& request : old_requests) {
-          j["requests"].push_back(request->toJson());
-          num++;
-        }
-
-        // compute filename based on the current timestamp
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_ts = std::chrono::system_clock::to_time_t(now);
-        std::tm * now_tm = std::localtime(&now_ts);
-        char now_buffer[20];
-        std::strftime(now_buffer, 20, utils::TIME_FORMAT.c_str(), now_tm);
-
-        std::string filename = now_buffer;
-        std::replace(filename.begin(), filename.end(), ' ', '-');
-        std::replace(filename.begin(), filename.end(), ':', '-');
-        std::ofstream outfile("../../../logs/" + filename);
-
-        if (outfile) {
-          outfile << j.dump(4);
-          outfile.close();
-          std::cout << "[INFO] successfully save logs to json file " << filename << "!" << std::endl;
-        }
-        else {
-          std::cout << "[ERROR] could not save logs to json file " << filename << ": " << std::strerror(errno) << std::endl;
-        }
-
-        std::cout << "[INFO] successfully cleaned " << num << " requests!" << std::endl;
+      for (metadata::Request * request : old_requests) {
+          delete request;
       }
+      spdlog::info("[GC] collected {} old requests", old_requests.size());
     }
     
   }).detach();
@@ -239,10 +205,6 @@ std::string Server::computeSubscriberId(const std::string& service, const std::s
 // -----------
 // Helpers
 //------------
-
-long Server::getNumInconsistencies() {
-  return _prevented_inconsistencies.load();
-}
 
 metadata::Request * Server::getRequest(const std::string& rid) {
   std::shared_lock<std::shared_mutex> lock(_mutex_requests); 
@@ -347,10 +309,6 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
   else
     result = request->wait(timeout);
 
-  if (result == 1) {
-    _prevented_inconsistencies.fetch_add(1);
-  }
-
   return result;
 }
 
@@ -372,8 +330,4 @@ std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * req
     return request->getStatusByRegionsOnService(service);
 
   return request->getStatusByRegions();
-}
-
-long Server::getNumPreventedInconsistencies() {
-  return _prevented_inconsistencies.load();
 }

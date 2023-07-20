@@ -13,5 +13,5 @@ examples/python/rendezvous/protos/rendezvous_pb2_grpc.py
 /logs/*
 /aws/*
 protos/rendezvous.proto
-subscriber-process/__pycache__
-subscriber-process/proto/__pycache__
+database-monitor/__pycache__
+database-monitor/proto/__pycache__

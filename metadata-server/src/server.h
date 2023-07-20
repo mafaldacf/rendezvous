@@ -23,6 +23,7 @@
 #include <set>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
+#include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
@@ -42,7 +43,6 @@ namespace rendezvous {
 
             const std::string _sid;
             std::atomic<long> _next_rid;
-            std::atomic<long> _prevented_inconsistencies;
             
             // <rid, request_ptr>
             std::unordered_map<std::string, metadata::Request*> _requests;

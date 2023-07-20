@@ -3,64 +3,64 @@
 
 version: "3.9"
 services:
-  rendezvous-eu:
+  metadata-server-eu:
     image: mafaldacf/rendezvous:latest
     hostname: rendezvous-eu
     ports:
       - 8001:8001
-    entrypoint: sh -c "cd rendezvous-server && ./start.sh run server eu"
-  rendezvous-us:
+    entrypoint: sh -c "cd metadata-server && ./start.sh run server eu"
+  metadata-server-us:
     image: mafaldacf/rendezvous:latest
     hostname: rendezvous-us
     ports:
       - 8002:8002
-    entrypoint: sh -c "cd rendezvous-server && ./start.sh run server us"
+    entrypoint: sh -c "cd metadata-server && ./start.sh run server us"
 
-  subscriber-cache-eu:
+  database-monitor-cache-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d cache -r eu"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d cache -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-cache-us:
+  database-monitor-cache-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d cache -r us"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d cache -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-dynamo-eu:
+  database-monitor-dynamo-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d dynamo -r eu"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d dynamo -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-dynamo-us:
+  database-monitor-dynamo-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d dynamo -r us"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d dynamo -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-mysql-eu:
+  database-monitor-mysql-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d mysql -r eu"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d mysql -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-mysql-us:
+  database-monitor-mysql-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d mysql -r us"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d mysql -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-s3-eu:
+  database-monitor-s3-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d s3 -r eu"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d s3 -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  subscriber-s3-us:
+  database-monitor-s3-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd subscriber-process && python3 main.py -cp aws -d s3 -r us"
+    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d s3 -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials

@@ -7,26 +7,6 @@ namespace utils {
 
     typedef google::protobuf::RepeatedPtrField<std::string> ProtoVec;
 
-    // debug mode
-    #ifndef DEBUG 
-    #define DEBUG 1
-    #endif
-
-    #if DEBUG
-    #define debug_log(...) {\
-        char str[255];\
-        sprintf(str, __VA_ARGS__);\
-        std::cout << "[" << __FUNCTION__ << "] " << str << std::endl;\
-        }
-    #else
-    #define debug_log(...)
-    #endif
-
-    // log mode
-    #ifndef LOG_REQUESTS
-    #define LOG_REQUESTS 1
-    #endif
-
     // subscribed requests
     #ifndef TRACK_SUBSCRIBED_BRANCHES
     #define TRACK_SUBSCRIBED_BRANCHES 1

@@ -68,10 +68,6 @@ namespace service {
             grpc::Status CheckRequestByRegions(grpc::ServerContext * context, 
                 const rendezvous::CheckRequestByRegionsMessage * request, 
                 rendezvous::CheckRequestByRegionsResponse * response) override;
-            
-            grpc::Status GetNumPreventedInconsistencies(grpc::ServerContext * context, 
-                const rendezvous::Empty * request, 
-                rendezvous::GetNumPreventedInconsistenciesResponse * response) override;
         
     };
 }

@@ -23,34 +23,6 @@ Request::~Request() {
     delete _versions_registry;
 }
 
-json Request::toJson() const {
-    json j;
-
-    std::time_t init_ts_t = std::chrono::system_clock::to_time_t(_init_ts);
-    std::time_t last_ts_t = std::chrono::system_clock::to_time_t(_last_ts);
-    auto init_ts_tm = *std::localtime(&init_ts_t);
-    auto last_ts_tm = *std::localtime(&last_ts_t);
-
-    std::ostringstream init_ts_oss;
-    std::ostringstream last_ts_oss;
-    init_ts_oss << std::put_time(&init_ts_tm, utils::TIME_FORMAT.c_str());
-    last_ts_oss << std::put_time(&last_ts_tm, utils::TIME_FORMAT.c_str());
-    auto init_ts_str = init_ts_oss.str();
-    auto final_ts_str = last_ts_oss.str();
-
-    auto duration = _last_ts - _init_ts;
-    auto duration_seconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
-
-    j[_rid]["init_ts"] = init_ts_str;
-    j[_rid]["last_ts"] = final_ts_str;
-    j[_rid]["duration_ms"] = duration_seconds.count();
-
-    for (const auto& branches_it : _branches) {
-        j[_rid]["branches"].push_back(branches_it.second->toJson(branches_it.first));
-    }
-    return j;
-}
-
 std::chrono::time_point<std::chrono::system_clock> Request::getLastTs() {
     return _last_ts;
 }

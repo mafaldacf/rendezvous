@@ -1,18 +1,18 @@
 {
   "local_settings": {
-    "requests_cleanup_sleep_m": 30,
-    "subscribers_cleanup_sleep_m": 30,
+    "requests_cleanup_sleep_m": -1,
+    "subscribers_cleanup_sleep_m": -1,
     "subscribers_max_wait_time_s": 60,
     "wait_replica_timeout_s": 10
   },
 
   "replicas": {
     "eu": {
-      "host": "3.72.7.183",
+      "host": "rendezvous-eu",
       "port": 8001
     },
     "us": {
-      "host": "3.83.247.42",
+      "host": "rendezvous-us",
       "port": 8002
     }
   }
