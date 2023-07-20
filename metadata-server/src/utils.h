@@ -29,6 +29,7 @@ namespace utils {
     const std::string ERR_MSG_INVALID_BRANCH_REGION = "No branch was found for the provided service";
     const std::string ERR_MSG_EMPTY_REGION = "Region cannot be empty";
     const std::string ERR_MSG_INVALID_TIMEOUT = "Invalid timeout. Value needs to be greater than 0";
+    const std::string ERR_MSG_REGISTER_BRANCHES_INVALID_DATASTORES = "Invalid datastores arguments";
 
     /* server gRPC custom error m essages */
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context provided";

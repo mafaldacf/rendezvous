@@ -5,3 +5,5 @@ paramiko
 scp
 grpcio
 grpcio-tools
+seaborn
+tqdm
