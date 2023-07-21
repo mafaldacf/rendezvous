@@ -8,59 +8,59 @@ services:
     hostname: rendezvous-eu
     ports:
       - 8001:8001
-    entrypoint: sh -c "cd metadata-server && ./start.sh run server eu"
+    entrypoint: sh -c "./manager.sh local run server eu"
   metadata-server-us:
     image: mafaldacf/rendezvous:latest
     hostname: rendezvous-us
     ports:
       - 8002:8002
-    entrypoint: sh -c "cd metadata-server && ./start.sh run server us"
+    entrypoint: sh -c "./manager.sh local run server us"
 
-  database-monitor-cache-eu:
+  datastore-monitor-cache-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d cache -r eu"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d cache -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-cache-us:
+  datastore-monitor-cache-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d cache -r us"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d cache -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-dynamo-eu:
+  datastore-monitor-dynamo-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d dynamo -r eu"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d dynamo -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-dynamo-us:
+  datastore-monitor-dynamo-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d dynamo -r us"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d dynamo -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-mysql-eu:
+  datastore-monitor-mysql-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d mysql -r eu"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d mysql -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-mysql-us:
+  datastore-monitor-mysql-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d mysql -r us"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d mysql -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-s3-eu:
+  datastore-monitor-s3-eu:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d s3 -r eu"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d s3 -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
-  database-monitor-s3-us:
+  datastore-monitor-s3-us:
     image: mafaldacf/rendezvous:latest
-    entrypoint: sh -c "cd database-monitor && python3 main.py -cp aws -d s3 -r us"
+    entrypoint: sh -c "cd datastore-monitor && python3 main.py -d s3 -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials

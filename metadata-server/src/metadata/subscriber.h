@@ -23,10 +23,10 @@ namespace metadata {
             std::condition_variable _cond;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
 
-            const int _subscribers_max_wait_time_s;
+            const int _subscribers_refresh_interval_s;
 
         public:
-            Subscriber(int subscribers_max_wait_time_s);
+            Subscriber(int subscribers_refresh_interval_s);
 
             /**
              * Add branch to queue
@@ -37,10 +37,10 @@ namespace metadata {
 
             /**
              * Remove the branch from the queue. Blocks until a branch is available
-             * 
+             * @param context The grpc context for the current connection
              * @return The bid for the removed branch
              */
-            std::string popBranch();
+            std::string popBranch(grpc::ServerContext * context);
 
             /**
              * Return timestamp of last active moment

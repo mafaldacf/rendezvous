@@ -21,51 +21,48 @@
 
 using json = nlohmann::json;
 
-std::unique_ptr<grpc::Server> server;
-
 static std::string _replica_id = "replica-eu";
 static std::string _replica_addr;
 static std::vector<std::string> _replicas_addrs;
-
 static json _settings;
 
+std::unique_ptr<grpc::Server> server;
+std::unique_ptr<service::ClientServiceImpl> client_service;
+std::unique_ptr<service::ServerServiceImpl> server_service;
+
+// NOTE: causes mutex deadlock because of server->Wait
 void sigintHandler(int sig) {
   server->Shutdown();
-  exit(EXIT_SUCCESS);
 }
 
-void shutdown(std::unique_ptr<grpc::Server> &server) {
-  // doesn't work using docker compose
-  std::cout << "Press any key to stop the server..." << std::endl << std::endl;
+// NOTE: does not work using docker compose
+void shutdown() {
+  spdlog::info("Press any key to stop the server");
   getchar();
-
-  std::cout << "Stopping server..." << std::endl;
+  spdlog::info("Shutting down server...");
   server->Shutdown();
 }
 
 void run() {
-
-  auto rendezvous_server = std::make_shared<rendezvous::Server> (
-    _replica_id, _settings);
-
-  service::ClientServiceImpl client_service(rendezvous_server, _replicas_addrs);
-  service::ServerServiceImpl server_service(rendezvous_server);
+  auto rendezvous_server = std::make_shared<rendezvous::Server> (_replica_id, _settings);
+  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs);
+  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server);
 
   grpc::ServerBuilder builder;
   builder.AddListeningPort(_replica_addr, grpc::InsecureServerCredentials());
-  builder.RegisterService(&client_service);
-  builder.RegisterService(&server_service);
+  //builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIME_MS, 2000);
+  builder.RegisterService(client_service.get());
+  builder.RegisterService(server_service.get());
 
   server = std::unique_ptr<grpc::Server>(builder.BuildAndStart());
-
-  spdlog::info("Server listening on {}...", _replica_addr);
-
   rendezvous_server->initRequestsCleanup();
   rendezvous_server->initSubscribersCleanup();
-  signal(SIGINT, sigintHandler);
-  // std::thread t(shutdown, std::ref(server));
+  //std::thread t(shutdown);
+  //signal(SIGINT, sigintHandler);
 
+  spdlog::info("Server listening on {}...", _replica_addr);
   server->Wait();
+  //t.join();
 }
 
 void loadConfig() {
@@ -123,12 +120,8 @@ int main(int argc, char *argv[]) {
       usage(argv);
     }
   }
-
+  spdlog::info("--------------- RENDEZVOUS SERVER ({}) --------------- ", _replica_id);
   loadConfig();
-
-  spdlog::info("--------------- Rendezvous Server ({}) --------------- ", _replica_id);
-
   run();
-
   return 0;
 }

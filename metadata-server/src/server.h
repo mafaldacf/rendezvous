@@ -36,23 +36,25 @@ namespace rendezvous {
             static const int REMOVE = -1;
 
             /* Garbage collector for old requests and subscribers */
-            const int _requests_cleanup_sleep_m;
-            const int _subscribers_cleanup_sleep_m;
-            const int _subscribers_max_wait_time_s;
+            const int _cleanup_requests_interval_m;
+            const int _cleanup_requests_validity_m;
+            const int _cleanup_subscribers_interval_m;
+            const int _cleanup_subscribers_validity_m;
+            const int _subscribers_refresh_interval_s;
             const int _wait_replica_timeout_s;
 
             const std::string _sid;
             std::atomic<long> _next_rid;
             
             // <rid, request_ptr>
-            std::unordered_map<std::string, metadata::Request*> _requests;
-            std::shared_mutex _mutex_requests;
 
             // <service w/ tag, <region, subscriber_ptr>>
             std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>> _subscribers;
             std::shared_mutex _mutex_subscribers;
 
         public:
+            std::shared_mutex _mutex_requests;
+            std::unordered_map<std::string, metadata::Request*> _requests;
             Server(std::string sid, json settings);
             Server(std::string sid);
             ~Server();

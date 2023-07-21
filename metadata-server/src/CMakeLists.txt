@@ -10,5 +10,5 @@ target_link_libraries(
     spdlog::spdlog_header_only)
 
 # UNCOMMENT to enable AddressSanitizer for detecting memory errors/leaks
-# target_compile_options(rendezvous PRIVATE -fsanitize=address -g)
-# target_link_options(rendezvous PRIVATE -fsanitize=address -g)
+#target_compile_options(rendezvous PRIVATE -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment -g)
+#target_link_options(rendezvous PRIVATE -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment -g)

@@ -5,7 +5,7 @@ using namespace service;
 ClientServiceImpl::ClientServiceImpl(
   std::shared_ptr<rendezvous::Server> server, 
   std::vector<std::string> addrs)
-  : server(server), _num_wait_calls(0), _replica_client(addrs) {
+  : _server(server), _num_wait_calls(0), _replica_client(addrs) {
 }
 
 grpc::Status ClientServiceImpl::SubscribeBranches(grpc::ServerContext * context,
@@ -14,22 +14,20 @@ grpc::Status ClientServiceImpl::SubscribeBranches(grpc::ServerContext * context,
 
   if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-  spdlog::trace("loading subscriber for service '{}', tag '{}' and region '{}'", request->service().c_str(), request->tag().c_str(), request->region().c_str());
-
-  metadata::Subscriber * subscriber = server->getSubscriber(request->service(), request->tag(), request->region());
+  spdlog::debug("[SUBSCRIBER] loading subscriber for service '{}', tag '{}' and region '{}'", request->service().c_str(), request->tag().c_str(), request->region().c_str());
+  metadata::Subscriber * subscriber = _server->getSubscriber(request->service(), request->tag(), request->region());
   rendezvous::SubscribeBranchesResponse response;
 
-  while (true) {
-    std::string bid = subscriber->popBranch();
+  while (!context->IsCancelled()) {
+    std::string bid = subscriber->popBranch(context);
     if (!bid.empty()) {
       response.set_bid(bid);
-      spdlog::trace("> subscribe branch --> sending rid: {}", bid.c_str());
+      spdlog::debug("[SUBSCRIBER] sending bid -->  {}", bid.c_str());
       writer->Write(response);
     }
-    else {
-      // TODO: check if client is still alive!!
-    }
   }
+
+  spdlog::debug("[SUBSCRIBER] context CANCELLED for service '{}', tag '{}' and region '{}'", request->service().c_str(), request->tag().c_str(), request->region().c_str());
 
   return grpc::Status::OK;
 }
@@ -40,41 +38,31 @@ grpc::Status ClientServiceImpl::CloseBranches(grpc::ServerContext* context,
 
     if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-    spdlog::trace("> init closing branches");
-    
+    spdlog::debug("> init closing branches");
     std::vector<rendezvous::CloseBranchMessage> replica_requests;
-
     rendezvous::CloseBranchMessage request;
     while (reader->Read(&request)) {
-
-
       spdlog::trace("> close branches stream -> closing branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
-
       if (request.region().empty()) {
         return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
       }
-
-      const std::string& rid = server->parseRid(request.bid());
+      const std::string& rid = _server->parseRid(request.bid());
       if (rid.empty()) {
         return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
       }
 
-      metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-      bool region_found = server->closeBranch(rdv_request, request.bid(), request.region(), true);
-
+      metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+      bool region_found = _server->closeBranch(rdv_request, request.bid(), request.region(), true);
       if (!region_found) {
         return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_INVALID_REGION);
       }
 
-      //TODO finish
       _replica_client.sendCloseBranch(request.bid(), request.region());
-      
       spdlog::trace("< close branches stream -> closed branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
       return grpc::Status::OK;
     }
 
     spdlog::trace("< end closing branches");
-
     return grpc::Status::OK; 
   }
 
@@ -89,14 +77,12 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
 
   spdlog::trace("> registering request '{}'", rid.c_str());
 
-  rdv_request = server->getOrRegisterRequest(rid);
+  rdv_request = _server->getOrRegisterRequest(rid);
   response->set_rid(rdv_request->getRid());
 
   // initialize empty metadata
   rendezvous::RequestContext ctx;
   response->mutable_context()->CopyFrom(ctx);
-
-
   _replica_client.sendRegisterRequest(rdv_request->getRid());
 
   spdlog::trace("< registered request '{}'", rdv_request->getRid().c_str());
@@ -118,29 +104,16 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   spdlog::trace("> registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
 
-  /* if (region.empty()) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
-  } */
-
-  rdv_request = server->getOrRegisterRequest(rid);
-  std::string bid = server->registerBranch(rdv_request, service, region, tag);
-
-  // sanity check - must never happen
-  if (bid.empty()) {
-    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
-  }
-  
-  std::string sid = server->getSid();
+  rdv_request = _server->getOrRegisterRequest(rid);
+  std::string bid = _server->registerBranch(rdv_request, service, region, tag);
+  std::string sid = _server->getSid();
   int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
   ctx.mutable_versions()->insert({sid, version});
-
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
   response->mutable_context()->CopyFrom(ctx);
 
-
   _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region, sid, version);
-
   spdlog::trace("< registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
@@ -156,25 +129,18 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   const std::string& tag = request->tag();
   rendezvous::RequestContext ctx = request->context();
   metadata::Request * rdv_request;
-
   int num = request->regions().size();
 
-  spdlog::trace("Registering {} branches for request '{}' on service '{}'", num, rid, service);
+  spdlog::trace("> registering {} branches for request '{}' on service '{}'", num, rid, service);
 
   if (num == 0) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
   }
 
   const auto& regions = request->regions();
-  rdv_request = server->getOrRegisterRequest(rid);
-  std::string bid = server->registerBranches(rdv_request, service, regions, tag);
-
-  // sanity check - must never happen
-  if (bid.empty()) {
-    return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
-  }
-
-  std::string sid = server->getSid();
+  rdv_request = _server->getOrRegisterRequest(rid);
+  std::string bid = _server->registerBranches(rdv_request, service, regions, tag);
+  std::string sid = _server->getSid();
   int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
   ctx.mutable_versions()->insert({sid, version});
   
@@ -182,11 +148,8 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   response->set_bid(bid);
   response->mutable_context()->CopyFrom(ctx);
 
-
   _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions, sid, version);
-
-  spdlog::trace("Registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
-
+  spdlog::trace("< registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
   return grpc::Status::OK;
 }
 
@@ -198,14 +161,14 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
-  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
 
   // client specifies different regions for each datastores using the DatastoreBranching type
   if (request->branches().size() > 0){
     for (const auto& branches : request->branches()) {
       const std::string& datastore = branches.datastore();
       const auto& regions = branches.regions();
-      std::string bid = server->registerBranches(rdv_request, datastore, regions, "");
+      std::string bid = _server->registerBranches(rdv_request, datastore, regions, "");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -217,7 +180,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   else if (request->datastores().size() > 0 && request->regions().size() > 0) {
     const auto& regions = request->regions();
     for (const auto& datastore: request->datastores()) {
-      std::string bid = server->registerBranches(rdv_request, datastore, regions, "");
+      std::string bid = _server->registerBranches(rdv_request, datastore, regions, "");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -230,6 +193,27 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   }
 
   response->set_rid(rdv_request->getRid());
+
+  std::size_t requests_size = _server->_requests.size();
+  spdlog::trace("Number of requests = {}", requests_size);
+  if (requests_size == 4000) {
+    auto now = std::chrono::system_clock::now();
+    std::unique_lock<std::shared_mutex> write_lock(_server->_mutex_requests);
+    
+    std::size_t initial_size = _server->_requests.size();
+    spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
+    for (auto it = _server->_requests.cbegin(); it != _server->_requests.cend(); /* no increment */) {
+      if (now - it->second->getLastTs() > std::chrono::seconds(1)) {
+        delete it->second;
+        _server->_requests.erase(it++);
+      }
+      else {
+        ++it;
+      }
+    }
+    spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _server->_requests.size());
+  }
+  
   return grpc::Status::OK;
 }
 
@@ -241,33 +225,26 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   
   const std::string& bid = request->bid();
   const std::string& region = request->region();
-
   spdlog::trace("> closing branch '{}' for request on region={}", bid.c_str(), region.c_str());
 
   if (region.empty()) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
   }
-
-  const std::string& rid = server->parseRid(bid);
+  const std::string& rid = _server->parseRid(bid);
   if (rid.empty()) {
     return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
   }
 
-
-  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  int res = server->closeBranch(rdv_request, bid, region, true);
-
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+  int res = _server->closeBranch(rdv_request, bid, region, true);
   if (res == 0) {
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
   }
   else if (res == -1) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
-  
   _replica_client.sendCloseBranch(bid, region);
-  
   spdlog::trace("< closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
-
   return grpc::Status::OK;
 }
 
@@ -286,13 +263,10 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   if (timeout < 0) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
   }
-
   spdlog::trace("> wait request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
-
-  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
-
-  int result = server->waitRequest(rdv_request, service, region, timeout);
+  int result = _server->waitRequest(rdv_request, service, region, timeout);
 
   spdlog::trace("< returning wait request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
@@ -310,14 +284,9 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   rendezvous::RequestContext ctx = request->context();
 
   spdlog::trace("> check request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
-
-  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  //rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
-
-  int result = server->checkRequest(rdv_request, service, region);
-
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+  int result = _server->checkRequest(rdv_request, service, region);
   response->set_status(static_cast<rendezvous::RequestStatus>(result));
-
   spdlog::trace("< returning check request call for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
   return grpc::Status::OK;
 }
@@ -333,11 +302,8 @@ grpc::Status ClientServiceImpl::CheckRequestByRegions(grpc::ServerContext* conte
   rendezvous::RequestContext ctx = request->context();
 
   spdlog::trace("> check request by regions call for request '{}' on service='{}'", rid.c_str(), service.c_str());
-
-  metadata::Request * rdv_request = server->getOrRegisterRequest(rid);
-  //rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
-
-  std::map<std::string, int> result = server->checkRequestByRegions(rdv_request, service);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+  std::map<std::string, int> result = _server->checkRequestByRegions(rdv_request, service);
 
   auto * statuses = response->mutable_statuses();
   for (auto pair = result.begin(); pair != result.end(); pair++) {

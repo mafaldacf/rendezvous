@@ -1,0 +1,24 @@
+rendezvous: 
+  address_region_eu-central-1: localhost:8001
+  address_region_us-east-1: localhost:8002
+
+mysql:
+  host_region_eu-central-1: antipode-lambda-eu.cluster-cowdztysvhul.eu-central-1.rds.amazonaws.com
+  host_region_us-east-1: antipode-lambda-us.cluster-ro-cfiggpj8crt2.us-east-1.rds.amazonaws.com
+  port: 3306
+  user: antipode
+  password: antipode
+  db: antipode
+  client_table: blobs
+dynamo:
+  region: eu-central-1
+  client_table: blobs
+s3:
+  bucket_region_eu-central-1: antipode-lambda-posts-eu-test
+  bucket_region_us-east-1: antipode-lambda-posts-us-rendezvous
+  rendezvous_path: rendezvous
+cache:
+  host_region_eu-central-1: antipode-lambda-writer-001.gwkjt4.0001.euc1.cache.amazonaws.com
+  host_region_us-east-1: antipode-lambda-reader-001.7jax8t.0001.use1.cache.amazonaws.com
+  port: 6379
+  rendezvous_prefix: rendezvous

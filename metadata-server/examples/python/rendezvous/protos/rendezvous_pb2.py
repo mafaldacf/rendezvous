@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"rendezvous/protos/rendezvous.proto\x12\nrendezvous\"\x07\n\x05\x45mpty\"}\n\x0eRequestContext\x12:\n\x08versions\x18\x01 \x03(\x0b\x32(.rendezvous.RequestContext.VersionsEntry\x1a/\n\rVersionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\"H\n\x18SubscribeBranchesMessage\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x0b\n\x03tag\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\"(\n\x19SubscribeBranchesResponse\x12\x0b\n\x03\x62id\x18\x01 \x01(\t\"%\n\x16RegisterRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\"S\n\x17RegisterRequestResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12+\n\x07\x63ontext\x18\x02 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x7f\n\x15RegisterBranchMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0b\n\x03tag\x18\x03 \x01(\t\x12\x0e\n\x06region\x18\x04 \x01(\t\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"_\n\x16RegisterBranchResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0b\n\x03\x62id\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x82\x01\n\x17RegisterBranchesMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0b\n\x03tag\x18\x03 \x01(\t\x12\x0f\n\x07regions\x18\x04 \x03(\t\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"a\n\x18RegisterBranchesResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0b\n\x03\x62id\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"^\n\x12\x43loseBranchMessage\x12\x0b\n\x03\x62id\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x80\x01\n\x12WaitRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12\x0f\n\x07timeout\x18\x04 \x01(\x05\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"6\n\x13WaitRequestResponse\x12\x1f\n\x17prevented_inconsistency\x18\x01 \x01(\x08\"p\n\x13\x43heckRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12+\n\x07\x63ontext\x18\x04 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"A\n\x14\x43heckRequestResponse\x12)\n\x06status\x18\x01 \x01(\x0e\x32\x19.rendezvous.RequestStatus\"i\n\x1c\x43heckRequestByRegionsMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x04 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\xb6\x01\n\x1d\x43heckRequestByRegionsResponse\x12I\n\x08statuses\x18\x01 \x03(\x0b\x32\x37.rendezvous.CheckRequestByRegionsResponse.StatusesEntry\x1aJ\n\rStatusesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12(\n\x05value\x18\x02 \x01(\x0e\x32\x19.rendezvous.RequestStatus:\x02\x38\x01\"A\n&GetNumPreventedInconsistenciesResponse\x12\x17\n\x0finconsistencies\x18\x01 \x01(\x03*4\n\rRequestStatus\x12\n\n\x06OPENED\x10\x00\x12\n\n\x06\x43LOSED\x10\x01\x12\x0b\n\x07UNKNOWN\x10\x02\x32\x89\x07\n\rClientService\x12\x62\n\x11SubscribeBranches\x12$.rendezvous.SubscribeBranchesMessage\x1a%.rendezvous.SubscribeBranchesResponse0\x01\x12\x44\n\rCloseBranches\x12\x1e.rendezvous.CloseBranchMessage\x1a\x11.rendezvous.Empty(\x01\x12Z\n\x0fRegisterRequest\x12\".rendezvous.RegisterRequestMessage\x1a#.rendezvous.RegisterRequestResponse\x12W\n\x0eRegisterBranch\x12!.rendezvous.RegisterBranchMessage\x1a\".rendezvous.RegisterBranchResponse\x12]\n\x10RegisterBranches\x12#.rendezvous.RegisterBranchesMessage\x1a$.rendezvous.RegisterBranchesResponse\x12@\n\x0b\x43loseBranch\x12\x1e.rendezvous.CloseBranchMessage\x1a\x11.rendezvous.Empty\x12N\n\x0bWaitRequest\x12\x1e.rendezvous.WaitRequestMessage\x1a\x1f.rendezvous.WaitRequestResponse\x12Q\n\x0c\x43heckRequest\x12\x1f.rendezvous.CheckRequestMessage\x1a .rendezvous.CheckRequestResponse\x12l\n\x15\x43heckRequestByRegions\x12(.rendezvous.CheckRequestByRegionsMessage\x1a).rendezvous.CheckRequestByRegionsResponse\x12g\n\x1eGetNumPreventedInconsistencies\x12\x11.rendezvous.Empty\x1a\x32.rendezvous.GetNumPreventedInconsistenciesResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"rendezvous/protos/rendezvous.proto\x12\nrendezvous\"\x07\n\x05\x45mpty\"}\n\x0eRequestContext\x12:\n\x08versions\x18\x01 \x03(\x0b\x32(.rendezvous.RequestContext.VersionsEntry\x1a/\n\rVersionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\"H\n\x18SubscribeBranchesMessage\x12\x0f\n\x07service\x18\x01 \x01(\t\x12\x0b\n\x03tag\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\"(\n\x19SubscribeBranchesResponse\x12\x0b\n\x03\x62id\x18\x01 \x01(\t\"%\n\x16RegisterRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\"S\n\x17RegisterRequestResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12+\n\x07\x63ontext\x18\x02 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x7f\n\x15RegisterBranchMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0b\n\x03tag\x18\x03 \x01(\t\x12\x0e\n\x06region\x18\x04 \x01(\t\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"_\n\x16RegisterBranchResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0b\n\x03\x62id\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x82\x01\n\x17RegisterBranchesMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0b\n\x03tag\x18\x03 \x01(\t\x12\x0f\n\x07regions\x18\x04 \x03(\t\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"a\n\x18RegisterBranchesResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0b\n\x03\x62id\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"8\n\x12\x44\x61tastoreBranching\x12\x11\n\tdatastore\x18\x01 \x01(\t\x12\x0f\n\x07regions\x18\x02 \x03(\t\"\x87\x01\n!RegisterBranchesDatastoresMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x12\n\ndatastores\x18\x02 \x03(\t\x12\x0f\n\x07regions\x18\x03 \x03(\t\x12\x30\n\x08\x62ranches\x18\x04 \x03(\x0b\x32\x1e.rendezvous.DatastoreBranching\"?\n\"RegisterBranchesDatastoresResponse\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0c\n\x04\x62ids\x18\x02 \x03(\t\"^\n\x12\x43loseBranchMessage\x12\x0b\n\x03\x62id\x18\x01 \x01(\t\x12\x0e\n\x06region\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x03 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\x80\x01\n\x12WaitRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12\x0f\n\x07timeout\x18\x04 \x01(\x05\x12+\n\x07\x63ontext\x18\x05 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"6\n\x13WaitRequestResponse\x12\x1f\n\x17prevented_inconsistency\x18\x01 \x01(\x08\"p\n\x13\x43heckRequestMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0e\n\x06region\x18\x03 \x01(\t\x12+\n\x07\x63ontext\x18\x04 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"A\n\x14\x43heckRequestResponse\x12)\n\x06status\x18\x01 \x01(\x0e\x32\x19.rendezvous.RequestStatus\"i\n\x1c\x43heckRequestByRegionsMessage\x12\x0b\n\x03rid\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12+\n\x07\x63ontext\x18\x04 \x01(\x0b\x32\x1a.rendezvous.RequestContext\"\xb6\x01\n\x1d\x43heckRequestByRegionsResponse\x12I\n\x08statuses\x18\x01 \x03(\x0b\x32\x37.rendezvous.CheckRequestByRegionsResponse.StatusesEntry\x1aJ\n\rStatusesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12(\n\x05value\x18\x02 \x01(\x0e\x32\x19.rendezvous.RequestStatus:\x02\x38\x01*4\n\rRequestStatus\x12\n\n\x06OPENED\x10\x00\x12\n\n\x06\x43LOSED\x10\x01\x12\x0b\n\x07UNKNOWN\x10\x02\x32\x9d\x07\n\rClientService\x12\x62\n\x11SubscribeBranches\x12$.rendezvous.SubscribeBranchesMessage\x1a%.rendezvous.SubscribeBranchesResponse0\x01\x12\x44\n\rCloseBranches\x12\x1e.rendezvous.CloseBranchMessage\x1a\x11.rendezvous.Empty(\x01\x12Z\n\x0fRegisterRequest\x12\".rendezvous.RegisterRequestMessage\x1a#.rendezvous.RegisterRequestResponse\x12W\n\x0eRegisterBranch\x12!.rendezvous.RegisterBranchMessage\x1a\".rendezvous.RegisterBranchResponse\x12]\n\x10RegisterBranches\x12#.rendezvous.RegisterBranchesMessage\x1a$.rendezvous.RegisterBranchesResponse\x12{\n\x1aRegisterBranchesDatastores\x12-.rendezvous.RegisterBranchesDatastoresMessage\x1a..rendezvous.RegisterBranchesDatastoresResponse\x12@\n\x0b\x43loseBranch\x12\x1e.rendezvous.CloseBranchMessage\x1a\x11.rendezvous.Empty\x12N\n\x0bWaitRequest\x12\x1e.rendezvous.WaitRequestMessage\x1a\x1f.rendezvous.WaitRequestResponse\x12Q\n\x0c\x43heckRequest\x12\x1f.rendezvous.CheckRequestMessage\x1a .rendezvous.CheckRequestResponse\x12l\n\x15\x43heckRequestByRegions\x12(.rendezvous.CheckRequestByRegionsMessage\x1a).rendezvous.CheckRequestByRegionsResponseb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'rendezvous.protos.rendezvous_pb2', globals())
@@ -24,8 +24,8 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _REQUESTCONTEXT_VERSIONSENTRY._serialized_options = b'8\001'
   _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._options = None
   _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._serialized_options = b'8\001'
-  _REQUESTSTATUS._serialized_start=1707
-  _REQUESTSTATUS._serialized_end=1759
+  _REQUESTSTATUS._serialized_start=1901
+  _REQUESTSTATUS._serialized_end=1953
   _EMPTY._serialized_start=50
   _EMPTY._serialized_end=57
   _REQUESTCONTEXT._serialized_start=59
@@ -48,24 +48,28 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _REGISTERBRANCHESMESSAGE._serialized_end=783
   _REGISTERBRANCHESRESPONSE._serialized_start=785
   _REGISTERBRANCHESRESPONSE._serialized_end=882
-  _CLOSEBRANCHMESSAGE._serialized_start=884
-  _CLOSEBRANCHMESSAGE._serialized_end=978
-  _WAITREQUESTMESSAGE._serialized_start=981
-  _WAITREQUESTMESSAGE._serialized_end=1109
-  _WAITREQUESTRESPONSE._serialized_start=1111
-  _WAITREQUESTRESPONSE._serialized_end=1165
-  _CHECKREQUESTMESSAGE._serialized_start=1167
-  _CHECKREQUESTMESSAGE._serialized_end=1279
-  _CHECKREQUESTRESPONSE._serialized_start=1281
-  _CHECKREQUESTRESPONSE._serialized_end=1346
-  _CHECKREQUESTBYREGIONSMESSAGE._serialized_start=1348
-  _CHECKREQUESTBYREGIONSMESSAGE._serialized_end=1453
-  _CHECKREQUESTBYREGIONSRESPONSE._serialized_start=1456
-  _CHECKREQUESTBYREGIONSRESPONSE._serialized_end=1638
-  _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._serialized_start=1564
-  _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._serialized_end=1638
-  _GETNUMPREVENTEDINCONSISTENCIESRESPONSE._serialized_start=1640
-  _GETNUMPREVENTEDINCONSISTENCIESRESPONSE._serialized_end=1705
-  _CLIENTSERVICE._serialized_start=1762
-  _CLIENTSERVICE._serialized_end=2667
+  _DATASTOREBRANCHING._serialized_start=884
+  _DATASTOREBRANCHING._serialized_end=940
+  _REGISTERBRANCHESDATASTORESMESSAGE._serialized_start=943
+  _REGISTERBRANCHESDATASTORESMESSAGE._serialized_end=1078
+  _REGISTERBRANCHESDATASTORESRESPONSE._serialized_start=1080
+  _REGISTERBRANCHESDATASTORESRESPONSE._serialized_end=1143
+  _CLOSEBRANCHMESSAGE._serialized_start=1145
+  _CLOSEBRANCHMESSAGE._serialized_end=1239
+  _WAITREQUESTMESSAGE._serialized_start=1242
+  _WAITREQUESTMESSAGE._serialized_end=1370
+  _WAITREQUESTRESPONSE._serialized_start=1372
+  _WAITREQUESTRESPONSE._serialized_end=1426
+  _CHECKREQUESTMESSAGE._serialized_start=1428
+  _CHECKREQUESTMESSAGE._serialized_end=1540
+  _CHECKREQUESTRESPONSE._serialized_start=1542
+  _CHECKREQUESTRESPONSE._serialized_end=1607
+  _CHECKREQUESTBYREGIONSMESSAGE._serialized_start=1609
+  _CHECKREQUESTBYREGIONSMESSAGE._serialized_end=1714
+  _CHECKREQUESTBYREGIONSRESPONSE._serialized_start=1717
+  _CHECKREQUESTBYREGIONSRESPONSE._serialized_end=1899
+  _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._serialized_start=1825
+  _CHECKREQUESTBYREGIONSRESPONSE_STATUSESENTRY._serialized_end=1899
+  _CLIENTSERVICE._serialized_start=1956
+  _CLIENTSERVICE._serialized_end=2881
 # @@protoc_insertion_point(module_scope)

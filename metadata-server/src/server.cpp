@@ -4,15 +4,22 @@ using namespace rendezvous;
 
 Server::Server(std::string sid, json settings)
     : _next_rid(0), _sid(sid), 
-    _requests_cleanup_sleep_m(settings["requests_cleanup_sleep_m"].get<int>()),
-    _subscribers_cleanup_sleep_m(settings["subscribers_cleanup_sleep_m"].get<int>()),
-    _subscribers_max_wait_time_s(settings["subscribers_max_wait_time_s"].get<int>()),
+    _cleanup_requests_interval_m(settings["cleanup_requests_interval_m"].get<int>()),
+    _cleanup_requests_validity_m(settings["cleanup_requests_validity_m"].get<int>()),
+    _cleanup_subscribers_interval_m(settings["cleanup_subscribers_interval_m"].get<int>()),
+    _cleanup_subscribers_validity_m(settings["cleanup_subscribers_validity_m"].get<int>()),
+    _subscribers_refresh_interval_s(settings["subscribers_refresh_interval_s"].get<int>()),
     _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
-
-      std::cout << "- Requests cleanup sleep: " << _requests_cleanup_sleep_m << "m" << std::endl;
-      std::cout << "- Subscribers cleanup sleep: " << _subscribers_cleanup_sleep_m << "m" << std::endl;
-      std::cout << "- Subscribers max wait time: " << _subscribers_max_wait_time_s << "s" << std::endl;
-      std::cout << "- Wait replica timeout: " << _wait_replica_timeout_s << "s" << std::endl;
+    
+    spdlog::info("------------------------------------------------------");
+    spdlog::info("- Garbage Collector Info (minutes):");
+    spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
+    spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
+    spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
+    spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
+    spdlog::info("- Subscribers max wait time: {} minutes", _subscribers_refresh_interval_s);
+    spdlog::info("- Wait replica timeout: {} minutes", _wait_replica_timeout_s);
+    spdlog::info("------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
@@ -21,9 +28,11 @@ Server::Server(std::string sid, json settings)
 // testing purposes
 Server::Server(std::string sid)
     : _next_rid(0), _sid(sid), 
-    _requests_cleanup_sleep_m(30),
-    _subscribers_cleanup_sleep_m(30),
-    _subscribers_max_wait_time_s(60),
+    _cleanup_requests_interval_m(30),
+    _cleanup_requests_validity_m(30),
+    _cleanup_subscribers_interval_m(30),
+    _cleanup_subscribers_validity_m(30),
+    _subscribers_refresh_interval_s(60),
     _wait_replica_timeout_s(60) {
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
@@ -67,7 +76,7 @@ metadata::Subscriber * Server::getSubscriber(const std::string& service, const s
   std::shared_lock<std::shared_mutex> write_lock(_mutex_subscribers);
 
   // register new subscriber
-  metadata::Subscriber * subscriber = new metadata::Subscriber(_subscribers_max_wait_time_s);
+  metadata::Subscriber * subscriber = new metadata::Subscriber(_subscribers_refresh_interval_s);
   _subscribers[subscriber_id][region] = subscriber;
   return subscriber;
 }
@@ -75,98 +84,80 @@ metadata::Subscriber * Server::getSubscriber(const std::string& service, const s
 void Server::publishBranches(const std::string& service, const std::string& tag, const std::string& bid) {
   metadata::Subscriber * subscriber;
   const std::string& subscriber_id = computeSubscriberId(service, tag);
-
-  spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
   
   std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
   auto it_regions = _subscribers.find(subscriber_id);
 
   // found subscriber in certain regions
   if (it_regions != _subscribers.end()) {
+    spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
     for (const auto& subscriber : it_regions->second) {
+      spdlog::debug("tracking branch {} for subscriber id {} in region '{}'", it_regions->first);
       subscriber.second->pushBranch(bid);
     }
   }
 }
 
-// -----------------
-// Garbage Collector
-//------------------
+// ------------------
+// Garbage Collectors
+//-------------------
 
 void Server::initSubscribersCleanup() {
-  if (_subscribers_cleanup_sleep_m == -1) {
+  if (_cleanup_subscribers_interval_m == -1 || _cleanup_subscribers_validity_m == -1) {
     return;
   }
   std::thread([this]() {
     while (true) {
-      std::this_thread::sleep_for(std::chrono::minutes(_subscribers_cleanup_sleep_m));
-
+      std::this_thread::sleep_for(std::chrono::minutes(_cleanup_subscribers_interval_m));
       auto now = std::chrono::system_clock::now();
-      std::cout << "[INFO] initializing clean subscribers procedure..." << std::endl;
+      std::unique_lock<std::shared_mutex> write_lock(_mutex_subscribers);
+      spdlog::info("[GC SUBSCRIBERS] initializing garbage collector...");
 
-      std::unordered_map<std::string, metadata::Subscriber *> old_subscribers;
-
-      // target old subscribers
-      std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
-      metadata::Subscriber * subscriber;
-      for (auto regions_it = _subscribers.begin(); regions_it != _subscribers.end(); ++regions_it) {
-        for (auto subscribers_it = regions_it->second.begin(); subscribers_it != regions_it->second.end(); subscribers_it++) {
-          auto last_ts = subscribers_it->second->getLastTs();
-          auto time_since = now - last_ts;
-
-          if (time_since > std::chrono::minutes(_subscribers_cleanup_sleep_m)) {
-            old_subscribers.insert({subscribers_it->first + "-" + regions_it->first, subscribers_it->second});
+      for (auto subscribers_it = _subscribers.begin(); subscribers_it != _subscribers.cend(); /* no increment */) {
+        for (auto regions_it = subscribers_it->second.cbegin(); regions_it != subscribers_it->second.cend(); /* no increment */) {
+          if (now - regions_it->second->getLastTs() > std::chrono::minutes(_cleanup_subscribers_validity_m)) {
+            delete regions_it->second;
+            subscribers_it->second.erase(regions_it++);
+          }
+          else {
+            ++regions_it;
           }
         }
-      }
-      read_lock.unlock();
-      std::unique_lock<std::shared_mutex> write_lock(_mutex_subscribers);
-
-      // remove and delete old subscribers
-      for (auto it = old_subscribers.begin(); it != old_subscribers.end(); it++) {
-        _subscribers.erase(it->first);
-        delete(it->second);
+        // current subscriber (id) is not associated with any region so we delete the id from the main subscriber map
+        if (subscribers_it->second.empty()) {
+          _subscribers.erase(subscribers_it++);
+        }
+        else {
+          ++subscribers_it;
+        }
       }
     }
   }).detach();
+
 }
 
 void Server::initRequestsCleanup() {
-  if (_requests_cleanup_sleep_m == -1) {
+  if (_cleanup_requests_interval_m == -1 || _cleanup_requests_validity_m == -1) {
     return;
   }
   std::thread([this]() {
     while (true) {
-      std::this_thread::sleep_for(std::chrono::minutes(_requests_cleanup_sleep_m));
-
-      int num = 0;
+      std::this_thread::sleep_for(std::chrono::minutes(_cleanup_requests_interval_m));
       auto now = std::chrono::system_clock::now();
-      spdlog::info("[GC] initializing requests garbage collector...");
+      std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
+      std::size_t initial_size = _requests.size();
+      spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
 
-      std::vector<metadata::Request*> old_requests;
-
-      // copy requests
-      std::shared_lock<std::shared_mutex> read_lock(_mutex_requests);
-      spdlog::info("[GC] initial number of requests = {}", _requests.size());
-      for (const auto& pair: _requests) {
-        if (now - pair.second->getLastTs() > std::chrono::minutes(_requests_cleanup_sleep_m)) {
-          old_requests.emplace_back(pair.second);
+      for (auto it = _requests.cbegin(); it != _requests.cend(); /* no increment */) {
+        if (now - it->second->getLastTs() > std::chrono::minutes(_cleanup_requests_validity_m)) {
+          delete it->second;
+          _requests.erase(it++);
+        }
+        else {
+          ++it;
         }
       }
-      read_lock.unlock();
-
-      // remove and delete old requests
-      std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
-      for (metadata::Request * request : old_requests) {
-        _requests.erase(request->getRid());
-      }
-      spdlog::info("[GC] final number of requests = {} (cleaned {})", _requests.size(), old_requests.size());
-      write_lock.unlock();
-
-      for (metadata::Request * request : old_requests) {
-          delete request;
-      }
-      spdlog::info("[GC] collected {} old requests", old_requests.size());
+      spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
     }
     
   }).detach();
@@ -278,7 +269,7 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
 
   if (!branch) {
     return "";
-  }
+  };
 
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, bid);

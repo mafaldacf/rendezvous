@@ -39,6 +39,11 @@ class ClientServiceStub(object):
                 request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage.SerializeToString,
                 response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse.FromString,
                 )
+        self.RegisterBranchesDatastores = channel.unary_unary(
+                '/rendezvous.ClientService/RegisterBranchesDatastores',
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.FromString,
+                )
         self.CloseBranch = channel.unary_unary(
                 '/rendezvous.ClientService/CloseBranch',
                 request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
@@ -58,11 +63,6 @@ class ClientServiceStub(object):
                 '/rendezvous.ClientService/CheckRequestByRegions',
                 request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
                 response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
-                )
-        self.GetNumPreventedInconsistencies = channel.unary_unary(
-                '/rendezvous.ClientService/GetNumPreventedInconsistencies',
-                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.SerializeToString,
-                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.GetNumPreventedInconsistenciesResponse.FromString,
                 )
 
 
@@ -101,6 +101,12 @@ class ClientServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RegisterBranchesDatastores(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CloseBranch(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -120,12 +126,6 @@ class ClientServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def CheckRequestByRegions(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetNumPreventedInconsistencies(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -159,6 +159,11 @@ def add_ClientServiceServicer_to_server(servicer, server):
                     request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesMessage.FromString,
                     response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesResponse.SerializeToString,
             ),
+            'RegisterBranchesDatastores': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterBranchesDatastores,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.SerializeToString,
+            ),
             'CloseBranch': grpc.unary_unary_rpc_method_handler(
                     servicer.CloseBranch,
                     request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.FromString,
@@ -178,11 +183,6 @@ def add_ClientServiceServicer_to_server(servicer, server):
                     servicer.CheckRequestByRegions,
                     request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.FromString,
                     response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.SerializeToString,
-            ),
-            'GetNumPreventedInconsistencies': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetNumPreventedInconsistencies,
-                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.FromString,
-                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.GetNumPreventedInconsistenciesResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -280,6 +280,23 @@ class ClientService(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def RegisterBranchesDatastores(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranchesDatastores',
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def CloseBranch(request,
             target,
             options=(),
@@ -344,22 +361,5 @@ class ClientService(object):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/CheckRequestByRegions',
             rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
             rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetNumPreventedInconsistencies(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/GetNumPreventedInconsistencies',
-            rendezvous_dot_protos_dot_rendezvous__pb2.Empty.SerializeToString,
-            rendezvous_dot_protos_dot_rendezvous__pb2.GetNumPreventedInconsistenciesResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

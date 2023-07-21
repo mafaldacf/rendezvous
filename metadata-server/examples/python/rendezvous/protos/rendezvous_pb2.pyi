@@ -60,15 +60,17 @@ class CloseBranchMessage(_message.Message):
     region: str
     def __init__(self, bid: _Optional[str] = ..., region: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
 
+class DatastoreBranching(_message.Message):
+    __slots__ = ["datastore", "regions"]
+    DATASTORE_FIELD_NUMBER: _ClassVar[int]
+    REGIONS_FIELD_NUMBER: _ClassVar[int]
+    datastore: str
+    regions: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, datastore: _Optional[str] = ..., regions: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class Empty(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
-
-class GetNumPreventedInconsistenciesResponse(_message.Message):
-    __slots__ = ["inconsistencies"]
-    INCONSISTENCIES_FIELD_NUMBER: _ClassVar[int]
-    inconsistencies: int
-    def __init__(self, inconsistencies: _Optional[int] = ...) -> None: ...
 
 class RegisterBranchMessage(_message.Message):
     __slots__ = ["context", "region", "rid", "service", "tag"]
@@ -93,6 +95,26 @@ class RegisterBranchResponse(_message.Message):
     context: RequestContext
     rid: str
     def __init__(self, rid: _Optional[str] = ..., bid: _Optional[str] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ...) -> None: ...
+
+class RegisterBranchesDatastoresMessage(_message.Message):
+    __slots__ = ["branches", "datastores", "regions", "rid"]
+    BRANCHES_FIELD_NUMBER: _ClassVar[int]
+    DATASTORES_FIELD_NUMBER: _ClassVar[int]
+    REGIONS_FIELD_NUMBER: _ClassVar[int]
+    RID_FIELD_NUMBER: _ClassVar[int]
+    branches: _containers.RepeatedCompositeFieldContainer[DatastoreBranching]
+    datastores: _containers.RepeatedScalarFieldContainer[str]
+    regions: _containers.RepeatedScalarFieldContainer[str]
+    rid: str
+    def __init__(self, rid: _Optional[str] = ..., datastores: _Optional[_Iterable[str]] = ..., regions: _Optional[_Iterable[str]] = ..., branches: _Optional[_Iterable[_Union[DatastoreBranching, _Mapping]]] = ...) -> None: ...
+
+class RegisterBranchesDatastoresResponse(_message.Message):
+    __slots__ = ["bids", "rid"]
+    BIDS_FIELD_NUMBER: _ClassVar[int]
+    RID_FIELD_NUMBER: _ClassVar[int]
+    bids: _containers.RepeatedScalarFieldContainer[str]
+    rid: str
+    def __init__(self, rid: _Optional[str] = ..., bids: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class RegisterBranchesMessage(_message.Message):
     __slots__ = ["context", "regions", "rid", "service", "tag"]

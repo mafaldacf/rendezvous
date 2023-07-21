@@ -90,7 +90,7 @@ metadata::Branch * Request::registerBranches(const std::string& bid, const std::
     return branch;
 }
 
-int Request::closeBranch(const std::string& bid, const std::string& region, std::string& service, std::string& tag) {
+int Request::closeBranch(const std::string& bid, const std::string& region) {
     std::unique_lock<std::mutex> lock(_mutex_branches);
 
     bool region_found = true;
@@ -102,8 +102,8 @@ int Request::closeBranch(const std::string& bid, const std::string& region, std:
     }
 
     metadata::Branch * branch = branch_it->second;
-    service = branch->getService();
-    tag = branch->getTag();
+    const std::string& service = branch->getService();
+    const std::string& tag = branch->getTag();
 
     int res = branch->close(region);
     if (res == 1) {

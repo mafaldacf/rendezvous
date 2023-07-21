@@ -23,7 +23,7 @@ namespace service {
     class ClientServiceImpl final : public rendezvous::ClientService::Service {
 
         private:
-            std::shared_ptr<rendezvous::Server> server;
+            std::shared_ptr<rendezvous::Server> _server;
             replicas::ReplicaClient _replica_client;
 
             // debugging purposes

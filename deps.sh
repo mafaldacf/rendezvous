@@ -17,7 +17,7 @@ sudo apt-get clean
 
 # Install python dependencies
 sudo apt install python3-pip -y
-cd database-monitor
+cd datastore-monitor
 sudo pip install -r requirements.txt
 cd ../client-eval
 sudo pip install -r requirements.txt

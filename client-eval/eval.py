@@ -400,7 +400,7 @@ if __name__ == '__main__':
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
     plot_parser.add_argument('-d', '--directory', type=str, default=RESULTS_DIR, help="Base directory of results")
-    plot_parser.add_argument('-a', '--annotate', type=bool, default=False, help="Annotate datapoints")
+    plot_parser.add_argument('-a', '--annotate', type=bool, action='store_true', help="Annotate datapoints")
 
 
     args = vars(main_parser.parse_args())

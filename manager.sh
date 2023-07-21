@@ -15,6 +15,66 @@ SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
 SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 
 # ------
+# LOCAL 
+# ------
+
+local_clean() {
+  cd metadata-server
+  # c++
+  rm -r -f cmake/build
+  # python
+  rm -r -f examples/python/__pycache__
+  rm -r -f examples/python/rendezvous/protos/__pycache__
+  echo done!
+}
+
+local_build() {
+  cd metadata-server
+  mkdir -p cmake/build
+  cd cmake/build
+  cmake ../..
+  make
+  echo done!
+}
+
+local_build_cfg() {
+  cd metadata-server
+  mkdir -p cmake/build
+  cd cmake/build
+  cmake -DCMAKE_PREFIX_PATH=$MY_INSTALL_DIR ../..
+  echo done!
+}
+
+local_build_py() {
+  # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
+  # https://github.com/protocolbuffers/protobuf/issues/1491
+  # consequently, we have to remove part of the path from the output flags (the path will be complemented with the package name)
+
+  # UNCOMMENT to build from global proto file in /protos/
+  cd metadata-server
+  python3 -m grpc_tools.protoc -I rendezvous/protos=protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python protos/rendezvous.proto
+
+  # UNCOMMENT to build from proto file in /examples/python/rendezvous/protos
+  # python3 -m grpc_tools.protoc -I rendezvous/protos=examples/python/rendezvous/protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python examples/python/rendezvous/protos/rendezvous.proto
+  echo done!
+}
+
+local_run_server() {
+  cd metadata-server/cmake/build/src
+  ./rendezvous $1
+}
+
+local_run_client() {
+  cd metadata-server/examples/python
+  python3 client.py
+}
+
+local_run_tests() {
+  cd metadata-server/cmake/build/test
+  ./tests
+}
+
+# ------
 # AWS 
 # ------
 
@@ -30,7 +90,7 @@ aws_setup() {
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
     echo "Cleaned EC2 instance workspace"
 
-    scp -i "$ssh_key" -r metadata-server/ database-monitor/  "ubuntu@$hostname:rendezvous"
+    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/  "ubuntu@$hostname:rendezvous"
     echo "Copied project"
 
     #cmd="cd rendezvous/metadata-server && sudo chmod 777 *.sh"
@@ -51,10 +111,10 @@ aws_update() {
     echo "Copied config files to '$region' instance"
 
     if [ $region != "eu" ]; then
-        scp -i "$ssh_key" database-monitor/config/* "ubuntu@$hostname:rendezvous/database-monitor/config"
+        scp -i "$ssh_key" datastore-monitor/config/* "ubuntu@$hostname:rendezvous/datastore-monitor/config"
         echo "Copied connections-$region.yaml file to '$region' instance"
 
-        scp -i "$ssh_key" -r database-monitor/*.py "ubuntu@$hostname:rendezvous/database-monitor"
+        scp -i "$ssh_key" -r datastore-monitor/*.py "ubuntu@$hostname:rendezvous/datastore-monitor"
         echo "Copied python code to '$region' instance"
     fi
 }
@@ -74,7 +134,7 @@ aws_start() {
     echo "Started rendezvous server in '$region' instance"
 
     if [ $region != "eu" ]; then
-        cmd="cd rendezvous/database-monitor && python3 main.py -cp aws -r $region -d $datastore"
+        cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
         ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
         echo "Started client process in '$region' instance"
     fi
@@ -97,77 +157,33 @@ aws_stop() {
     fi
 }
 
+# -------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------
+
 # ------
 # LOCAL 
 # ------
 
-if [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "clean" ]
-  then
-    cd metadata-server
-    # c++
-    rm -r -f cmake/build
-    # python
-    rm -r -f examples/python/__pycache__
-    rm -r -f examples/python/rendezvous/protos/__pycache__
-    echo done!
+if [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "clean" ]; then
+  local_clean
 
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ]
-  then
-    cd metadata-server
-    mkdir -p cmake/build
-    cd cmake/build
-    cmake ../..
-    make
-    echo done!
+elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ]; then
+  local_build
 
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-cfg" ]
-  then
-    cd metadata-server
-    mkdir -p cmake/build
-    cd cmake/build
-    cmake -DCMAKE_PREFIX_PATH=$MY_INSTALL_DIR ../..
-    echo done!
+elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-cfg" ]; then
+  local_build_cfg
 
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-py" ]
-  then
-    # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
-    # https://github.com/protocolbuffers/protobuf/issues/1491
-    # consequently, we have to remove part of the path from the output flags (the path will be complemented with the package name)
-
-    # UNCOMMENT to build from global proto file in /protos/
-    cd metadata-server
-    python3 -m grpc_tools.protoc -I rendezvous/protos=protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python protos/rendezvous.proto
-
-    # UNCOMMENT to build from proto file in /examples/python/rendezvous/protos
-    # python3 -m grpc_tools.protoc -I rendezvous/protos=examples/python/rendezvous/protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python examples/python/rendezvous/protos/rendezvous.proto
-    echo done!
+elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-py" ]; then
+  local_build_py
     
-elif [ "$#" -ge 3 ] && [ "$#" -le 4 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]
-  then
-    cd metadata-server/cmake/build/src
-    if [ "$#" -eq 4 ]
-    then
-      ./rendezvous $4
-      echo done!
-    else
-      ./rendezvous
-      echo done!
-    fi
+elif [ "$#" -eq 4 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
+  local_run_server $4
 
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]
-  then
-    cd metadata-server/cmake/build/examples/cpp
-    ./client
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
+  local_run_client
 
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]
-  then
-    cd metadata-server/examples/python
-    python3 client.py
-
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "tests" ]
-  then
-    cd metadata-server/cmake/build/test
-    ./tests
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "tests" ]; then
+  local_run_tests
 
 # ------
 # AWS 
@@ -236,7 +252,7 @@ elif [ "$#" -eq 3 ] && [ $1 = "aws-docker" ]; then
   cmd="sudo docker pull mafaldacf/rendezvous-deps; sudo docker pull mafaldacf/rendezvous"
   ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
 
-  cmd="sudo docker-compose up --force-recreate metadata-server-${region} database-monitor-${db}-${region}"
+  cmd="sudo docker-compose up --force-recreate metadata-server-${region} datastore-monitor-${db}-${region}"
   ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
 
 else

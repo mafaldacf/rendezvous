@@ -133,12 +133,10 @@ namespace metadata {
              * 
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region The region where the branch was registered
-             * @param service to be modified
-             * @param tag to be modified
              * 
              * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            int closeBranch(const std::string& bid, const std::string& region, std::string& service, std::string& tag);
+            int closeBranch(const std::string& bid, const std::string& region);
 
             /**
              * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps

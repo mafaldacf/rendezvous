@@ -3,13 +3,11 @@ syntax = "proto3";
 package rendezvous;
 
 service ClientService {
-  // Publish-Subscribe
-  rpc RecoverBranches(RecoverBranchesMessage) returns (RecoverBranchesResponse);
+  /* Streaming */
   rpc SubscribeBranches(SubscribeBranchesMessage) returns (stream SubscribeBranchesResponse);
-  
-  // Unidirectional Streaming
   rpc CloseBranches(stream CloseBranchMessage) returns (Empty);
 
+  /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
   rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
@@ -17,81 +15,15 @@ service ClientService {
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
   rpc CheckRequest(CheckRequestMessage) returns (CheckRequestResponse);
   rpc CheckRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
-  rpc GetPreventedInconsistencies(Empty) returns (GetPreventedInconsistenciesResponse);
+  rpc GetNumPreventedInconsistencies(Empty) returns (GetNumPreventedInconsistenciesResponse);
 }
-
-// -----------------
-// Publish-Subscribe
-// -----------------
-
-message RecoverBranchesMessage {
-  string service = 1;
-}
-
-message RecoverBranchesResponse {
-  repeated string bids = 1;
-  bool done = 2;
-}
-
-message SubscribeBranchesMessage {
-  string service = 1;
-  string tag = 2;
-}
-
-message SubscribeBranchesResponse {
-  string bid = 1;
-}
-
-// -----------------------
-// Bidirectional Streaming
-// -----------------------
-
-/* Pending Requests */
-
-message WatchOpenedRequestsMessage {
-  string service = 1;
-}
-
-message WatchOpenedRequestsResponse {
-  repeated string rids = 1;
-  bool done = 2;
-}
-
-/* Waiting Requests */
-
-message WatchPendingRequestsMessage {
-  string service = 1;
-}
-
-message WatchPendingRequestsResponse {
-  repeated string rids = 1;
-  bool done = 2;
-}
-
-// ------------------------
-// Unidirectional Streaming
-// ------------------------
-
-/* Pending Requests */
-
-message GetOpenedRequestsMessage {
-  string service = 1;
-}
-
-message GetOpenedRequestsResponse {
-  repeated string rids = 1;
-}
-
-// -----------
-// Unary RPCs
-// -----------
 
 /* Helpers */
 
 enum RequestStatus {
   OPENED = 0;
   CLOSED = 1;
-  NOT_FOUND = 2;
+  UNKNOWN = 2;
 }
 
 message Empty {
@@ -100,6 +32,18 @@ message Empty {
 
 message RequestContext {
   map<string, int32> versions = 1;
+}
+
+/* Publish-Subscribe */
+
+message SubscribeBranchesMessage {
+  string service = 1;
+  string tag = 2;
+  string region = 3;
+}
+
+message SubscribeBranchesResponse {
+  string bid = 1;
 }
 
 /* Register Request */
@@ -193,6 +137,6 @@ message CheckRequestByRegionsResponse {
 
 /* Get Prevented Inconsistencies */
 
-message GetPreventedInconsistenciesResponse {
+message GetNumPreventedInconsistenciesResponse {
   int64 inconsistencies = 1;
 }
