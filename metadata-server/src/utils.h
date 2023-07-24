@@ -19,7 +19,7 @@ namespace utils {
 
     const std::string TIME_FORMAT = "%Y-%m-%d %H:%M:%S";
 
-    const std::string ERR_PARSING_RID = "Unexpected error parsing branch identifier";
+    const std::string ERR_PARSING_BID = "Unexpected error parsing full bid";
     
     /* client gRPC custom error messages */
     const std::string ERR_MSG_SERVICE_NOT_FOUND = "Request status not found for the provided service";

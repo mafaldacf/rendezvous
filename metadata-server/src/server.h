@@ -47,17 +47,19 @@ namespace rendezvous {
             std::atomic<long> _next_rid;
             
             // <rid, request_ptr>
+            std::shared_mutex _mutex_requests;
+            std::unordered_map<std::string, metadata::Request*> _requests;
 
             // <service w/ tag, <region, subscriber_ptr>>
             std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>> _subscribers;
             std::shared_mutex _mutex_subscribers;
 
         public:
-            std::shared_mutex _mutex_requests;
-            std::unordered_map<std::string, metadata::Request*> _requests;
             Server(std::string sid, json settings);
             Server(std::string sid);
             ~Server();
+
+            std::atomic<int> _prevented_inconsistencies = 0;
 
             /**
              * Get subscriber associated with the subscriber id
@@ -105,7 +107,7 @@ namespace rendezvous {
             std::string genRid();
 
             /**
-             * Generate an identifier for a new branch
+             * Generate a (small) identifier for a new branch
              * 
              * @param request The request where the branch is going to be registered
              * @return the new identifier 
@@ -113,12 +115,21 @@ namespace rendezvous {
             std::string genBid(metadata::Request * request);
 
             /**
-             * Get rid from bid
+             * Generate an full identifier from rid and bid
              * 
-             * @param bid 
-             * @return std::string 
+             * @param request
+             * @param bid
+             * @return the new identifier 
              */
-            std::string parseRid(std::string bid);
+            std::string getFullBid(metadata::Request * request, const std::string& bid);
+
+            /**
+             * Parse rid and bid from full bid
+             * 
+             * @param full_bid 
+             * @return rid and bid
+             */
+            std::pair<std::string, std::string> parseFullBid(const std::string& full_bid);
 
             /**
              * Compute subscriber id from service and tag
@@ -183,10 +194,9 @@ namespace rendezvous {
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
              * @param service Service where branch was registered
-             * @param client_request True if request comes from client and false if request comes from replica
              * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool client_request = false);
+            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)

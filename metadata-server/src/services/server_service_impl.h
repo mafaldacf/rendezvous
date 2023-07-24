@@ -18,7 +18,7 @@ namespace service {
     class ServerServiceImpl final : public rendezvous_server::ServerService::Service {
 
         private:
-            std::shared_ptr<rendezvous::Server> server;
+            std::shared_ptr<rendezvous::Server> _server;
 
         public:
             ServerServiceImpl(std::shared_ptr<rendezvous::Server> server);

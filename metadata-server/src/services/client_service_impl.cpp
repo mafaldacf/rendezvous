@@ -38,31 +38,34 @@ grpc::Status ClientServiceImpl::CloseBranches(grpc::ServerContext* context,
 
     if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-    spdlog::debug("> init closing branches");
+    spdlog::debug("> [CLOSE STREAM] init closing branches");
     std::vector<rendezvous::CloseBranchMessage> replica_requests;
     rendezvous::CloseBranchMessage request;
     while (reader->Read(&request)) {
-      spdlog::trace("> close branches stream -> closing branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
+      spdlog::trace("> [CLOSE STREAM] -> closing branch w/ full bid'{}' on region={}", request.bid().c_str(), request.region().c_str());
       if (request.region().empty()) {
         return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
       }
-      const std::string& rid = _server->parseRid(request.bid());
-      if (rid.empty()) {
-        return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
+      // full_bid format: <bid>:<rid>
+      auto ids = _server->parseFullBid(request.bid());
+      std::string bid = ids.first;
+      std::string rid = ids.second;
+      if (rid.empty() || bid.empty()) {
+        return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_BID);
       }
 
       metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
-      bool region_found = _server->closeBranch(rdv_request, request.bid(), request.region(), true);
+      bool region_found = _server->closeBranch(rdv_request, bid, request.region());
       if (!region_found) {
         return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_INVALID_REGION);
       }
 
       _replica_client.sendCloseBranch(request.bid(), request.region());
-      spdlog::trace("< close branches stream -> closed branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
+      spdlog::trace("< [CLOSE STREAM] close branches stream -> closed branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
       return grpc::Status::OK;
     }
 
-    spdlog::trace("< end closing branches");
+    spdlog::trace("< [CLOSE STREAM] end closing branches");
     return grpc::Status::OK; 
   }
 
@@ -193,27 +196,6 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   }
 
   response->set_rid(rdv_request->getRid());
-
-  std::size_t requests_size = _server->_requests.size();
-  spdlog::trace("Number of requests = {}", requests_size);
-  if (requests_size == 4000) {
-    auto now = std::chrono::system_clock::now();
-    std::unique_lock<std::shared_mutex> write_lock(_server->_mutex_requests);
-    
-    std::size_t initial_size = _server->_requests.size();
-    spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
-    for (auto it = _server->_requests.cbegin(); it != _server->_requests.cend(); /* no increment */) {
-      if (now - it->second->getLastTs() > std::chrono::seconds(1)) {
-        delete it->second;
-        _server->_requests.erase(it++);
-      }
-      else {
-        ++it;
-      }
-    }
-    spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _server->_requests.size());
-  }
-  
   return grpc::Status::OK;
 }
 
@@ -222,29 +204,29 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   rendezvous::Empty* response) {
 
   if (SKIP_CONSISTENCY_CHECKS) return grpc::Status::OK;
-  
-  const std::string& bid = request->bid();
-  const std::string& region = request->region();
-  spdlog::trace("> closing branch '{}' for request on region={}", bid.c_str(), region.c_str());
+  spdlog::trace("> closing branch w/ full_bid '{}' on region={}", request->bid().c_str(), request->region().c_str());
 
-  if (region.empty()) {
+  if (request->region().empty()) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
   }
-  const std::string& rid = _server->parseRid(bid);
-  if (rid.empty()) {
-    return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
+  // full_bid format: <bid>:<rid>
+  auto ids = _server->parseFullBid(request->bid());
+  std::string bid = ids.first;
+  std::string rid = ids.second;
+  if (rid.empty() || bid.empty()) {
+    return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_BID);
   }
 
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
-  int res = _server->closeBranch(rdv_request, bid, region, true);
+  int res = _server->closeBranch(rdv_request, bid, request->region());
   if (res == 0) {
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
   }
   else if (res == -1) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
-  _replica_client.sendCloseBranch(bid, region);
-  spdlog::trace("< closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
+  _replica_client.sendCloseBranch(request->bid(), request->region());
+  spdlog::trace("< closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), request->region().c_str());
   return grpc::Status::OK;
 }
 

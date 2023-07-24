@@ -17,8 +17,8 @@ Server::Server(std::string sid, json settings)
     spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
     spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
     spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
-    spdlog::info("- Subscribers max wait time: {} minutes", _subscribers_refresh_interval_s);
-    spdlog::info("- Wait replica timeout: {} minutes", _wait_replica_timeout_s);
+    spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
+    spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
     spdlog::info("------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
@@ -90,9 +90,8 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
 
   // found subscriber in certain regions
   if (it_regions != _subscribers.end()) {
-    spdlog::debug("tracking branch {} for subscriber id {}", bid.c_str(), subscriber_id.c_str());
     for (const auto& subscriber : it_regions->second) {
-      spdlog::debug("tracking branch {} for subscriber id {} in region '{}'", it_regions->first);
+      spdlog::debug("tracking branch '{}' for subscriber id '{}' in region '{}'", bid.c_str(), subscriber_id.c_str(), it_regions->first);
       subscriber.second->pushBranch(bid);
     }
   }
@@ -176,17 +175,24 @@ std::string Server::genRid() {
 }
 
 std::string Server::genBid(metadata::Request * request) {
-  return _sid + '_' + request->genId() + ':' + request->getRid();
+  return _sid + '_' + request->genId();
 }
 
-std::string Server::parseRid(std::string bid) {
-  size_t delimiter_pos = bid.find(':');
-  std::string rid = "";
+std::string Server::getFullBid(metadata::Request * request, const std::string& bid) {
+  return bid + ':' + request->getRid();
+}
 
+std::pair<std::string, std::string> Server::parseFullBid(const std::string& full_bid) {
+  size_t delimiter_pos = full_bid.find(':');
+  std::string rid = "";
+  std::string bid = "";
+
+  // format of full bid: <bid>:<rid>
   if (delimiter_pos != std::string::npos) {
-    rid = bid.substr(delimiter_pos+1);
+    rid = full_bid.substr(delimiter_pos+1);
+    bid = full_bid.substr(0, delimiter_pos);
   }
-  return rid;
+  return std::make_pair(bid, rid);
 }
 
 std::string Server::computeSubscriberId(const std::string& service, const std::string& tag) {
@@ -254,11 +260,11 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
     return "";
   }
 
+  const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
-    publishBranches(service, tag, bid);
+    publishBranches(service, tag, full_bid);
   }
-
-  return bid;
+  return full_bid;
 }
 
 std::string Server::registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
@@ -271,16 +277,15 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
     return "";
   };
 
+  const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
-    publishBranches(service, tag, bid);
+    publishBranches(service, tag, full_bid);
   }
-
-  return bid;
+  return full_bid;
 }
 
-int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool client_request) {
-  std::string service, tag;
-  return request->closeBranch(bid, region, service, tag);
+int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
+  return request->closeBranch(bid, region);
 }
 
 int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout) {
@@ -299,6 +304,11 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
 
   else
     result = request->wait(timeout);
+
+  // TODO: REMOVE THIS FOR RELEASE!
+  if (result == 1) {
+    _prevented_inconsistencies.fetch_add(1);
+  }
 
   return result;
 }
