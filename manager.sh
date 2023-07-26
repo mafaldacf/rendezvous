@@ -2,7 +2,7 @@
 
 usage() {
     echo "Invalid arguments! Usage:"
-    echo "> ./manager.sh local {clean, build, build-cfg, build-py, run {client, tests, server <replica id>}}"
+    echo "> ./manager.sh local {clean, build, build-cfg, build-py, run {server <replica id>, tests, client, monitor}}"
     echo "> ./manager.sh aws {setup {eu, us}, update {eu, us}, start {eu, us {dynamo, s3, cache, mysql}}, stop {eu, us}}"
     echo "> ./manager.sh aws-docker {eu, us} {dynamo, s3, cache, mysql}"
     exit 1
@@ -67,6 +67,11 @@ local_run_server() {
 local_run_client() {
   cd metadata-server/examples/python
   python3 client.py
+}
+
+local_run_monitor() {
+  cd metadata-server/examples/python
+  python3 monitor.py
 }
 
 local_run_tests() {
@@ -181,6 +186,9 @@ elif [ "$#" -eq 4 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; 
 
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
   local_run_client
+
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "monitor" ]; then
+  local_run_monitor
 
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "tests" ]; then
   local_run_tests

@@ -42,6 +42,16 @@ namespace replicas {
             int updateLocalVersion(const std::string& id);
 
             /**
+             * Get version for current server id
+             * 
+             * @param id The local replica id
+             * 
+             * @return The current version
+             * 
+             */
+            int getLocalVersion(const std::string& id);
+
+            /**
              * Update version of a remote replica
              * 
              * @param id The remote replica id

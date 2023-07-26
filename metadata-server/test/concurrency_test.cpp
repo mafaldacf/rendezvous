@@ -16,13 +16,14 @@ const int INCONSISTENCY_NOT_PREVENTED = 0;
 const int TIMED_OUT = -1;
 
 const int INVALID_REQUEST = -1;
-const int CONTEXT_NOT_FOUND = 2;
+const int CONTEXT_NOT_FOUND = -2;
 const int INVALID_BRANCH_SERVICE = -2;
 const int INVALID_BRANCH_REGION = -3;
 
 const std::string _SID = "eu-central-1";
 const std::string _RID = "myrequestid";
 const std::string _TAG = "mytag";
+const std::string _EMPTY_TAG = "";
 
 // for closing branches
 std::string _getBid(std::string rid, int id) {
@@ -59,7 +60,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
   }
 }
 
-/* TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
+TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   rendezvous::Server server(_SID);
   int status;
 
@@ -83,7 +84,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
 
   status = server.waitRequest(request, "wrong_service", "region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
-} */
+}
 
 TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   rendezvous::Server server(_SID);
@@ -92,13 +93,13 @@ TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   metadata::Request * request = server.getOrRegisterRequest(_RID);
   ASSERT_EQ(_RID, request->getRid());
 
-  std::string bid =  server.registerBranch(request, "service", "region", _TAG);
+  std::string bid =  server.registerBranch(request, "service", "region", _EMPTY_TAG);
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
-  status = server.waitRequest(request, "service", "region", 1);
+  status = server.waitRequest(request, "service", "region", _EMPTY_TAG, false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.waitRequest(request, "service2", "", 1);
+  status = server.waitRequest(request, "service2", "", _EMPTY_TAG, true, 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 
@@ -216,4 +217,88 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   // validate number of prevented inconsistencies
   long value = server._prevented_inconsistencies.load();
   ASSERT_EQ(8, value);
+}
+
+TEST(ServerConcurrencyTest, WaitServiceTag) {
+  rendezvous::Server server(_SID);
+  std::vector<std::thread> threads;
+  metadata::Request * request = server.getOrRegisterRequest(_RID);
+
+  utils::ProtoVec regions;
+  regions.Add("EU");
+  regions.Add("US");
+  std::string bid_0 = server.registerBranches(request, "service", regions, "tag");
+  ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
+
+  sleep(1);
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "EU", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "US", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  sleep(1);
+
+  int r = server.closeBranch(request, _getBid(request->getRid(), 0), "EU");
+  ASSERT_EQ(1, r);
+  r = server.closeBranch(request, _getBid(request->getRid(), 0), "US");
+  ASSERT_EQ(1, r);
+
+  for(auto& thread : threads) {
+    if (thread.joinable()) {
+        thread.join();
+    }
+  }
+}
+
+TEST(ServerConcurrencyTest, WaitServiceTagForceAsync) {
+  rendezvous::Server server(_SID);
+  std::vector<std::thread> threads;
+  metadata::Request * request = server.getOrRegisterRequest(_RID);
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "EU", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "US", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  threads.emplace_back([&server, request] {
+    int status = server.waitRequest(request, "service", "", "tag", true);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  sleep(1);
+
+  utils::ProtoVec regions;
+  regions.Add("EU");
+  regions.Add("US");
+  std::string bid_0 = server.registerBranches(request, "service", regions, "tag");
+  ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
+
+  sleep(1);
+
+  int r = server.closeBranch(request, _getBid(request->getRid(), 0), "EU");
+  ASSERT_EQ(1, r);
+  r = server.closeBranch(request, _getBid(request->getRid(), 0), "US");
+  ASSERT_EQ(1, r);
+
+  for(auto& thread : threads) {
+    if (thread.joinable()) {
+        thread.join();
+    }
+  }
 }

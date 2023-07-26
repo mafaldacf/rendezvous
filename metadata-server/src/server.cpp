@@ -57,11 +57,9 @@ Server::~Server() {
 // Publish-Subscribe
 //------------------
 
-metadata::Subscriber * Server::getSubscriber(const std::string& service, const std::string& tag, const std::string& region) {
-  const std::string& subscriber_id = computeSubscriberId(service, tag);
-
+metadata::Subscriber * Server::getSubscriber(const std::string& service, const std::string& region) {
   std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
-  auto it_regions = _subscribers.find(subscriber_id);
+  auto it_regions = _subscribers.find(service);
 
   // found subscriber in the region
   if (it_regions != _subscribers.end()) {
@@ -71,28 +69,27 @@ metadata::Subscriber * Server::getSubscriber(const std::string& service, const s
     }
   }
 
-  // manually upgrade lock (TODO: use tbb::wr_mutex later)
+  // manually upgrade lock
   read_lock.unlock();
   std::shared_lock<std::shared_mutex> write_lock(_mutex_subscribers);
 
   // register new subscriber
   metadata::Subscriber * subscriber = new metadata::Subscriber(_subscribers_refresh_interval_s);
-  _subscribers[subscriber_id][region] = subscriber;
+  _subscribers[service][region] = subscriber;
   return subscriber;
 }
 
 void Server::publishBranches(const std::string& service, const std::string& tag, const std::string& bid) {
   metadata::Subscriber * subscriber;
-  const std::string& subscriber_id = computeSubscriberId(service, tag);
   
   std::shared_lock<std::shared_mutex> read_lock(_mutex_subscribers);
-  auto it_regions = _subscribers.find(subscriber_id);
+  auto it_regions = _subscribers.find(service);
 
   // found subscriber in certain regions
   if (it_regions != _subscribers.end()) {
     for (const auto& subscriber : it_regions->second) {
-      spdlog::debug("tracking branch '{}' for subscriber id '{}' in region '{}'", bid.c_str(), subscriber_id.c_str(), it_regions->first);
-      subscriber.second->pushBranch(bid);
+      spdlog::debug("tracking branch '{}' for subscriber for service '{}' in region '{}'", bid.c_str(), service.c_str(), it_regions->first);
+      subscriber.second->pushBranch(bid, tag);
     }
   }
 }
@@ -187,7 +184,7 @@ std::pair<std::string, std::string> Server::parseFullBid(const std::string& full
   std::string rid = "";
   std::string bid = "";
 
-  // format of full bid: <bid>:<rid>
+  // FORMAT of full bid: <bid>:<rid>
   if (delimiter_pos != std::string::npos) {
     rid = full_bid.substr(delimiter_pos+1);
     bid = full_bid.substr(0, delimiter_pos);
@@ -205,14 +202,11 @@ std::string Server::computeSubscriberId(const std::string& service, const std::s
 
 metadata::Request * Server::getRequest(const std::string& rid) {
   std::shared_lock<std::shared_mutex> lock(_mutex_requests); 
-
   auto pair = _requests.find(rid);
-  
   // return request if it was found
   if (pair != _requests.end()) {
       return pair->second;
   }
-
   return nullptr;
 }
 
@@ -222,13 +216,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   // rid is not empty so we try to get the request
   if (!rid.empty()) {
     auto pair = _requests.find(rid);
-
     // return request if it was found
     if (pair != _requests.end()) {
       return pair->second;
     }
   }
-
   read_lock.unlock();
 
   // generate new rid
@@ -236,13 +228,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
     rid = genRid();
   }
 
-  std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
-
   // register request 
+  std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
   replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry(_wait_replica_timeout_s);
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
   _requests.insert({rid, request});
-
   return request;
 }
 
@@ -250,16 +240,18 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 // Main Rendezvous Logic
 //----------------------
 
-std::string Server::registerBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& tag, std::string bid) {
+std::string Server::registerBranch(metadata::Request * request, const std::string& service, const std::string& region, 
+const std::string& tag, std::string bid) {
+
+  // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
     bid = genBid(request);
   }
   metadata::Branch * branch = request->registerBranch(bid, service, tag, region);
-
+  // unexpected error
   if (!branch) {
     return "";
   }
-
   const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, full_bid);
@@ -267,16 +259,18 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
   return full_bid;
 }
 
-std::string Server::registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
+std::string Server::registerBranches(metadata::Request * request, const std::string& service, 
+const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
+
+  // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
     bid = genBid(request);
   }
   metadata::Branch * branch = request->registerBranches(bid, service, tag, regions);
-
+  // unexpected error
   if (!branch) {
     return "";
   };
-
   const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, full_bid);
@@ -288,19 +282,21 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return request->closeBranch(bid, region);
 }
 
-int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout) {
+int Server::waitRequest(metadata::Request * request, const std::string& service, const::std::string& region, 
+  std::string tag, bool async, int timeout) {
+
   int result;
   metadata::Subscriber * subscriber;
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitOnServiceAndRegion(service, region, timeout);
+    result = request->waitOnServiceAndRegion(service, region, tag, async, timeout);
 
   else if (!service.empty())
-    result = request->waitOnService(service, timeout);
+    result = request->waitOnService(service, tag, async, timeout);
 
   else if (!region.empty())
-    result = request->waitOnRegion(region, timeout);
+    result = request->waitOnRegion(region, async, timeout);
 
   else
     result = request->wait(timeout);

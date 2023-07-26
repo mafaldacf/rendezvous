@@ -30,7 +30,6 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
 }
 
 void ReplicaClient::sendRegisterRequest(const std::string& rid) {
-    if (_servers.size() == 0) return;
     std::thread([this, rid]() {
         struct RequestHelper req_helper;
 
@@ -58,8 +57,7 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
      }).detach();
 }
 
-void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, const std::string& id, const int& version) {
-    if (_servers.size() == 0) return;
+void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, std::string id, int version) {
     std::thread([this, rid, bid, service, region, id, version]() {
         struct RequestHelper req_helper;
 
@@ -72,17 +70,19 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
 
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
             req_helper.responses.emplace_back(response);
-
-            rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replica_id(id);
-            ctx.set_request_version(version);
-
+            
             rendezvous_server::RegisterBranchMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
             request.set_region(region);
-            request.mutable_context()->CopyFrom(ctx);
+
+            if (CONTEXT_PROPAGATION) {
+                rendezvous_server::ReplicaRequestContext ctx;
+                ctx.set_replica_id(id);
+                ctx.set_request_version(version);
+                request.mutable_context()->CopyFrom(ctx);
+            }
 
             req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
@@ -95,8 +95,10 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
     }).detach();
 }
 
-void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, const std::string& id, const int& version) {
-    if (_servers.size() == 0) return;
+void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, 
+    const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, 
+    std::string id, int version) {
+
     std::thread([this, rid, bid, service, regions, id, version]() {
         struct RequestHelper req_helper;
 
@@ -110,16 +112,18 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
             req_helper.responses.emplace_back(response);
 
-            rendezvous_server::ReplicaRequestContext ctx;
-            ctx.set_replica_id(id);
-            ctx.set_request_version(version);
-
             rendezvous_server::RegisterBranchesMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
             request.mutable_regions()->CopyFrom(regions);
-            request.mutable_context()->CopyFrom(ctx);
+
+            if (CONTEXT_PROPAGATION) {
+                rendezvous_server::ReplicaRequestContext ctx;
+                ctx.set_replica_id(id);
+                ctx.set_request_version(version);
+                request.mutable_context()->CopyFrom(ctx);
+            }
 
             req_helper.rpcs.emplace_back(server->AsyncRegisterBranches(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
@@ -132,9 +136,10 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
     }).detach();
 }
 
-void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region) {
-    if (_servers.size() == 0) return;
-    std::thread([this, bid, region]() {
+void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region, 
+    std::string id, int version) {
+
+    std::thread([this, bid, region, id, version]() {
         struct RequestHelper req_helper;
 
         for (const auto& server : _servers) {
@@ -150,6 +155,13 @@ void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& r
             rendezvous_server::CloseBranchMessage request;
             request.set_bid(bid);
             request.set_region(region);
+
+            if (CONTEXT_PROPAGATION) {
+                rendezvous_server::ReplicaRequestContext ctx;
+                ctx.set_replica_id(id);
+                ctx.set_request_version(version);
+                request.mutable_context()->CopyFrom(ctx);
+            }
 
             req_helper.rpcs.emplace_back(server->AsyncCloseBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);

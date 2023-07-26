@@ -17,8 +17,13 @@ namespace metadata {
 
     class Subscriber {
 
+        typedef struct SubscribedBranchStruct {
+            std::string bid;
+            std::string tag;
+        } SubscribedBranch;
+
         private:
-            std::queue<std::string> _subscribed_branches;
+            std::queue<SubscribedBranch> _subscribed_branches;
             std::mutex _mutex;
             std::condition_variable _cond;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
@@ -32,15 +37,16 @@ namespace metadata {
              * Add branch to queue
              * 
              * @param branch The branch's bid
+             * @param tag
              */
-            void pushBranch(const std::string& bid);
+            void pushBranch(const std::string& bid, const std::string& tag);
 
             /**
              * Remove the branch from the queue. Blocks until a branch is available
              * @param context The grpc context for the current connection
              * @return The bid for the removed branch
              */
-            std::string popBranch(grpc::ServerContext * context);
+            SubscribedBranch popBranch(grpc::ServerContext * context);
 
             /**
              * Return timestamp of last active moment

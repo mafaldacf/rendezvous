@@ -25,21 +25,18 @@ namespace service {
         private:
             std::shared_ptr<rendezvous::Server> _server;
             replicas::ReplicaClient _replica_client;
-
             // debugging purposes
             std::atomic<int> _num_wait_calls;
+            int _num_replicas;
+
+            metadata::Request * _getRequest(const std::string& rid);
 
         public:
             ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs);
 
-            grpc::Status SubscribeBranches(grpc::ServerContext * context,
-                const rendezvous::SubscribeBranchesMessage * request,
-                grpc::ServerWriter<rendezvous::SubscribeBranchesResponse> * writer) override;
-
-            grpc::Status CloseBranches(grpc::ServerContext* context, 
-                grpc::ServerReader<rendezvous::CloseBranchMessage>* reader, 
-                rendezvous::Empty* response) override;
-
+            grpc::Status Subscribe(grpc::ServerContext * context,
+                const rendezvous::SubscribeMessage * request,
+                grpc::ServerWriter<rendezvous::SubscribeResponse> * writer) override;
 
             grpc::Status RegisterRequest(grpc::ServerContext * context, 
                 const rendezvous::RegisterRequestMessage * request, 

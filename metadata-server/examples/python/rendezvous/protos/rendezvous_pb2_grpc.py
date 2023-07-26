@@ -14,15 +14,10 @@ class ClientServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.SubscribeBranches = channel.unary_stream(
-                '/rendezvous.ClientService/SubscribeBranches',
-                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesMessage.SerializeToString,
-                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesResponse.FromString,
-                )
-        self.CloseBranches = channel.stream_unary(
-                '/rendezvous.ClientService/CloseBranches',
-                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
-                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.FromString,
+        self.Subscribe = channel.unary_stream(
+                '/rendezvous.ClientService/Subscribe',
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.FromString,
                 )
         self.RegisterRequest = channel.unary_unary(
                 '/rendezvous.ClientService/RegisterRequest',
@@ -69,15 +64,9 @@ class ClientServiceStub(object):
 class ClientServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def SubscribeBranches(self, request, context):
+    def Subscribe(self, request, context):
         """Streaming 
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def CloseBranches(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -134,15 +123,10 @@ class ClientServiceServicer(object):
 
 def add_ClientServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'SubscribeBranches': grpc.unary_stream_rpc_method_handler(
-                    servicer.SubscribeBranches,
-                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesMessage.FromString,
-                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesResponse.SerializeToString,
-            ),
-            'CloseBranches': grpc.stream_unary_rpc_method_handler(
-                    servicer.CloseBranches,
-                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.FromString,
-                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.SerializeToString,
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.SerializeToString,
             ),
             'RegisterRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterRequest,
@@ -195,7 +179,7 @@ class ClientService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def SubscribeBranches(request,
+    def Subscribe(request,
             target,
             options=(),
             channel_credentials=None,
@@ -205,26 +189,9 @@ class ClientService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/rendezvous.ClientService/SubscribeBranches',
-            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesMessage.SerializeToString,
-            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeBranchesResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def CloseBranches(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/rendezvous.ClientService/CloseBranches',
-            rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
-            rendezvous_dot_protos_dot_rendezvous__pb2.Empty.FromString,
+        return grpc.experimental.unary_stream(request, target, '/rendezvous.ClientService/Subscribe',
+            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

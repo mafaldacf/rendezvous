@@ -53,14 +53,14 @@ def load_connections_config(datastore, region):
 
 def init_monitor(datastore, region):
     region = REGIONS_FULL_NAMES[region]
-    info_datastore, rendezvous_address = load_connections_config(datastore, region)
     client_config = load_client_config()
-
-    db = SHIM_LAYERS[datastore](**info_datastore)
-    monitor = DatastoreMonitor(db, rendezvous_address, client_config['service'], region)
+    info_datastore, rendezvous_address = load_connections_config(datastore, region)
+    shim_layers = {
+        '': SHIM_LAYERS[datastore](**info_datastore) # empty tag for testing purposes
+    }
+    monitor = DatastoreMonitor(shim_layers, rendezvous_address, client_config['service'], region)
+    print(f'> Starting datastore monitor for {datastore}')
     monitor.monitor_branches()
-
-# Usage: python3 main.py -cp aws -r eu -d dynamo
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

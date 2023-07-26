@@ -18,8 +18,9 @@ namespace metadata {
             const std::string _service;
             const std::string _tag;
 
-            // <region, status>
+            // region status with key: <region>, value: <status>
             std::unordered_map<std::string, int> _regions;
+            int _opened_regions;
 
         public:
             Branch(std::string service, std::string tag, std::string region);
@@ -38,6 +39,13 @@ namespace metadata {
              * @return service 
              */
             std::string getService();
+
+            /**
+             * Check if branch is closed for a given region (or globally)
+             * 
+             * @param region if empty, status is checked globally
+            */
+            bool isClosed(std::string region = "");
 
             /**
              * Set status to close for a given region

@@ -25,6 +25,13 @@ namespace metadata {
 
     class Request {
 
+        typedef struct ServiceBranchingStruct {
+            int num_opened_branches;
+            bool global;
+            std::unordered_map<std::string, int> opened_regions;
+            std::unordered_map<std::string, metadata::Branch*> tagged_branches;
+        } ServiceBranching;
+
         /* request status */
         static const int OPENED = 0;
         static const int CLOSED = 1;
@@ -38,34 +45,43 @@ namespace metadata {
 
             const std::string _rid;
             std::atomic<long> _next_id;
-            std::chrono::time_point<std::chrono::system_clock> _init_ts;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
-
+            
+            /* ------------------- */
             /* replicas versioning */
+            /* ------------------- */
             replicas::VersionRegistry * _versions_registry;
 
+            /* -------------------- */
             /* branching management */
+            /* -------------------- */
+            // number of opened branches globally
+            std::atomic<int> _num_opened_branches;
+            std::unordered_map<std::string, metadata::Branch*> _branches; // <bid, branch ptr>
+            std::unordered_map<std::string, ServiceBranching> _service_branching;
+            std::unordered_map<std::string, int> _opened_regions;
 
-            // <bid, branch>
-            std::unordered_map<std::string, metadata::Branch*> _branches;
-
-            // number of opened branches
-            std::atomic<int> _num_branches;
-            std::unordered_map<std::string, int> _num_branches_service;
-            std::unordered_map<std::string, int> _num_branches_region;
-            std::unordered_map<std::string, std::unordered_map<std::string, int>> _num_branches_service_region;
-
-            // concurrency control
+            /* ------------------- */
+            /* concurrency control */
+            /* ------------------- */
             std::mutex _mutex_branches;
-            std::mutex _mutex_num_branches_service;
-            std::mutex _mutex_num_branches_region;
-            std::mutex _mutex_num_branches_service_region;
-            
-            std::condition_variable _cond_new_branches;
+            std::mutex _mutex_service_branching;
+            std::mutex _mutex_opened_regions;
             std::condition_variable _cond_branches;
-            std::condition_variable _cond_num_branches_service;
-            std::condition_variable _cond_num_branches_region;
-            std::condition_variable _cond_num_branches_service_region;
+            std::condition_variable _cond_service_branching;
+            std::condition_variable _cond_opened_regions;
+
+            // for wait with async option
+            std::condition_variable _cond_new_service_branching;
+            std::condition_variable _cond_new_opened_regions;
+
+            /**
+             * Compute remaining timeout based on the original timeout value and the elapsed time
+             * 
+             * @param timeout Timeout, in seconds, provided by the user
+             * @param start_time
+            */
+            std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
 
         public:
 
@@ -144,26 +160,19 @@ namespace metadata {
              * @param service The service context
              * @param region The region context
              * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
+             * @param branch If we want to specify the tag for the service we need to provided the branch
              */
-            void trackBranchOnContext(const std::string& service, const std::string& region, long value);
+            void trackBranchOnContext(const std::string& service, const std::string& region, long value, metadata::Branch * branch = nullptr);
 
             /**
-             * Track a set of branches (add or remove) according to their context (service, region or none) in the corresponding maps
+             * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
              *
              * @param service The service context
              * @param regions The regions for each branch
-             * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
              * @param num The number of new branches
+             * @param branch If we want to specify the tag for the service we need to provided the branch
              */
-            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, long value, int num);
-            
-            /**
-             * Compute remaining timeout based on the original timeout value and the elapsed time
-             * 
-             * @param timeout Timeout, in seconds, provided by the user
-             * @param start_time
-            */
-            std::chrono::seconds computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
+            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed
@@ -181,41 +190,49 @@ namespace metadata {
              * Wait until request is closed for a given context (service)
              *
              * @param service The name of the service that defines the waiting context
+             * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnService(const std::string& service, int timeout);
+            int waitOnService(const std::string& service, const std::string& tag, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
              *
              * @param region The name of the region that defines the waiting context
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnRegion(const std::string& region, int timeout);
+            int waitOnRegion(const std::string& region, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service and region)
              *
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
+             * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - 2 if context was not found
+             * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnServiceAndRegion(const std::string& service, const std::string& region, int timeout);
+            int waitOnServiceAndRegion(const std::string& service, const std::string& region, const std::string& tag, bool async, int timeout);
 
             /**
              * Check status of request

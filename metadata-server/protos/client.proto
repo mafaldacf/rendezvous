@@ -4,8 +4,7 @@ package rendezvous;
 
 service ClientService {
   /* Streaming */
-  rpc SubscribeBranches(SubscribeBranchesMessage) returns (stream SubscribeBranchesResponse);
-  rpc CloseBranches(stream CloseBranchMessage) returns (Empty);
+  rpc Subscribe(SubscribeMessage) returns (stream SubscribeResponse);
 
   /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
@@ -30,20 +29,22 @@ message Empty {
 
 }
 
+/* Metadata for server replication */
+
 message RequestContext {
   map<string, int32> versions = 1;
 }
 
 /* Publish-Subscribe */
 
-message SubscribeBranchesMessage {
+message SubscribeMessage {
   string service = 1;
-  string tag = 2;
-  string region = 3;
+  string region = 2;
 }
 
-message SubscribeBranchesResponse {
+message SubscribeResponse {
   string bid = 1;
+  string tag = 2;
 }
 
 /* Register Request */
@@ -93,19 +94,23 @@ message RegisterBranchesResponse {
 
 message DatastoreBranching {
   string datastore = 1;
-  repeated string regions = 2;
+  string tag = 2;
+  repeated string regions = 3;
 }
 
 message RegisterBranchesDatastoresMessage {
   string rid = 1;
   repeated string datastores = 2;
   repeated string regions = 3;
-  repeated DatastoreBranching branches = 4;
+  repeated string tags = 4;
+  repeated DatastoreBranching branches = 5;
+  RequestContext context = 6;
 }
 
 message RegisterBranchesDatastoresResponse {
   string rid = 1;
   repeated string bids = 2;
+  RequestContext context = 3;
 }
 
 /* Close Branch */
@@ -122,12 +127,15 @@ message WaitRequestMessage {
   string rid = 1;
   string service = 2;
   string region = 3;
-  int32 timeout = 4;
-  RequestContext context = 5;
+  string tag = 4;
+  int32 timeout = 5;
+  //bool async = 6;
+  RequestContext context = 7;
 }
 
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
+  bool timed_out = 2;
 }
 
 /* Check Request */
@@ -148,7 +156,7 @@ message CheckRequestResponse {
 message CheckRequestByRegionsMessage {
   string rid = 1;
   string service = 2;
-  RequestContext context = 4;
+  RequestContext context = 3;
 }
 
 message CheckRequestByRegionsResponse {

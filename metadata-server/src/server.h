@@ -35,7 +35,9 @@ namespace rendezvous {
             static const int REGISTER = 1;
             static const int REMOVE = -1;
 
-            /* Garbage collector for old requests and subscribers */
+            /* ------------- */
+            /* config values */
+            /* --------------*/
             const int _cleanup_requests_interval_m;
             const int _cleanup_requests_validity_m;
             const int _cleanup_subscribers_interval_m;
@@ -62,14 +64,13 @@ namespace rendezvous {
             std::atomic<int> _prevented_inconsistencies = 0;
 
             /**
-             * Get subscriber associated with the subscriber id
+             * Get subscriber associated with the service and region
              * 
-             * @param service 
-             * @param tag
+             * @param service
              * @param region
              * @return metadata::Subscriber* 
              */
-            metadata::Subscriber * getSubscriber(const std::string& service, const std::string& tag, const std::string& region);
+            metadata::Subscriber * getSubscriber(const std::string& service, const std::string& region);
 
             /**
              * Publish branches for interested subscribers
@@ -173,7 +174,8 @@ namespace rendezvous {
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new branch identifiers or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranch(metadata::Request * request, const std::string& service, const std::string& region, const std::string& tag, std::string bid = "");
+            std::string registerBranch(metadata::Request * request, const std::string& service, 
+                const std::string& region, const std::string& tag, std::string bid = "");
 
             /**
              * Register new branches for a given request
@@ -185,7 +187,8 @@ namespace rendezvous {
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranches(metadata::Request * request, const std::string& service, const utils::ProtoVec& regions, const std::string& tag, std::string bid = "");
+            std::string registerBranches(metadata::Request * request, const std::string& service, 
+                const utils::ProtoVec& regions, const std::string& tag, std::string bid = "");
 
             /**
              * Close a branch according to its identifier
@@ -203,12 +206,18 @@ namespace rendezvous {
              * 
              * @param request Request where the branch is registered
              * @param service The service context
+             * @param region The region we are waiting for the service on
+             * @param tag The specified operation tag for this service
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
+             * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout = 0);
+            int waitRequest(metadata::Request * request, const std::string& service, const::std::string& region, 
+                std::string tag = "", bool async = false, int timeout = 0);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)

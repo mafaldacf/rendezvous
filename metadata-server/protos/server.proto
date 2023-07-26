@@ -53,4 +53,5 @@ message RegisterBranchesMessage {
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
+  ReplicaRequestContext context = 3;
 }

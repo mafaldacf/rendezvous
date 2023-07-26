@@ -7,6 +7,10 @@ namespace utils {
 
     typedef google::protobuf::RepeatedPtrField<std::string> ProtoVec;
 
+    #ifndef CONTEXT_PROPAGATION
+    #define CONTEXT_PROPAGATION 1
+    #endif
+
     // subscribed requests
     #ifndef TRACK_SUBSCRIBED_BRANCHES
     #define TRACK_SUBSCRIBED_BRANCHES 1
@@ -30,6 +34,7 @@ namespace utils {
     const std::string ERR_MSG_EMPTY_REGION = "Region cannot be empty";
     const std::string ERR_MSG_INVALID_TIMEOUT = "Invalid timeout. Value needs to be greater than 0";
     const std::string ERR_MSG_REGISTER_BRANCHES_INVALID_DATASTORES = "Invalid datastores arguments";
+    const std::string ERR_MSG_INVALID_TAG_USAGE = "Tag can only be specified when service is specified";
 
     /* server gRPC custom error m essages */
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context provided";

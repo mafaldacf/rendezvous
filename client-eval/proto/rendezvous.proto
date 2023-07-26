@@ -4,7 +4,7 @@ package rendezvous;
 
 service ClientService {
   /* Streaming */
-  rpc SubscribeBranches(SubscribeBranchesMessage) returns (stream SubscribeBranchesResponse);
+  rpc Subscribe(SubscribeMessage) returns (stream SubscribeResponse);
   rpc CloseBranches(stream CloseBranchMessage) returns (Empty);
 
   /* Unary RPCs */
@@ -36,13 +36,13 @@ message RequestContext {
 
 /* Publish-Subscribe */
 
-message SubscribeBranchesMessage {
+message SubscribeMessage {
   string service = 1;
   string tag = 2;
   string region = 3;
 }
 
-message SubscribeBranchesResponse {
+message SubscribeResponse {
   string bid = 1;
 }
 

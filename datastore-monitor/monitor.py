@@ -6,10 +6,10 @@ from proto import rendezvous_pb2_grpc as rdv
 import time
 
 class DatastoreMonitor:
-  def __init__(self, datastore, rendezvous_address, service, region):
+  def __init__(self, shim_layers, rendezvous_address, service, region):
     self.running = True
     self.threads = []
-    self.datastore = datastore
+    self.shim_layers = shim_layers
 
     # rendezvous
     self.channel = grpc.insecure_channel(rendezvous_address)
@@ -19,10 +19,6 @@ class DatastoreMonitor:
 
     # config values
     self.server_unavailable_sleep_time_s = 5
-
-# -----------
-# Client API
-# -----------
 
   def monitor_branches(self):
     lock = threading.Lock()
@@ -56,14 +52,15 @@ class DatastoreMonitor:
   def _subscribe_branches(self, bids, lock, cond):
     while self.running:
       try: 
-        request = pb.SubscribeBranchesMessage(service=self.service, region=self.region)
+        request = pb.SubscribeMessage(service=self.service, region=self.region)
         print("[DEBUG] Subcription: going to subscribe...", flush=True)
-        reader = self.stub.SubscribeBranches(request)
+        reader = self.stub.Subscribe(request)
         for response in reader:
           bid = response.bid
+          tag = response.tag
           print(f"[DEBUG] Subcription: received bid: {bid}", flush=True)
           with lock:
-            bids.add(bid)
+            bids.add((bid, tag))
             cond.notify_all()
 
       except grpc.RpcError as e:
@@ -84,9 +81,9 @@ class DatastoreMonitor:
         copy = bids.copy()
 
       closed = []
-      for bid in copy:
+      for bid, tag in copy:
         try:
-          if self.datastore.find_metadata(bid):
+          if self.shim_layers[tag].find_metadata(bid):
             print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
             self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
             closed.append(bid)
