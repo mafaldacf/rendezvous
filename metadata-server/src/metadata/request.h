@@ -38,31 +38,35 @@ namespace metadata {
 
             const std::string _rid;
             std::atomic<long> _next_id;
-            std::chrono::time_point<std::chrono::system_clock> _init_ts;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
-
+            
+            /* ------------------- */
             /* replicas versioning */
+            /* ------------------- */
             replicas::VersionRegistry * _versions_registry;
 
+            /* -------------------- */
             /* branching management */
+            /* -------------------- */
 
             // <bid, branch>
             std::unordered_map<std::string, metadata::Branch*> _branches;
-
             // number of opened branches
             std::atomic<int> _num_branches;
             std::unordered_map<std::string, int> _num_branches_service;
             std::unordered_map<std::string, int> _num_branches_region;
             std::unordered_map<std::string, std::unordered_map<std::string, int>> _num_branches_service_region;
 
-            // concurrency control
+            /* ------------------- */
+            /* concurrency control */
+            /* ------------------- */
             std::mutex _mutex_branches;
+            std::mutex _mutex_branches_context;
             std::mutex _mutex_num_branches_service;
             std::mutex _mutex_num_branches_region;
             std::mutex _mutex_num_branches_service_region;
-            
-            std::condition_variable _cond_new_branches;
             std::condition_variable _cond_branches;
+            std::condition_variable _cond_branches_context;
             std::condition_variable _cond_num_branches_service;
             std::condition_variable _cond_num_branches_region;
             std::condition_variable _cond_num_branches_service_region;
@@ -181,41 +185,47 @@ namespace metadata {
              * Wait until request is closed for a given context (service)
              *
              * @param service The name of the service that defines the waiting context
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnService(const std::string& service, int timeout);
+            int waitOnService(const std::string& service, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
              *
              * @param region The name of the region that defines the waiting context
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnRegion(const std::string& region, int timeout);
+            int waitOnRegion(const std::string& region, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service and region)
              *
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
-             * - 2 if context was not found
+             * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitOnServiceAndRegion(const std::string& service, const std::string& region, int timeout);
+            int waitOnServiceAndRegion(const std::string& service, const std::string& region, bool async, int timeout);
 
             /**
              * Check status of request

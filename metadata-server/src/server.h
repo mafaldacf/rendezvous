@@ -35,7 +35,9 @@ namespace rendezvous {
             static const int REGISTER = 1;
             static const int REMOVE = -1;
 
-            /* Garbage collector for old requests and subscribers */
+            /* ------------- */
+            /* config values */
+            /* --------------*/
             const int _cleanup_requests_interval_m;
             const int _cleanup_requests_validity_m;
             const int _cleanup_subscribers_interval_m;
@@ -203,12 +205,15 @@ namespace rendezvous {
              * 
              * @param request Request where the branch is registered
              * @param service The service context
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
+             * - (-1) if timeout was reached
+             * - (-2) if context was not found
              */
-            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout = 0);
+            int waitRequest(metadata::Request * request, const std::string& service, const std::string& region, bool async = false, int timeout = 0);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)

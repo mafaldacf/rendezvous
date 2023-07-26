@@ -30,7 +30,6 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
 }
 
 void ReplicaClient::sendRegisterRequest(const std::string& rid) {
-    if (_servers.size() == 0) return;
     std::thread([this, rid]() {
         struct RequestHelper req_helper;
 
@@ -59,7 +58,6 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
 }
 
 void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, const std::string& id, const int& version) {
-    if (_servers.size() == 0) return;
     std::thread([this, rid, bid, service, region, id, version]() {
         struct RequestHelper req_helper;
 
@@ -96,7 +94,6 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
 }
 
 void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, const std::string& id, const int& version) {
-    if (_servers.size() == 0) return;
     std::thread([this, rid, bid, service, regions, id, version]() {
         struct RequestHelper req_helper;
 
@@ -133,7 +130,6 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
 }
 
 void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region) {
-    if (_servers.size() == 0) return;
     std::thread([this, bid, region]() {
         struct RequestHelper req_helper;
 

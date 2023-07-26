@@ -16,7 +16,7 @@ const int INCONSISTENCY_NOT_PREVENTED = 0;
 const int TIMED_OUT = -1;
 
 const int INVALID_REQUEST = -1;
-const int CONTEXT_NOT_FOUND = 2;
+const int CONTEXT_NOT_FOUND = -2;
 const int INVALID_BRANCH_SERVICE = -2;
 const int INVALID_BRANCH_REGION = -3;
 
@@ -59,7 +59,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
   }
 }
 
-/* TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
+TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   rendezvous::Server server(_SID);
   int status;
 
@@ -83,7 +83,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
 
   status = server.waitRequest(request, "wrong_service", "region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
-} */
+}
 
 TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   rendezvous::Server server(_SID);
@@ -95,10 +95,10 @@ TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid =  server.registerBranch(request, "service", "region", _TAG);
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
-  status = server.waitRequest(request, "service", "region", 1);
+  status = server.waitRequest(request, "service", "region", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.waitRequest(request, "service2", "", 1);
+  status = server.waitRequest(request, "service2", "", true, 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 

@@ -51,21 +51,20 @@ def load_connections_config(datastore, region):
         rendezvous_address = info['rendezvous']['address_region_'+region]
         return info_datastore, rendezvous_address 
 
-def init_monitor(datastore, region):
+def init_monitor(datastores, region):
     region = REGIONS_FULL_NAMES[region]
-    info_datastore, rendezvous_address = load_connections_config(datastore, region)
     client_config = load_client_config()
-
-    db = SHIM_LAYERS[datastore](**info_datastore)
-    monitor = DatastoreMonitor(db, rendezvous_address, client_config['service'], region)
-    monitor.monitor_branches()
-
-# Usage: python3 main.py -cp aws -r eu -d dynamo
+    for datastore in datastores:
+        info_datastore, rendezvous_address = load_connections_config(datastore, region)
+        db = SHIM_LAYERS[datastore](**info_datastore)
+        monitor = DatastoreMonitor(db, rendezvous_address, client_config['service'], region)
+        print(f'> Starting datastore monitor for {datastore}')
+        monitor.monitor_branches()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    datastore_group = parser.add_argument_group('Datastore')
-    datastore_group.add_argument('-d', '--datastore', choices=SHIM_LAYERS.keys(), help='Specify the type of datastore', required=True)
+    datastores_group = parser.add_argument_group('Datastore')
+    datastores_group.add_argument('-d', '--datastores', choices=SHIM_LAYERS.keys(), help='Specify the type of datastore', nargs='+', required=True)
 
     region_group = parser.add_argument_group('Region')
     region_group.add_argument('-r', '--region', choices=REGIONS_FULL_NAMES.keys(), help='Specify the region', required=True)

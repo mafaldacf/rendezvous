@@ -71,7 +71,7 @@ metadata::Subscriber * Server::getSubscriber(const std::string& service, const s
     }
   }
 
-  // manually upgrade lock (TODO: use tbb::wr_mutex later)
+  // manually upgrade lock
   read_lock.unlock();
   std::shared_lock<std::shared_mutex> write_lock(_mutex_subscribers);
 
@@ -205,14 +205,11 @@ std::string Server::computeSubscriberId(const std::string& service, const std::s
 
 metadata::Request * Server::getRequest(const std::string& rid) {
   std::shared_lock<std::shared_mutex> lock(_mutex_requests); 
-
   auto pair = _requests.find(rid);
-  
   // return request if it was found
   if (pair != _requests.end()) {
       return pair->second;
   }
-
   return nullptr;
 }
 
@@ -222,13 +219,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   // rid is not empty so we try to get the request
   if (!rid.empty()) {
     auto pair = _requests.find(rid);
-
     // return request if it was found
     if (pair != _requests.end()) {
       return pair->second;
     }
   }
-
   read_lock.unlock();
 
   // generate new rid
@@ -236,13 +231,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
     rid = genRid();
   }
 
-  std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
-
   // register request 
+  std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
   replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry(_wait_replica_timeout_s);
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
   _requests.insert({rid, request});
-
   return request;
 }
 
@@ -255,11 +248,9 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
     bid = genBid(request);
   }
   metadata::Branch * branch = request->registerBranch(bid, service, tag, region);
-
   if (!branch) {
     return "";
   }
-
   const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, full_bid);
@@ -272,11 +263,9 @@ std::string Server::registerBranches(metadata::Request * request, const std::str
     bid = genBid(request);
   }
   metadata::Branch * branch = request->registerBranches(bid, service, tag, regions);
-
   if (!branch) {
     return "";
   };
-
   const std::string& full_bid = getFullBid(request, bid);
   if (TRACK_SUBSCRIBED_BRANCHES) {
     publishBranches(service, tag, full_bid);
@@ -288,19 +277,19 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return request->closeBranch(bid, region);
 }
 
-int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region, int timeout) {
+int Server::waitRequest(metadata::Request * request, const std::string& service, const std::string& region, bool async, int timeout) {
   int result;
   metadata::Subscriber * subscriber;
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitOnServiceAndRegion(service, region, timeout);
+    result = request->waitOnServiceAndRegion(service, region, async, timeout);
 
   else if (!service.empty())
-    result = request->waitOnService(service, timeout);
+    result = request->waitOnService(service, async, timeout);
 
   else if (!region.empty())
-    result = request->waitOnRegion(region, timeout);
+    result = request->waitOnRegion(region, async, timeout);
 
   else
     result = request->wait(timeout);

@@ -15,11 +15,9 @@ int VersionRegistry::updateLocalVersion(const std::string& id) {
 
 void VersionRegistry::updateRemoteVersion(const std::string& id, const int& version) {
     std::unique_lock<std::mutex> lock(_mutex_versions);
-
     while (version != _versions[id] + 1) {
         _cond_versions.wait(lock);
     }
-
     _versions[id] = version;
     _cond_versions.notify_all();
 }
