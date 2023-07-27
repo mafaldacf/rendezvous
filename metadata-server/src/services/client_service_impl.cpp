@@ -72,7 +72,10 @@ grpc::Status ClientServiceImpl::CloseBranches(grpc::ServerContext* context,
         return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_INVALID_REGION);
       }
 
-      _replica_client.sendCloseBranch(request.bid(), request.region());
+      if (_num_replicas > 1) {
+        _replica_client.sendCloseBranch(request.bid(), request.region());
+      }
+
       spdlog::trace("< [CLOSE STREAM] close branches stream -> closed branch '{}' on region={}", request.bid().c_str(), request.region().c_str());
       return grpc::Status::OK;
     }
@@ -93,9 +96,11 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   response->set_rid(rdv_request->getRid());
 
   if (_num_replicas > 1) {
-    // initialize empty metadata
-    rendezvous::RequestContext ctx;
-    response->mutable_context()->CopyFrom(ctx);
+    if (CONTEXT_PROPAGATION) {
+      // initialize empty metadata
+      rendezvous::RequestContext ctx;
+      response->mutable_context()->CopyFrom(ctx);
+    }
     _replica_client.sendRegisterRequest(rdv_request->getRid());
   }
 
@@ -117,16 +122,21 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   spdlog::trace("> registering branch for request '{}' on service='{}' and region='{}'", rid.c_str(), service.c_str(), region.c_str());
   rdv_request = _server->getOrRegisterRequest(rid);
   std::string bid = _server->registerBranch(rdv_request, service, region, tag);
-  std::string sid = _server->getSid();
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
   
   if (_num_replicas > 1) {
-    rendezvous::RequestContext ctx = request->context();
-    int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-    ctx.mutable_versions()->insert({sid, version});
-    response->mutable_context()->CopyFrom(ctx);
-    _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region, sid, version);
+    if (CONTEXT_PROPAGATION){
+      rendezvous::RequestContext ctx = request->context();
+      std::string sid = _server->getSid();
+      int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
+      ctx.mutable_versions()->insert({sid, version});
+      response->mutable_context()->CopyFrom(ctx);
+      _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region, sid, version);
+    }
+    else {
+      _replica_client.sendRegisterBranch(rdv_request->getRid(), bid, service, region);
+    }
   }
 
   spdlog::trace("< registered branch '{}' for request '{}' on service='{}' and region='{}'", bid.c_str(), rdv_request->getRid().c_str(), service.c_str(), region.c_str());
@@ -157,12 +167,17 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
   response->set_bid(bid);
 
   if (_num_replicas > 1) {
-    rendezvous::RequestContext ctx = request->context();
-    std::string sid = _server->getSid();
-    int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-    ctx.mutable_versions()->insert({sid, version});
-    response->mutable_context()->CopyFrom(ctx);
-    _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions, sid, version);
+    if (CONTEXT_PROPAGATION) {
+      rendezvous::RequestContext ctx = request->context();
+      std::string sid = _server->getSid();
+      int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
+      ctx.mutable_versions()->insert({sid, version});
+      response->mutable_context()->CopyFrom(ctx);
+      _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions, sid, version);
+    }
+    else {
+      _replica_client.sendRegisterBranches(rdv_request->getRid(), bid, service, regions);
+    }
   }
   
   spdlog::trace("< registered {} branches '{}' for request '{}' on service '{}'", num, bid, rid, service);
@@ -252,7 +267,11 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   else if (res == -1) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
-  _replica_client.sendCloseBranch(request->bid(), region);
+
+  if (_num_replicas > 1) {
+    _replica_client.sendCloseBranch(request->bid(), region);
+  }
+  
   spdlog::trace("< closed branch '{}' for request '{}' on region={}", bid.c_str(), rid.c_str(), region.c_str());
   return grpc::Status::OK;
 }

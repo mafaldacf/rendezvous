@@ -7,6 +7,10 @@ namespace utils {
 
     typedef google::protobuf::RepeatedPtrField<std::string> ProtoVec;
 
+    #ifndef CONTEXT_PROPAGATION
+    #define CONTEXT_PROPAGATION 0
+    #endif
+
     // subscribed requests
     #ifndef TRACK_SUBSCRIBED_BRANCHES
     #define TRACK_SUBSCRIBED_BRANCHES 1
