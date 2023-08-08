@@ -46,19 +46,6 @@ namespace replicas {
              * @param rid The identifier of the request
              */
             void sendRegisterRequest(const std::string& rid);
-
-            /**
-             * Send register branch call to all replicas
-             * 
-             * @param rid The identifier of the request associated with the branch
-             * @param bid The identifier of the set of branches generated when the branch was registered
-             * @param service The service where the branch was registered
-             * @param region The region where the branch was registered
-             * @param id The id of the current replica
-             * @param version The request version of the current replica
-             */
-            void sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, std::string id = "", int version = 0);
-
             /**
              * Send register branches call to all replicas
              * 
@@ -69,7 +56,7 @@ namespace replicas {
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void sendRegisterBranches(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, std::string id = "", int version = 0);
+            void sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, std::string id = "", int version = 0);
 
             /**
              * Send close branch call to all replicas

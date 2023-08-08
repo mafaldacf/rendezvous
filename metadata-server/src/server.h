@@ -133,15 +133,6 @@ namespace rendezvous {
             std::pair<std::string, std::string> parseFullBid(const std::string& full_bid);
 
             /**
-             * Compute subscriber id from service and tag
-             * 
-             * @param service 
-             * @param tag 
-             * @return std::string 
-             */
-            std::string computeSubscriberId(const std::string& service, const std::string& tag);
-
-            /**
              * Returns the number of inconsistencies prevented so far
              * 
              * @return The number of prevented inconsistencies
@@ -165,7 +156,7 @@ namespace rendezvous {
             metadata::Request * getOrRegisterRequest(std::string rid);
 
             /**
-             * Register a new branch for a given request
+             * Register a new branch for a region
              * 
              * @param request Request where the branch is registered
              * @param service The service context
@@ -174,20 +165,19 @@ namespace rendezvous {
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new branch identifiers or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranch(metadata::Request * request, const std::string& service, 
+            std::string registerBranchRegion(metadata::Request * request, const std::string& service, 
                 const std::string& region, const std::string& tag, std::string bid = "");
-
             /**
-             * Register new branches for a given request
+             * Register new branch for a given request
              * 
              * @param request Request where the branch is registered
              * @param service The service context
-             * @param regions The regions context for each branch
+             * @param regions The regions context
              * @param tag The service tag
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranches(metadata::Request * request, const std::string& service, 
+            std::string registerBranch(metadata::Request * request, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, std::string bid = "");
 
             /**

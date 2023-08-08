@@ -121,18 +121,6 @@ namespace metadata {
             std::string genId();
 
             /**
-             * Register a branch in the request
-             * 
-             * @param bid The identifier of the set of branches where the current branch is going to be registered
-             * @param service The service where the branch is being registered
-             * @param tag The service tag
-             * @param region The region where the branch is being registered
-             * 
-             * @param return branch if successfully registered and nullptr otherwise (if branch already exists)
-             */
-            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, const std::string& tag, const std::string& region);
-
-            /**
              * Register a set of branches in the request
              * 
              * @param bid The identifier of the set of branches
@@ -142,7 +130,7 @@ namespace metadata {
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            metadata::Branch * registerBranches(const std::string& bid, const std::string& service, const std::string& tag, const utils::ProtoVec& regions);
+            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, const std::string& tag, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
@@ -162,7 +150,7 @@ namespace metadata {
              * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
              * @param branch If we want to specify the tag for the service we need to provided the branch
              */
-            void trackBranchOnContext(const std::string& service, const std::string& region, long value, metadata::Branch * branch = nullptr);
+            void untrackBranch(const std::string& service, const std::string& region, long value, metadata::Branch * branch = nullptr);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
@@ -172,7 +160,7 @@ namespace metadata {
              * @param num The number of new branches
              * @param branch If we want to specify the tag for the service we need to provided the branch
              */
-            void trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch = nullptr);
+            void trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed

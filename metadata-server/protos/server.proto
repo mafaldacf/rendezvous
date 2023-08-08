@@ -5,7 +5,6 @@ package rendezvous_server;
 service ServerService {
   rpc RegisterRequest(RegisterRequestMessage) returns (Empty);
   rpc RegisterBranch(RegisterBranchMessage) returns (Empty);
-  rpc RegisterBranches(RegisterBranchesMessage) returns (Empty);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
 }
 
@@ -26,20 +25,9 @@ message RegisterRequestMessage {
   string rid = 1;
 }
 
-/* Register Branch */
-
-message RegisterBranchMessage {
-  string rid = 1;
-  string bid = 2;
-  string service = 3;
-  string tag = 4;
-  string region = 5;
-  ReplicaRequestContext context = 6;
-}
-
 /* Registers Branches */
 
-message RegisterBranchesMessage {
+message RegisterBranchMessage {
   string rid = 1;
   string bid = 2;
   string service = 3;

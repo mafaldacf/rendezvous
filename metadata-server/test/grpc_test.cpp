@@ -53,7 +53,7 @@ void registerBranchAndAssert(std::string rid, long bid, std::string service, std
   request.set_service(service);
   request.set_region(region);
 
-  auto status = stub->registerBranch(&context, request, &response);
+  auto status = stub->registerBranchRegion(&context, request, &response);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(bid, response.bid());
 }
@@ -70,7 +70,7 @@ void registerBranchesAndAssert(std::string rid, long num, std::string service, s
   request.set_service(service);
   request.set_region(region);
 
-  auto status = stub->registerBranches(&context, request, &response);
+  auto status = stub->registerBranch(&context, request, &response);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(num, response.bid().size());
 }
@@ -199,7 +199,7 @@ TEST(gRPCTest, RegisterBranch_NoRID) {
   rendezvous::RegisterBranchMessage request;
   rendezvous::RegisterBranchResponse response;
 
-  status = stub->registerBranch(&context, request, &response);
+  status = stub->registerBranchRegion(&context, request, &response);
 
   ASSERT_TRUE(status.ok());
   ASSERT_EQ("rendezvous-0", response.rid());
@@ -216,7 +216,7 @@ TEST(gRPCTest, RegisterBranches_NoRID) {
   rendezvous::RegisterBranchesResponse response;
   request.set_num(3);
 
-  status = stub->registerBranches(&context, request, &response);
+  status = stub->registerBranch(&context, request, &response);
 
   ASSERT_TRUE(status.ok());
   ASSERT_EQ("rendezvous-1", response.rid());
@@ -240,7 +240,7 @@ TEST(gRPCTest, RegisterBranch_InvalidRID) {
   rendezvous::RegisterBranchResponse response;
   request.set_rid("invalid_rid");
 
-  status = stub->registerBranch(&context, request, &response);
+  status = stub->registerBranchRegion(&context, request, &response);
 
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(grpc::INVALID_ARGUMENT, status.error_code());
@@ -258,7 +258,7 @@ TEST(gRPCTest, RegisterBranches_InvalidRid) {
   request.set_num(3);
   request.set_rid("invalid_rid");
 
-  status = stub->registerBranches(&context, request, &response);
+  status = stub->registerBranch(&context, request, &response);
 
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(grpc::INVALID_ARGUMENT, status.error_code());

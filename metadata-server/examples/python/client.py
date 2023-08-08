@@ -22,17 +22,9 @@ def registerRequest(stub, rid):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def registerBranch(stub, rid, service, region):
+def registerBranch(stub, rid, service, regions, tag=""):
     try:
-        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, region=region))
-        print(f"[Register Branch] {response}")
-        return toBytes(response.context)
-    except grpc.RpcError as e:
-        print(f"[Error] {e.details()}")
-
-def registerBranches(stub, rid, service, regions, tag=""):
-    try:
-        response = stub.RegisterBranches(pb.RegisterBranchesMessage(rid=rid, service=service, regions=regions, tag=tag))
+        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag))
         print(f"[Register Branches] {response}")
         return toBytes(response.context)
     except grpc.RpcError as e:
@@ -78,8 +70,7 @@ def checkRequestByRegions(stub, rid, service, ctx=None):
 # Input commands
 REGISTER_REQUEST = "rr";
 REGISTER_BRANCH = "rb";
-REGISTER_BRANCHES = "rbs";
-REGISTER_BRANCHES_WITH_TAG = "rbstag";
+REGISTER_BRANCH_WITH_TAG = "rbtag";
 CLOSE_BRANCH = "cb";
 WAIT_REQUEST = "wr";
 CHECK_REQUEST = "cr";
@@ -90,9 +81,8 @@ EXIT = "exit";
 
 def showOptions():
     print(f"- Register Request: \t \t \t {REGISTER_REQUEST} <rid>")
-    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <region>")
-    print(f"- Register Branches: \t \t \t {REGISTER_BRANCHES} <rid> <service> <regions>")
-    print(f"- Register Branches w/ tag: \t \t {REGISTER_BRANCHES_WITH_TAG} <rid> <service> <regions> <tag> ")
+    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <regions>")
+    print(f"- Register Branch w/ tag: \t \t {REGISTER_BRANCH_WITH_TAG} <rid> <service> <regions> <tag> ")
     print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <rid> <bid> <region>")
     print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
     print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> <service> <region>")
@@ -115,22 +105,16 @@ def readInput(stubs):
             rid = args[0] if len(args) == 1 else None
             ctx = registerRequest(stub, rid)
 
-        elif command == REGISTER_BRANCH and len(args) >= 1 and len(args) <= 3:
-            rid = args[0]
-            service = args[1] if len(args) >= 2 else None
-            region = args[2] if len(args) >= 3 else None
-            ctx = registerBranch(stub, rid, service, region)
-
-        elif command == REGISTER_BRANCHES and len(args) >= 2:
+        elif command == REGISTER_BRANCH and len(args) >= 2:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
 
             regions = []
             for region in args[2:]:
                 regions.append(region)
-            ctx = registerBranches(stub, rid, service, regions)
+            ctx = registerBranch(stub, rid, service, regions)
 
-        elif command == REGISTER_BRANCHES_WITH_TAG and len(args) >= 3:
+        elif command == REGISTER_BRANCH_WITH_TAG and len(args) >= 3:
             rid = args[0]
             service = args[1]
 
@@ -139,7 +123,7 @@ def readInput(stubs):
                 regions.append(region)
 
             tag = regions.pop()
-            ctx = registerBranches(stub, rid, service, regions, tag)
+            ctx = registerBranch(stub, rid, service, regions, tag)
 
         elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 2:
             bid = args[0]

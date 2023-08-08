@@ -88,8 +88,8 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
   // found subscriber in certain regions
   if (it_regions != _subscribers.end()) {
     for (const auto& subscriber : it_regions->second) {
-      spdlog::debug("tracking branch '{}' for subscriber for service '{}' in region '{}'", bid.c_str(), service.c_str(), it_regions->first);
-      subscriber.second->pushBranch(bid, tag);
+      //spdlog::debug("publishing branch '{}' for service '{}' in region '{}'", bid.c_str(), service.c_str(), it_regions->first);
+      subscriber.second->push(bid, tag);
     }
   }
 }
@@ -192,9 +192,6 @@ std::pair<std::string, std::string> Server::parseFullBid(const std::string& full
   return std::make_pair(bid, rid);
 }
 
-std::string Server::computeSubscriberId(const std::string& service, const std::string& tag) {
-  return service + ":" + tag;
-}
 
 // -----------
 // Helpers
@@ -240,33 +237,22 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 // Main Rendezvous Logic
 //----------------------
 
-std::string Server::registerBranch(metadata::Request * request, const std::string& service, const std::string& region, 
+// testing purposes
+std::string Server::registerBranchRegion(metadata::Request * request, const std::string& service, const std::string& region, 
 const std::string& tag, std::string bid) {
-
-  // bid already defined when we have a replicated request from another server
-  if (bid.empty()) {
-    bid = genBid(request);
-  }
-  metadata::Branch * branch = request->registerBranch(bid, service, tag, region);
-  // unexpected error
-  if (!branch) {
-    return "";
-  }
-  const std::string& full_bid = getFullBid(request, bid);
-  if (TRACK_SUBSCRIBED_BRANCHES) {
-    publishBranches(service, tag, full_bid);
-  }
-  return full_bid;
+  utils::ProtoVec regions;
+  regions.Add(region.c_str());
+  return registerBranch(request, service, regions, tag, bid);
 }
 
-std::string Server::registerBranches(metadata::Request * request, const std::string& service, 
+std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
 const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
 
   // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
     bid = genBid(request);
   }
-  metadata::Branch * branch = request->registerBranches(bid, service, tag, regions);
+  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions);
   // unexpected error
   if (!branch) {
     return "";

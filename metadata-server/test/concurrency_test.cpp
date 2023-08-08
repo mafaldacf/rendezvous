@@ -49,7 +49,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
   });
   
 
-  std::string bid = server.registerBranch(request, "service", "region", _TAG);
+  std::string bid = server.registerBranchRegion(request, "service", "region", _TAG);
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
   // sanity check - wait threads
@@ -76,7 +76,7 @@ TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   status = server.waitRequest(request, "wrong_service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  std::string bid = server.registerBranch(request, "service", "region", _TAG); // bid = 0
+  std::string bid = server.registerBranchRegion(request, "service", "region", _TAG); // bid = 0
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
   status = server.waitRequest(request, "service", "wrong_region");
@@ -93,7 +93,7 @@ TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   metadata::Request * request = server.getOrRegisterRequest(_RID);
   ASSERT_EQ(_RID, request->getRid());
 
-  std::string bid =  server.registerBranch(request, "service", "region", _EMPTY_TAG);
+  std::string bid =  server.registerBranchRegion(request, "service", "region", _EMPTY_TAG);
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
   status = server.waitRequest(request, "service", "region", _EMPTY_TAG, false, 1);
@@ -116,16 +116,16 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   status = server.waitRequest(request, "", "");
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  bid =  server.registerBranch(request, "", "", _TAG); // bid = 0
+  bid =  server.registerBranchRegion(request, "", "", _TAG); // bid = 0
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
-  bid =  server.registerBranch(request, "service1", "", _TAG); // bid = 1
+  bid =  server.registerBranchRegion(request, "service1", "", _TAG); // bid = 1
   ASSERT_EQ(_getFullBid(request->getRid(), 1), bid);
 
-  bid =  server.registerBranch(request, "", "region1", _TAG); // bid = 2
+  bid =  server.registerBranchRegion(request, "", "region1", _TAG); // bid = 2
   ASSERT_EQ(_getFullBid(request->getRid(), 2), bid);
 
-  bid =  server.registerBranch(request, "service2", "region2", _TAG); // bid = 3
+  bid =  server.registerBranchRegion(request, "service2", "region2", _TAG); // bid = 3
   ASSERT_EQ(_getFullBid(request->getRid(), 3), bid);
 
   threads.emplace_back([&server, request] {
@@ -161,13 +161,13 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   ASSERT_EQ(true, found_region);
 
   // Sanity Check - ensure that locks still work
-  bid =  server.registerBranch(request, "storage", "EU", _TAG); // bid = 4
+  bid =  server.registerBranchRegion(request, "storage", "EU", _TAG); // bid = 4
   ASSERT_EQ(_getFullBid(request->getRid(), 4), bid);
 
-  bid =  server.registerBranch(request, "storage", "US", _TAG); // bid = 5
+  bid =  server.registerBranchRegion(request, "storage", "US", _TAG); // bid = 5
   ASSERT_EQ(_getFullBid(request->getRid(), 5), bid);
 
-  bid =  server.registerBranch(request, "notification", "GLOBAL", _TAG); // bid = 6
+  bid =  server.registerBranchRegion(request, "notification", "GLOBAL", _TAG); // bid = 6
   ASSERT_EQ(_getFullBid(request->getRid(), 6), bid);
 
   threads.emplace_back([&server, request] {
@@ -227,7 +227,7 @@ TEST(ServerConcurrencyTest, WaitServiceTag) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranches(request, "service", regions, "tag");
+  std::string bid_0 = server.registerBranch(request, "service", regions, "tag");
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
 
   sleep(1);
@@ -286,7 +286,7 @@ TEST(ServerConcurrencyTest, WaitServiceTagForceAsync) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranches(request, "service", regions, "tag");
+  std::string bid_0 = server.registerBranch(request, "service", regions, "tag");
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
 
   sleep(1);

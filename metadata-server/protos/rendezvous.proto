@@ -9,7 +9,6 @@ service ClientService {
   /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
-  rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
   rpc RegisterBranchesDatastores(RegisterBranchesDatastoresMessage) returns (RegisterBranchesDatastoresResponse);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
@@ -58,25 +57,9 @@ message RegisterRequestResponse {
   RequestContext context = 2;
 }
 
-/* Register Branch */
-
-message RegisterBranchMessage {
-  string rid = 1;
-  string service = 2;
-  string tag = 3;
-  string region = 4;
-  RequestContext context = 5;
-}
-
-message RegisterBranchResponse {
-  string rid = 1;
-  string bid = 2;
-  RequestContext context = 3;
-}
-
 /* Registers Branches */
 
-message RegisterBranchesMessage {
+message RegisterBranchMessage {
   string rid = 1;
   string service = 2;
   string tag = 3;
@@ -84,7 +67,7 @@ message RegisterBranchesMessage {
   RequestContext context = 5;
 }
 
-message RegisterBranchesResponse {
+message RegisterBranchResponse {
   string rid = 1;
   string bid = 2;
   RequestContext context = 3;
@@ -129,7 +112,7 @@ message WaitRequestMessage {
   string region = 3;
   string tag = 4;
   int32 timeout = 5;
-  bool async = 6;
+  //bool async = 6;
   RequestContext context = 7;
 }
 
@@ -144,7 +127,8 @@ message CheckRequestMessage {
   string rid = 1;
   string service = 2;
   string region = 3;
-  RequestContext context = 4;
+  bool detailed = 4;
+  RequestContext context = 5;
 }
 
 message CheckRequestResponse {
@@ -156,7 +140,8 @@ message CheckRequestResponse {
 message CheckRequestByRegionsMessage {
   string rid = 1;
   string service = 2;
-  RequestContext context = 3;
+  bool detailed = 3;
+  RequestContext context = 4;
 }
 
 message CheckRequestByRegionsResponse {

@@ -32,10 +32,6 @@ namespace service {
                 const rendezvous_server::RegisterBranchMessage * request, 
                 rendezvous_server::Empty * response) override;
             
-            grpc::Status RegisterBranches(grpc::ServerContext * context,
-                const rendezvous_server::RegisterBranchesMessage * request, 
-                rendezvous_server::Empty * response) override;
-            
             grpc::Status CloseBranch(grpc::ServerContext * context, 
                 const rendezvous_server::CloseBranchMessage * request, 
                 rendezvous_server::Empty * response) override;

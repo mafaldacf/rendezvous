@@ -39,23 +39,6 @@ std::string Request::genId() {
 }
 
 metadata::Branch * Request::registerBranch(const std::string& bid, const std::string& service, 
-const std::string& tag, const std::string& region) {
-
-    std::unique_lock<std::mutex> lock(_mutex_branches);
-    auto branch_it = _branches.find(bid);
-    // branches already exists
-    if (branch_it != _branches.end()) {
-        return nullptr;
-    }
-
-    metadata::Branch * branch = new metadata::Branch(service, tag, region);
-    _branches[bid] = branch;
-    trackBranchOnContext(service, region, REGISTER, branch);
-    refreshLastTs();
-    return branch;
-}
-
-metadata::Branch * Request::registerBranches(const std::string& bid, const std::string& service, 
     const std::string& tag, const utils::ProtoVec& regions) {
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
@@ -68,7 +51,7 @@ metadata::Branch * Request::registerBranches(const std::string& bid, const std::
     metadata::Branch * branch = new metadata::Branch(service, tag, regions);
     _branches[bid] = branch;
     int num = regions.size();
-    trackBranchesOnContext(service, regions, num, branch);
+    trackBranch(service, regions, num, branch);
     refreshLastTs();
     return branch;
 }
@@ -88,14 +71,14 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
 
     int r = branch->close(region);
     if (r == 1) {
-        trackBranchOnContext(service, region, REMOVE);
+        untrackBranch(service, region, REMOVE);
         refreshLastTs();
         _cond_branches.notify_all();
     }
     return r;
 }
 
-void Request::trackBranchOnContext(const std::string& service, const std::string& region, long value, metadata::Branch * branch) {
+void Request::untrackBranch(const std::string& service, const std::string& region, long value, metadata::Branch * branch) {
     _num_opened_branches.fetch_add(value);
 
     // service context
@@ -137,7 +120,7 @@ void Request::trackBranchOnContext(const std::string& service, const std::string
     }
 }
 
-void Request::trackBranchesOnContext(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch) {
+void Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch) {
     _num_opened_branches.fetch_add(num);
 
     // service context
@@ -174,7 +157,7 @@ void Request::trackBranchesOnContext(const std::string& service, const utils::Pr
         }
 
         // notify upon creation (due to async waits)
-        _cond_new_service_branching.notify_all();
+        _cond_new_opened_regions.notify_all();
     }
 }
 

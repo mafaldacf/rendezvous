@@ -21,10 +21,10 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
         const grpc::Status & status = *(req_helper.statuses[tag-1].get());
 
         if (status.ok()) {
-            spdlog::debug("{} RPC #{} OK", request.c_str(), tag);
+            //spdlog::debug("{} RPC #{} OK", request.c_str(), tag);
         }
         else {
-            spdlog::debug("{} RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
+            //spdlog::debug("{} RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
         }
     }
 }
@@ -57,45 +57,7 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
      }).detach();
 }
 
-void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const std::string& region, std::string id, int version) {
-    std::thread([this, rid, bid, service, region, id, version]() {
-        struct RequestHelper req_helper;
-
-        for (const auto& server : _servers) {
-            grpc::ClientContext * context = new grpc::ClientContext();
-            req_helper.contexts.emplace_back(context);
-
-            grpc::Status * status = new grpc::Status();
-            req_helper.statuses.emplace_back(status);
-
-            rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            req_helper.responses.emplace_back(response);
-            
-            rendezvous_server::RegisterBranchMessage request;
-            request.set_rid(rid);
-            request.set_bid(bid);
-            request.set_service(service);
-            request.set_region(region);
-
-            if (CONTEXT_PROPAGATION) {
-                rendezvous_server::ReplicaRequestContext ctx;
-                ctx.set_replica_id(id);
-                ctx.set_request_version(version);
-                request.mutable_context()->CopyFrom(ctx);
-            }
-
-            req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
-            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
-
-            req_helper.nrpcs++;
-        }
-
-        waitCompletionQueue("Register Branch", req_helper);
-
-    }).detach();
-}
-
-void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::string& bid, 
+void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, 
     const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, 
     std::string id, int version) {
 
@@ -112,7 +74,7 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
             req_helper.responses.emplace_back(response);
 
-            rendezvous_server::RegisterBranchesMessage request;
+            rendezvous_server::RegisterBranchMessage request;
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
@@ -125,7 +87,7 @@ void ReplicaClient::sendRegisterBranches(const std::string& rid, const std::stri
                 request.mutable_context()->CopyFrom(ctx);
             }
 
-            req_helper.rpcs.emplace_back(server->AsyncRegisterBranches(context, request, &req_helper.queue));
+            req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
             req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
             req_helper.nrpcs++;

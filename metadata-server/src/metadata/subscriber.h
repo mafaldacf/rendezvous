@@ -10,7 +10,6 @@
 #include "branch.h"
 #include "../utils.h"
 #include <chrono>
-#include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
 
 namespace metadata {
@@ -39,14 +38,14 @@ namespace metadata {
              * @param branch The branch's bid
              * @param tag
              */
-            void pushBranch(const std::string& bid, const std::string& tag);
+            void push(const std::string& bid, const std::string& tag);
 
             /**
              * Remove the branch from the queue. Blocks until a branch is available
              * @param context The grpc context for the current connection
              * @return The bid for the removed branch
              */
-            SubscribedBranch popBranch(grpc::ServerContext * context);
+            SubscribedBranch pop(grpc::ServerContext * context);
 
             /**
              * Return timestamp of last active moment

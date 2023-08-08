@@ -14,70 +14,54 @@ class ClientServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.SubscribeBranches = channel.unary_stream(
-                '/rendezvous.ClientService/SubscribeBranches',
-                request_serializer=rendezvous__pb2.SubscribeBranchesMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.SubscribeBranchesResponse.FromString,
-                )
-        self.CloseBranches = channel.stream_unary(
-                '/rendezvous.ClientService/CloseBranches',
-                request_serializer=rendezvous__pb2.CloseBranchMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.Empty.FromString,
+        self.Subscribe = channel.unary_stream(
+                '/rendezvous.ClientService/Subscribe',
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.FromString,
                 )
         self.RegisterRequest = channel.unary_unary(
                 '/rendezvous.ClientService/RegisterRequest',
-                request_serializer=rendezvous__pb2.RegisterRequestMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.RegisterRequestResponse.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestResponse.FromString,
                 )
         self.RegisterBranch = channel.unary_unary(
                 '/rendezvous.ClientService/RegisterBranch',
-                request_serializer=rendezvous__pb2.RegisterBranchMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.RegisterBranchResponse.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchResponse.FromString,
                 )
-        self.RegisterBranches = channel.unary_unary(
-                '/rendezvous.ClientService/RegisterBranches',
-                request_serializer=rendezvous__pb2.RegisterBranchesMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.RegisterBranchesResponse.FromString,
+        self.RegisterBranchesDatastores = channel.unary_unary(
+                '/rendezvous.ClientService/RegisterBranchesDatastores',
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.FromString,
                 )
         self.CloseBranch = channel.unary_unary(
                 '/rendezvous.ClientService/CloseBranch',
-                request_serializer=rendezvous__pb2.CloseBranchMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.Empty.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.FromString,
                 )
         self.WaitRequest = channel.unary_unary(
                 '/rendezvous.ClientService/WaitRequest',
-                request_serializer=rendezvous__pb2.WaitRequestMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.WaitRequestResponse.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestResponse.FromString,
                 )
         self.CheckRequest = channel.unary_unary(
                 '/rendezvous.ClientService/CheckRequest',
-                request_serializer=rendezvous__pb2.CheckRequestMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.CheckRequestResponse.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestResponse.FromString,
                 )
         self.CheckRequestByRegions = channel.unary_unary(
                 '/rendezvous.ClientService/CheckRequestByRegions',
-                request_serializer=rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
-                response_deserializer=rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
-                )
-        self.GetNumPreventedInconsistencies = channel.unary_unary(
-                '/rendezvous.ClientService/GetNumPreventedInconsistencies',
-                request_serializer=rendezvous__pb2.Empty.SerializeToString,
-                response_deserializer=rendezvous__pb2.GetNumPreventedInconsistenciesResponse.FromString,
+                request_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
+                response_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
                 )
 
 
 class ClientServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def SubscribeBranches(self, request, context):
+    def Subscribe(self, request, context):
         """Streaming 
         """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def CloseBranches(self, request_iterator, context):
-        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -95,7 +79,7 @@ class ClientServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def RegisterBranches(self, request, context):
+    def RegisterBranchesDatastores(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -125,64 +109,48 @@ class ClientServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetNumPreventedInconsistencies(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_ClientServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'SubscribeBranches': grpc.unary_stream_rpc_method_handler(
-                    servicer.SubscribeBranches,
-                    request_deserializer=rendezvous__pb2.SubscribeBranchesMessage.FromString,
-                    response_serializer=rendezvous__pb2.SubscribeBranchesResponse.SerializeToString,
-            ),
-            'CloseBranches': grpc.stream_unary_rpc_method_handler(
-                    servicer.CloseBranches,
-                    request_deserializer=rendezvous__pb2.CloseBranchMessage.FromString,
-                    response_serializer=rendezvous__pb2.Empty.SerializeToString,
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.SerializeToString,
             ),
             'RegisterRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterRequest,
-                    request_deserializer=rendezvous__pb2.RegisterRequestMessage.FromString,
-                    response_serializer=rendezvous__pb2.RegisterRequestResponse.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestResponse.SerializeToString,
             ),
             'RegisterBranch': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterBranch,
-                    request_deserializer=rendezvous__pb2.RegisterBranchMessage.FromString,
-                    response_serializer=rendezvous__pb2.RegisterBranchResponse.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchResponse.SerializeToString,
             ),
-            'RegisterBranches': grpc.unary_unary_rpc_method_handler(
-                    servicer.RegisterBranches,
-                    request_deserializer=rendezvous__pb2.RegisterBranchesMessage.FromString,
-                    response_serializer=rendezvous__pb2.RegisterBranchesResponse.SerializeToString,
+            'RegisterBranchesDatastores': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterBranchesDatastores,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.SerializeToString,
             ),
             'CloseBranch': grpc.unary_unary_rpc_method_handler(
                     servicer.CloseBranch,
-                    request_deserializer=rendezvous__pb2.CloseBranchMessage.FromString,
-                    response_serializer=rendezvous__pb2.Empty.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.Empty.SerializeToString,
             ),
             'WaitRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.WaitRequest,
-                    request_deserializer=rendezvous__pb2.WaitRequestMessage.FromString,
-                    response_serializer=rendezvous__pb2.WaitRequestResponse.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestResponse.SerializeToString,
             ),
             'CheckRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckRequest,
-                    request_deserializer=rendezvous__pb2.CheckRequestMessage.FromString,
-                    response_serializer=rendezvous__pb2.CheckRequestResponse.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestResponse.SerializeToString,
             ),
             'CheckRequestByRegions': grpc.unary_unary_rpc_method_handler(
                     servicer.CheckRequestByRegions,
-                    request_deserializer=rendezvous__pb2.CheckRequestByRegionsMessage.FromString,
-                    response_serializer=rendezvous__pb2.CheckRequestByRegionsResponse.SerializeToString,
-            ),
-            'GetNumPreventedInconsistencies': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetNumPreventedInconsistencies,
-                    request_deserializer=rendezvous__pb2.Empty.FromString,
-                    response_serializer=rendezvous__pb2.GetNumPreventedInconsistenciesResponse.SerializeToString,
+                    request_deserializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.FromString,
+                    response_serializer=rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -195,7 +163,7 @@ class ClientService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def SubscribeBranches(request,
+    def Subscribe(request,
             target,
             options=(),
             channel_credentials=None,
@@ -205,26 +173,9 @@ class ClientService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_stream(request, target, '/rendezvous.ClientService/SubscribeBranches',
-            rendezvous__pb2.SubscribeBranchesMessage.SerializeToString,
-            rendezvous__pb2.SubscribeBranchesResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def CloseBranches(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_unary(request_iterator, target, '/rendezvous.ClientService/CloseBranches',
-            rendezvous__pb2.CloseBranchMessage.SerializeToString,
-            rendezvous__pb2.Empty.FromString,
+        return grpc.experimental.unary_stream(request, target, '/rendezvous.ClientService/Subscribe',
+            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.SubscribeResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -240,8 +191,8 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterRequest',
-            rendezvous__pb2.RegisterRequestMessage.SerializeToString,
-            rendezvous__pb2.RegisterRequestResponse.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterRequestResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -257,13 +208,13 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranch',
-            rendezvous__pb2.RegisterBranchMessage.SerializeToString,
-            rendezvous__pb2.RegisterBranchResponse.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def RegisterBranches(request,
+    def RegisterBranchesDatastores(request,
             target,
             options=(),
             channel_credentials=None,
@@ -273,9 +224,9 @@ class ClientService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranches',
-            rendezvous__pb2.RegisterBranchesMessage.SerializeToString,
-            rendezvous__pb2.RegisterBranchesResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/RegisterBranchesDatastores',
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.RegisterBranchesDatastoresResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -291,8 +242,8 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/CloseBranch',
-            rendezvous__pb2.CloseBranchMessage.SerializeToString,
-            rendezvous__pb2.Empty.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.CloseBranchMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -308,8 +259,8 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/WaitRequest',
-            rendezvous__pb2.WaitRequestMessage.SerializeToString,
-            rendezvous__pb2.WaitRequestResponse.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.WaitRequestResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -325,8 +276,8 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/CheckRequest',
-            rendezvous__pb2.CheckRequestMessage.SerializeToString,
-            rendezvous__pb2.CheckRequestResponse.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -342,24 +293,7 @@ class ClientService(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/CheckRequestByRegions',
-            rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
-            rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
-            options, channel_credentials,
-            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def GetNumPreventedInconsistencies(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/rendezvous.ClientService/GetNumPreventedInconsistencies',
-            rendezvous__pb2.Empty.SerializeToString,
-            rendezvous__pb2.GetNumPreventedInconsistenciesResponse.FromString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsMessage.SerializeToString,
+            rendezvous_dot_protos_dot_rendezvous__pb2.CheckRequestByRegionsResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -8,15 +8,14 @@ Subscriber::Subscriber(int subscribers_refresh_interval_s)
         _last_ts = std::chrono::system_clock::now();
 }
 
-void Subscriber::pushBranch(const std::string& bid, const std::string& tag) {
+void Subscriber::push(const std::string& bid, const std::string& tag) {
     _mutex.lock();
-    spdlog::debug("adding subscribed branch {}", bid.c_str());
     _subscribed_branches.push(SubscribedBranch{bid, tag});
     _cond.notify_all();
     _mutex.unlock();
 }
 
-metadata::Subscriber::SubscribedBranch Subscriber::popBranch(grpc::ServerContext * context) {
+metadata::Subscriber::SubscribedBranch Subscriber::pop(grpc::ServerContext * context) {
     // refresh timestamp of last time moment
     _last_ts = std::chrono::system_clock::now();
     std::unique_lock<std::mutex> lock(_mutex);
