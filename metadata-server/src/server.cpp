@@ -11,15 +11,15 @@ Server::Server(std::string sid, json settings)
     _subscribers_refresh_interval_s(settings["subscribers_refresh_interval_s"].get<int>()),
     _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
     
-    spdlog::info("------------------------------------------------------");
-    spdlog::info("- Garbage Collector Info (minutes):");
-    spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
-    spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
-    spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
-    spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
-    spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
-    spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
-    spdlog::info("------------------------------------------------------");
+    //spdlog::info("------------------------------------------------------");
+    //spdlog::info("- Garbage Collector Info (minutes):");
+    //spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
+    //spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
+    //spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
+    //spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
+    //spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
+    //spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
+    //spdlog::info("------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
@@ -107,7 +107,7 @@ void Server::initSubscribersCleanup() {
       std::this_thread::sleep_for(std::chrono::minutes(_cleanup_subscribers_interval_m));
       auto now = std::chrono::system_clock::now();
       std::unique_lock<std::shared_mutex> write_lock(_mutex_subscribers);
-      spdlog::info("[GC SUBSCRIBERS] initializing garbage collector...");
+      //spdlog::info("[GC SUBSCRIBERS] initializing garbage collector...");
 
       for (auto subscribers_it = _subscribers.begin(); subscribers_it != _subscribers.cend(); /* no increment */) {
         for (auto regions_it = subscribers_it->second.cbegin(); regions_it != subscribers_it->second.cend(); /* no increment */) {
@@ -142,7 +142,7 @@ void Server::initRequestsCleanup() {
       auto now = std::chrono::system_clock::now();
       std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
       std::size_t initial_size = _requests.size();
-      spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
+      //spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
 
       for (auto it = _requests.cbegin(); it != _requests.cend(); /* no increment */) {
         if (now - it->second->getLastTs() > std::chrono::minutes(_cleanup_requests_validity_m)) {
@@ -153,7 +153,7 @@ void Server::initRequestsCleanup() {
           ++it;
         }
       }
-      spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
+      //spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
     }
     
   }).detach();

@@ -12,14 +12,14 @@ export PATH="$MY_INSTALL_DIR/bin:$PATH"
 echo '(1) Installing tools...'
 sudo apt-get update
 sudo apt upgrade -y 
-sudo apt-get install -y build-essential autoconf git pkg-config cmake automake libtool curl zip unzip tar make wget g++ nano libtbb-dev libspdlog-dev
+sudo apt-get install -y build-essential autoconf git pkg-config cmake automake libtool curl zip unzip tar make wget g++ nano libtbb-dev libspdlog-dev tmux
 sudo apt-get clean
 
 # Install python dependencies
 sudo apt install python3-pip -y
 cd datastore-monitor
 sudo pip install -r requirements.txt
-cd ../client-eval
+cd ../server-eval
 sudo pip install -r requirements.txt
 
 # Prepare environemnt

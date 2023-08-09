@@ -1,9 +1,0 @@
-Client 3.70.70.228: {'requests': 143703, 'responses': 143703, 'throughput': 4790.1, 'avg_latency': 41}
-----------------------------
-Duration: 30
-Clients: 1
-Threads per Client: 200
-Requests: 143703
-Responses: 143703 (100.0%)
-Throughput (req/s): 4790
-Latency (ms): 41

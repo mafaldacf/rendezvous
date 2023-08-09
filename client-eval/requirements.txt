@@ -1,9 +1,0 @@
-pause
-pandas
-matplotlib
-paramiko
-scp
-grpcio
-grpcio-tools
-seaborn
-tqdm

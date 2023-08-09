@@ -5,14 +5,13 @@ services:
     hostname: rendezvous-eu
     ports:
       - 8001:8001
-    entrypoint: sh -c "./manager.sh local run server eu"
+    entrypoint: sh -c "./manager.sh local run server eu docker.json"
   metadata-server-us:
     image: mafaldacf/rendezvous:latest
     hostname: rendezvous-us
     ports:
       - 8002:8002
-    entrypoint: sh -c "./manager.sh local run server us"
-
+    entrypoint: sh -c "./manager.sh local run server us docker.json"
   datastore-monitor-cache-eu:
     image: mafaldacf/rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d cache -r eu"

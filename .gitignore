@@ -15,4 +15,7 @@ examples/python/rendezvous/protos/rendezvous_pb2_grpc.py
 protos/rendezvous.proto
 datastore-monitor/__pycache__
 datastore-monitor/proto/__pycache__
-client-eval/proto/__pycache__
+server-eval/proto/__pycache__
+server-eval/plots/**
+server-eval/results/**
+server-eval/remote-csv-results/**

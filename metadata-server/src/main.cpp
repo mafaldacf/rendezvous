@@ -21,7 +21,8 @@
 
 using json = nlohmann::json;
 
-static std::string _replica_id = "replica-eu";
+static std::string _replica_id;
+static std::string _config_file;
 static std::string _replica_addr;
 static std::vector<std::string> _replicas_addrs;
 static json _settings;
@@ -66,13 +67,13 @@ void run() {
 }
 
 void loadConfig() {
-  std::ifstream file("../config.json");
+  std::ifstream file("../" + _config_file);
   if (!file.is_open()) {
     spdlog::error("Error opening JSON config");
     exit(-1);
   }
 
-  spdlog::info("Parsing JSON config...");
+  spdlog::info("Parsing " + _config_file + "...");
 
   try {
     json root;
@@ -101,7 +102,7 @@ void loadConfig() {
 }
 
 void usage(char *argv[]) {
-  spdlog::error("Usage: {} <replica_id>", argv[0]);
+  spdlog::error("Usage: {} <replica_id> <config_file>", argv[0]);
 
   // TODO for oficial code
   // std::cout << "Usage: " << argv[0] << " [--debug] [--logs] [--no_consistency_checks] <_replica_id>" << std::endl;
@@ -111,14 +112,13 @@ void usage(char *argv[]) {
 int main(int argc, char *argv[]) {
   spdlog::set_level(spdlog::level::trace);
 
-  if (argc > 1) {
-    if (argc == 2) {
-      _replica_id = argv[1];
-    }
-    else if (argc > 2) {
-      spdlog::error("Invalid number of arguments");
-      usage(argv);
-    }
+  if (argc == 3) {
+    _replica_id = argv[1];
+    _config_file = argv[2];
+  }
+  else {
+    spdlog::error("Invalid number of arguments");
+    usage(argv);
   }
   spdlog::info("--------------- RENDEZVOUS SERVER ({}) --------------- ", _replica_id);
   loadConfig();

@@ -2,7 +2,7 @@
 
 usage() {
     echo "Invalid arguments! Usage:"
-    echo "> ./manager.sh local {clean, build, build-cfg, build-py, run {server <replica id>, tests, client, monitor}}"
+    echo "> ./manager.sh local {clean, build, build-py-proto, run {server <replica id>, tests, client, monitor}}"
     echo "> ./manager.sh aws {setup {eu, us}, update {eu, us}, start {eu, us {dynamo, s3, cache, mysql}}, stop {eu, us}}"
     echo "> ./manager.sh aws-docker {eu, us} {dynamo, s3, cache, mysql}"
     exit 1
@@ -45,7 +45,7 @@ local_build_cfg() {
   echo done!
 }
 
-local_build_py() {
+local_build_py_proto() {
   # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
   # https://github.com/protocolbuffers/protobuf/issues/1491
   # consequently, we have to remove part of the path from the output flags (the path will be complemented with the package name)
@@ -61,7 +61,7 @@ local_build_py() {
 
 local_run_server() {
   cd metadata-server/cmake/build/src
-  ./rendezvous $1
+  ./rendezvous $1 $2
 }
 
 local_run_client() {
@@ -175,14 +175,11 @@ if [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "clean" ]; then
 elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ]; then
   local_build
 
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-cfg" ]; then
-  local_build_cfg
-
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-py" ]; then
-  local_build_py
+elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-py-proto" ]; then
+  local_build_py_proto
     
-elif [ "$#" -eq 4 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
-  local_run_server $4
+elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
+  local_run_server $4 $5
 
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
   local_run_client
