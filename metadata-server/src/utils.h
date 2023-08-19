@@ -4,27 +4,20 @@
 #include <string>
 
 namespace utils {
-
-    typedef google::protobuf::RepeatedPtrField<std::string> ProtoVec;
-
+    // request context versioning
     #ifndef CONTEXT_PROPAGATION
     #define CONTEXT_PROPAGATION 1
     #endif
 
-    // subscribed requests
-    #ifndef TRACK_SUBSCRIBED_BRANCHES
-    #define TRACK_SUBSCRIBED_BRANCHES 1
-    #endif
+    /* --------------------- */
+    /* gRPC structure helper */
+    /* --------------------- */
+    typedef google::protobuf::RepeatedPtrField<std::string> ProtoVec;
 
-    // measure overhead of API without any consistency checks
-    #ifndef SKIP_CONSISTENCY_CHECKS 
-    #define SKIP_CONSISTENCY_CHECKS 0
-    #endif 
+    /* ------------------- */
+    /* gRPC error messages */
+    /* ------------------- */
 
-    const std::string TIME_FORMAT = "%Y-%m-%d %H:%M:%S";
-
-    const std::string ERR_PARSING_BID = "Unexpected error parsing full bid";
-    
     /* client gRPC custom error messages */
     const std::string ERR_MSG_SERVICE_NOT_FOUND = "Request status not found for the provided service";
     const std::string ERR_MSG_INVALID_REGION = "Branch does not exist in the given region";
@@ -35,6 +28,8 @@ namespace utils {
     const std::string ERR_MSG_INVALID_TIMEOUT = "Invalid timeout. Value needs to be greater than 0";
     const std::string ERR_MSG_REGISTER_BRANCHES_INVALID_DATASTORES = "Invalid datastores arguments";
     const std::string ERR_MSG_INVALID_TAG_USAGE = "Tag can only be specified when service is specified";
+    const std::string ERR_MSG_FAILED_DETAILED_QUERY = "Cannot provide detailed information without specifying service";
+    const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and needs to be unique";
 
     /* server gRPC custom error m essages */
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context provided";
@@ -43,6 +38,7 @@ namespace utils {
     const std::string ERR_MSG_INVALID_REQUEST = "Invalid request identifier";
     const std::string ERR_MSG_REQUEST_ALREADY_EXISTS = "A request was already registered with the provided identifier";
     const std::string ERR_MSG_BRANCH_ALREADY_EXISTS = "A branch was already registered with the provided identifier";
+    const std::string ERR_PARSING_BID = "Unexpected error parsing full bid";
 }
 
 #endif

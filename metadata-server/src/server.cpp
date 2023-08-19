@@ -11,15 +11,15 @@ Server::Server(std::string sid, json settings)
     _subscribers_refresh_interval_s(settings["subscribers_refresh_interval_s"].get<int>()),
     _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
     
-    //spdlog::info("------------------------------------------------------");
-    //spdlog::info("- Garbage Collector Info (minutes):");
-    //spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
-    //spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
-    //spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
-    //spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
-    //spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
-    //spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
-    //spdlog::info("------------------------------------------------------");
+    spdlog::info("------------------------------------------------------");
+    spdlog::info("- Garbage Collector Info (minutes):");
+    spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
+    spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
+    spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
+    spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
+    spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
+    spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
+    spdlog::info("------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
@@ -107,7 +107,7 @@ void Server::initSubscribersCleanup() {
       std::this_thread::sleep_for(std::chrono::minutes(_cleanup_subscribers_interval_m));
       auto now = std::chrono::system_clock::now();
       std::unique_lock<std::shared_mutex> write_lock(_mutex_subscribers);
-      //spdlog::info("[GC SUBSCRIBERS] initializing garbage collector...");
+      spdlog::info("[GC SUBSCRIBERS] initializing garbage collector...");
 
       for (auto subscribers_it = _subscribers.begin(); subscribers_it != _subscribers.cend(); /* no increment */) {
         for (auto regions_it = subscribers_it->second.cbegin(); regions_it != subscribers_it->second.cend(); /* no increment */) {
@@ -142,7 +142,7 @@ void Server::initRequestsCleanup() {
       auto now = std::chrono::system_clock::now();
       std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
       std::size_t initial_size = _requests.size();
-      //spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
+      spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
 
       for (auto it = _requests.cbegin(); it != _requests.cend(); /* no increment */) {
         if (now - it->second->getLastTs() > std::chrono::minutes(_cleanup_requests_validity_m)) {
@@ -153,7 +153,7 @@ void Server::initRequestsCleanup() {
           ++it;
         }
       }
-      //spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
+      spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
     }
     
   }).detach();
@@ -242,11 +242,11 @@ std::string Server::registerBranchRegion(metadata::Request * request, const std:
 const std::string& tag, std::string bid) {
   utils::ProtoVec regions;
   regions.Add(region.c_str());
-  return registerBranch(request, service, regions, tag, bid);
+  return registerBranch(request, service, regions, tag, true, bid);
 }
 
 std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
-const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
+const utils::ProtoVec& regions, const std::string& tag, bool monitor, std::string bid) {
 
   // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
@@ -256,16 +256,31 @@ const utils::ProtoVec& regions, const std::string& tag, std::string bid) {
   // unexpected error
   if (!branch) {
     return "";
-  };
+  }
   const std::string& full_bid = getFullBid(request, bid);
-  if (TRACK_SUBSCRIBED_BRANCHES) {
+  if (monitor) {
     publishBranches(service, tag, full_bid);
   }
   return full_bid;
 }
 
-int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
-  return request->closeBranch(bid, region);
+int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force) {
+  int r = request->closeBranch(bid, region);
+  
+  // close branch in the background
+  if (r != 1 && force) {
+    std::thread([this, request, bid, region]() {
+      int retries = 0;
+      while (retries++ <= _wait_replica_timeout_s) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (request->closeBranch(bid, region) == 1) {
+          break;
+        }
+      }
+    }).detach();
+    return 1;
+  }
+  return r;
 }
 
 int Server::waitRequest(metadata::Request * request, const std::string& service, const::std::string& region, 
@@ -276,14 +291,11 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitOnServiceAndRegion(service, region, tag, async, timeout);
-
+    result = request->waitServiceRegion(service, region, tag, async, timeout);
   else if (!service.empty())
-    result = request->waitOnService(service, tag, async, timeout);
-
+    result = request->waitService(service, tag, async, timeout);
   else if (!region.empty())
-    result = request->waitOnRegion(region, async, timeout);
-
+    result = request->waitRegion(region, async, timeout);
   else
     result = request->wait(timeout);
 
@@ -296,21 +308,29 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
 }
 
 int Server::checkRequest(metadata::Request * request, const std::string& service, const std::string& region) {
+  metadata::Request::Status res;
+
   if (!service.empty() && !region.empty())
-    return request->getStatusOnServiceAndRegion(service, region);
-
+    res = request->getStatusServiceRegion(service, region);
   else if (!service.empty())
-    return request->getStatusOnService(service);
-
+    res = request->getStatusService(service);
   else if (!region.empty())
-    return request->getStatusOnRegion(region);
+    res = request->getStatusRegion(region);
+  else
+    res = request->getStatus();
 
-  return request->getStatus();
+  // parse request status and ignore detailed field
+  return res.status;
+}
+
+metadata::Request::Status Server::checkDetailedRequest(metadata::Request * request, const std::string& service, const std::string& region) {
+  if (!service.empty() && !region.empty())
+    return request->getStatusServiceRegion(service, region, true);
+  return request->getStatusService(service, true);
 }
 
 std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * request, const std::string& service) {
   if (!service.empty())
     return request->getStatusByRegionsOnService(service);
-
   return request->getStatusByRegions();
 }

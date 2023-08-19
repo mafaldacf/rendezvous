@@ -21,7 +21,7 @@ const int INVALID_BRANCH_REGION = -3;
 
 const std::string SID = "eu-central-1";
 const std::string RID = "myrequestid";
-const std::string TAG = "mytag";
+const std::string EMPTY_TAG = "";
 
 std::string getRid(int id) {
   return SID + ':' + std::to_string(id);
@@ -95,35 +95,54 @@ TEST(ServerTest, GetOrRegisterTwiceRequest) {
 TEST(ServerTest, RegisterBranch) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "", "", TAG);
+  std::string bid = server.registerBranchRegion(request, "", "", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
 TEST(ServerTest, RegisterBranch_WithService) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "s", "", TAG);
+  std::string bid = server.registerBranchRegion(request, "s", "", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
 TEST(ServerTest, RegisterBranch_WithRegion) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "", "r", TAG);
+  std::string bid = server.registerBranchRegion(request, "", "r", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
 TEST(ServerTest, RegisterBranch_WithServiceAndRegion) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "s", "r", TAG);
+  std::string bid = server.registerBranchRegion(request, "s", "r", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+}
+
+TEST(ServerTest, RegisterBranch_DiffTags) { 
+  rendezvous::Server server(SID); 
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+  std::string bid = server.registerBranchRegion(request, "service", "region", "tag_A");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranchRegion(request, "service", "region", "tag_B");
+  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+}
+
+TEST(ServerTest, RegisterBranch_SameTags) { 
+  rendezvous::Server server(SID); 
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+  std::string bid = server.registerBranchRegion(request, "service", "region", "tag_A");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranchRegion(request, "service", "region", "tag_A");
+  // server returns empty when registration fails
+  ASSERT_EQ("", bid);
 }
 
 TEST(ServerTest, CloseBranch) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "s", "r", TAG);
+  std::string bid = server.registerBranchRegion(request, "s", "r", EMPTY_TAG);
   int res = server.closeBranch(request, parseFullBid(&server, request, bid, 0), "r");
   ASSERT_EQ(1, res);
 }
@@ -131,7 +150,7 @@ TEST(ServerTest, CloseBranch) {
 TEST(ServerTest, CloseBranchInvalidRegion) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", TAG);
+  std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", EMPTY_TAG);
   int res = server.closeBranch(request, parseFullBid(&server, request, bid, 0), "us-east-1");
   ASSERT_EQ(-1, res);
 }
@@ -139,7 +158,7 @@ TEST(ServerTest, CloseBranchInvalidRegion) {
 TEST(ServerTest, CloseBranchInvalidBid) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", TAG);
+  std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", EMPTY_TAG);
   int res = server.closeBranch(request, "invalid bid", "us-east-1");
   ASSERT_EQ(0, res);
 }
@@ -151,10 +170,10 @@ TEST(ServerTest, CheckRequest_AllContexts) {
 
   /* Register Request and Branches with Multiple Contexts */
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid_0 = server.registerBranchRegion(request, "", "", TAG); // bid = 0
-  std::string bid_1 = server.registerBranchRegion(request, "s", "", TAG); // bid = 1
-  std::string bid_2 = server.registerBranchRegion(request, "", "r", TAG); // bid = 2
-  std::string bid_3 = server.registerBranchRegion(request, "s", "r", TAG); // bid = 3
+  std::string bid_0 = server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
+  std::string bid_1 = server.registerBranchRegion(request, "s", "", EMPTY_TAG); // bid = 1
+  std::string bid_2 = server.registerBranchRegion(request, "", "r", EMPTY_TAG); // bid = 2
+  std::string bid_3 = server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
 
   /* Check Request for Multiple Contexts */
   status = server.checkRequest(request, "", "");
@@ -206,13 +225,13 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   google::protobuf::RepeatedPtrField<std::string> regionsNoService;
   regionsNoService.Add("EU");
   regionsNoService.Add("US");
-  std::string bid_0 = server.registerBranch(request, "notifications", regionsNoService, TAG);
+  std::string bid_0 = server.registerBranch(request, "notifications", regionsNoService, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid_0);
 
   google::protobuf::RepeatedPtrField<std::string> regionsService;
   regionsService.Add("EU");
   regionsService.Add("US");
-  std::string bid_1 = server.registerBranch(request, "post-storage", regionsService, TAG);
+  std::string bid_1 = server.registerBranch(request, "post-storage", regionsService, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 1), bid_1);
 
   /* multiple services verifications */
@@ -241,7 +260,7 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   google::protobuf::RepeatedPtrField<std::string> regionsService2;
   regionsService2.Add("CH");
   regionsService2.Add("EU");
-  std::string bid_2 = server.registerBranch(request, "post-storage", regionsService2, TAG);
+  std::string bid_2 = server.registerBranch(request, "post-storage", regionsService2, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 2), bid_2);
 
   /* 'post-storage' service verifications */
@@ -294,10 +313,10 @@ TEST(ServerTest, CheckRequest_ContextNotFound) {
   int status;
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
-  server.registerBranchRegion(request, "", "", TAG); // bid = 0
-  server.registerBranchRegion(request, "s", "", TAG); // bid = 1
-  server.registerBranchRegion(request, "", "r", TAG); // bid = 2
-  server.registerBranchRegion(request, "s", "r", TAG); // bid = 3
+  server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
+  server.registerBranchRegion(request, "s", "", EMPTY_TAG); // bid = 1
+  server.registerBranchRegion(request, "", "r", EMPTY_TAG); // bid = 2
+  server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
 
   status = server.checkRequest(request, "s1", "");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
@@ -319,20 +338,20 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts_SetOfBranches) {
   regionsNoService.Add("");
   regionsNoService.Add("r1");
   regionsNoService.Add("r2");
-  std::string bid_0 = server.registerBranch(request, "", regionsNoService, TAG);
+  std::string bid_0 = server.registerBranch(request, "", regionsNoService, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid_0);
 
   google::protobuf::RepeatedPtrField<std::string> regionsService1;
   regionsService1.Add("");
   regionsService1.Add("r1");
-  std::string bid_1 = server.registerBranch(request, "s1", regionsService1, TAG);
+  std::string bid_1 = server.registerBranch(request, "s1", regionsService1, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 1), bid_1);
 
   google::protobuf::RepeatedPtrField<std::string> regionsService2;
   regionsService2.Add("");
   regionsService2.Add("r1");
   regionsService2.Add("r2");
-  std::string bid_2 = server.registerBranch(request, "s2", regionsService2, TAG);
+  std::string bid_2 = server.registerBranch(request, "s2", regionsService2, EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 2), bid_2);
 
   result = server.checkRequestByRegions(request, "");
@@ -393,14 +412,14 @@ TEST(ServerTest, CheckRequestByRegions_AllContexts) {
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
-  std::string bid_0 = server.registerBranchRegion(request, "", "", TAG); // bid = 0
-  std::string bid_1 = server.registerBranchRegion(request, "s1", "", TAG); // bid = 1
-  std::string bid_2 = server.registerBranchRegion(request, "s2", "", TAG); // bid = 2
-  std::string bid_3 = server.registerBranchRegion(request, "", "r1", TAG); // bid = 3
-  std::string bid_4 = server.registerBranchRegion(request, "", "r2", TAG); // bid = 4
-  std::string bid_5 = server.registerBranchRegion(request, "s1", "r1", TAG); // bid = 5
-  std::string bid_6 = server.registerBranchRegion(request, "s2", "r1", TAG); // bid = 6
-  std::string bid_7 = server.registerBranchRegion(request, "s2", "r2", TAG); // bid = 7
+  std::string bid_0 = server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
+  std::string bid_1 = server.registerBranchRegion(request, "s1", "", EMPTY_TAG); // bid = 1
+  std::string bid_2 = server.registerBranchRegion(request, "s2", "", EMPTY_TAG); // bid = 2
+  std::string bid_3 = server.registerBranchRegion(request, "", "r1", EMPTY_TAG); // bid = 3
+  std::string bid_4 = server.registerBranchRegion(request, "", "r2", EMPTY_TAG); // bid = 4
+  std::string bid_5 = server.registerBranchRegion(request, "s1", "r1", EMPTY_TAG); // bid = 5
+  std::string bid_6 = server.registerBranchRegion(request, "s2", "r1", EMPTY_TAG); // bid = 6
+  std::string bid_7 = server.registerBranchRegion(request, "s2", "r2", EMPTY_TAG); // bid = 7
 
   result = server.checkRequestByRegions(request, "");
   ASSERT_TRUE(result.size() == 2); // 2 opened regions: 'r1' and 'r2'
@@ -459,14 +478,14 @@ TEST(ServerTest, CheckRequestByRegions_RegionAndContextNotFound) {
   result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(0, result.size());
 
-  server.registerBranchRegion(request, "", "", TAG); // bid = 0
-  server.registerBranchRegion(request, "s", "", TAG); // bid = 1
+  server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
+  server.registerBranchRegion(request, "s", "", EMPTY_TAG); // bid = 1
 
   result = server.checkRequestByRegions(request, "");
   ASSERT_EQ(0, result.size());
 
-  server.registerBranchRegion(request, "", "r", TAG); // bid = 2
-  server.registerBranchRegion(request, "s", "r", TAG); // bid = 3
+  server.registerBranchRegion(request, "", "r", EMPTY_TAG); // bid = 2
+  server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
   result = server.checkRequestByRegions(request, "s1");
 }
 

@@ -1,8 +1,9 @@
 #!/bin/bash
 
-keypairname=rendezvous-eu
-ec2_ip=ec2-3-68-80-248.eu-central-1.compute.amazonaws.com
-scp -i "~/.ssh/${keypairname}.pem" -r ~/.aws ubuntu@${ec2_ip}:/home/ubuntu/.aws
+KEYPAIR_NAME=rendezvous-eu
+HOSTNAME=ec2-3-68-80-248.eu-central-1.compute.amazonaws.com
+
+scp -i "~/.ssh/${KEYPAIR_NAME}.pem" -r ~/.aws ubuntu@${HOSTNAME}:/home/ubuntu/.aws
 
 # if necessary, export these variables in command line before running the script
 export MY_INSTALL_DIR=$HOME/.local
@@ -34,6 +35,7 @@ sudo sh cmake-linux.sh -- --skip-license --prefix=$MY_INSTALL_DIR
 sudo rm cmake-linux.sh
 
 # Install gRPC and Protobuf dependencies
+# https://grpc.io/docs/languages/cpp/quickstart/#install-grpc
 echo '(3) Installing gRPC and Protobuf dependencies...'
 cd ~/rendezvous_deps
 sudo git clone --recurse-submodules -b v1.52.0 --depth 1 --shallow-submodules https://github.com/grpc/grpc
@@ -45,6 +47,7 @@ sudo make -j 4
 sudo make install
 
 # Install GTest
+# https://github.com/google/googletest/blob/main/googletest/README.md#standalone-cmake-project
 echo '(4) Installing GTest...'
 cd ~/rendezvous_deps
 sudo git clone https://github.com/google/googletest.git -b v1.13.0
@@ -77,14 +80,3 @@ sudo cmake ..
 sudo make -j
 sudo rm -r ~/rendezvous_deps/spdlog
 sudo apt-get install libspdlog-dev # idk why i need this but it only works like this
-
-# aws cli
-echo '(7) Installing AWS CLI...'
-cd ~/rendezvous_deps
-sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-sudo unzip awscliv2.zip
-sudo ./aws/install
-
-sudo rm -rf ~/rendezvous_deps
-
-echo 'done!'

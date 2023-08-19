@@ -3,15 +3,7 @@
 .vscode/
 cmake/build/
 build/
-examples/python/__pycache__
 *.tar
-examples/python/rendezvous/protos/__pycache__/rendezvous_pb2.cpython-310.pyc
-examples/python/rendezvous/protos/__pycache__/rendezvous_pb2_grpc.cpython-310.pyc
-examples/python/rendezvous/protos/rendezvous_pb2.py
-examples/python/rendezvous/protos/rendezvous_pb2.pyi
-examples/python/rendezvous/protos/rendezvous_pb2_grpc.py
-/logs/*
-/aws/*
 protos/rendezvous.proto
 datastore-monitor/__pycache__
 datastore-monitor/proto/__pycache__
@@ -19,3 +11,6 @@ server-eval/proto/__pycache__
 server-eval/plots/**
 server-eval/results/**
 server-eval/remote-csv-results/**
+metadata-server/examples/python/rendezvous/protos/__pycache__/**
+metadata-server/examples/python/rendezvous/protos/**
+datastore-monitor/proto/**

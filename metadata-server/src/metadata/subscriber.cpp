@@ -11,7 +11,7 @@ Subscriber::Subscriber(int subscribers_refresh_interval_s)
 void Subscriber::push(const std::string& bid, const std::string& tag) {
     _mutex.lock();
     _subscribed_branches.push(SubscribedBranch{bid, tag});
-    _cond.notify_all();
+    _cond.notify_one();
     _mutex.unlock();
 }
 

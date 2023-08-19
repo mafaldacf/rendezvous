@@ -174,11 +174,12 @@ namespace rendezvous {
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
+             * @param monitor Monitor branch by publishing identifier to subscribers
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
             std::string registerBranch(metadata::Request * request, const std::string& service, 
-                const utils::ProtoVec& regions, const std::string& tag, std::string bid = "");
+                const utils::ProtoVec& regions, const std::string& tag, bool monitor = false, std::string bid = "");
 
             /**
              * Close a branch according to its identifier
@@ -187,9 +188,11 @@ namespace rendezvous {
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
              * @param service Service where branch was registered
+             * @param force Force waiting until branch is registered
              * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region);
+            int closeBranch(metadata::Request * request, const std::string& bid, 
+                const std::string& region, bool force = false);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)
@@ -221,6 +224,20 @@ namespace rendezvous {
              * - 2 if context was not found
              */
             int checkRequest(metadata::Request * request, const std::string& service, const std::string& region);
+
+            /**
+             * Check DETAILED status of the request for a given context (none, service, region or service and region)
+             * 
+             * @param request Request where the branch is registered
+             * @param service The service context
+             * @param region The region context
+             * @return Return status for current context as well as status for all tagged branches. Status can either be:
+             * - 0 if request is OPENED 
+             * - 1 if request is CLOSED
+             * - 2 if context was not found
+             */
+            metadata::Request::Status checkDetailedRequest(metadata::Request * request, 
+                const std::string& service, const std::string& region);
             
             /**
              * Check status of request for each available region and for a given contex (service)

@@ -1,6 +1,6 @@
 rendezvous: 
-  address_region_eu-central-1: rendezvous-eu:8001
-  address_region_us-east-1: rendezvous-us:8002
+  address_region_eu-central-1: localhost:8001
+  address_region_us-east-1: localhost:8002
 
 mysql:
   host_region_eu-central-1: antipode-lambda-eu.cluster-cowdztysvhul.eu-central-1.rds.amazonaws.com

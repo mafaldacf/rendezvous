@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 
 from plumbum import FG, local
+import yaml
 
-DURATION = 150
-THREADS = 200
-WORDS23 = False 
-EVAL_THESIS = [
-    # (clients, metadata)
-    #(1, 1),    (2, 1),    (3, 1),    (4, 1),    (5, 1),
-    (1, 10),   (2, 10),   (3, 10),   (4, 10),   (5, 10),
-    #(1, 100),  (2, 100),  (3, 100),  (4, 100),  (5, 100)
-]
+# start off by loading the master config file
+with open('configs/master.yml', 'r') as f:
+    config = yaml.safe_load(f)
+    DURATION = int(config['duration'])
+    THREADS = int(config['threads'])
+    WORDS23 = bool(config['words23'])
+    PARAMS = config['params'] 
 
-server_eval = local["./eval.py"] 
-server_eval['deploy-clients'] & FG
-for i, types in enumerate(EVAL_THESIS):
+eval_worker = local["./eval_worker.py"] 
+eval_worker['deploy-clients'] & FG
+for i, types in enumerate(PARAMS):
     clients, metadata = types
-    server_eval['restart-server'] & FG
+    eval_worker['restart-server'] & FG
 
     run_args = ['run-clients', 
         '-d', DURATION,
@@ -25,9 +24,10 @@ for i, types in enumerate(EVAL_THESIS):
         '-m', metadata]
     if WORDS23:
         run_args.append('-words')
+    
+    print('\n##### -----------------------------------------------')
+    print(f'##### Running eval {i+1}/{len(PARAMS)} for: {clients} clients, {metadata} metadata')
+    print('##### -----------------------------------------------\n')
 
-    print("\n##### -----------------------")
-    print(f"##### Running eval {i+1}/{len(EVAL_THESIS)} for: {clients} clients, {metadata} metadata")
-    print("##### -----------------------\n")
-    server_eval[run_args] & FG
+    eval_worker[run_args] & FG
     

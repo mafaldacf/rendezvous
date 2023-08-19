@@ -5,13 +5,14 @@
 # runs in the native OS without any containerization for better evaluation performance
 # 
 # As a result, it is necessary to create an EC2 instance and manually transfer the source code
-# Don't forget to edit the config.json file of the metadata server with only 1 replica!!
-# Additionally, it is also necessary to connect to the instance to build the project
-# The project can be built with ./manager.sh local build
+# Then, you connect to the EC2 instance and build the project with: ./manager.sh local build
 # --------------------------------------------------------------------------------------------
 
+# recommended to have a dedicated subfolder inside 'results'
 results_dir: "results/thesis"
+# make sure key has at least 500 permissions and we have the full path
 ssh_key_path: "/home/mafaldacf/.ssh/rendezvous-eu.pem"
+
 clients_ip: ["3.67.100.216", "3.74.169.111", "3.72.11.142", "3.79.17.232", "3.78.182.133"]
 server_ip: "3.75.223.255"
 server_port: 8001

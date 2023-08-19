@@ -1,61 +1,61 @@
 version: "3.9"
 services:
   metadata-server-eu:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     hostname: rendezvous-eu
     ports:
       - 8001:8001
-    entrypoint: sh -c "./manager.sh local run server eu docker.json"
+    entrypoint: sh -c "./manager.sh local run server eu remote.json"
   metadata-server-us:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     hostname: rendezvous-us
     ports:
       - 8002:8002
-    entrypoint: sh -c "./manager.sh local run server us docker.json"
+    entrypoint: sh -c "./manager.sh local run server us remote.json"
   datastore-monitor-cache-eu:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d cache -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-cache-us:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d cache -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-dynamo-eu:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d dynamo -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-dynamo-us:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d dynamo -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-mysql-eu:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d mysql -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-mysql-us:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d mysql -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-s3-eu:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d s3 -r eu"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config
       - /home/ubuntu/.aws/credentials:/root/.aws/credentials
   datastore-monitor-s3-us:
-    image: mafaldacf/rendezvous:latest
+    image: rendezvous:latest
     entrypoint: sh -c "cd datastore-monitor && python3 main.py -d s3 -r us"
     volumes:
       - /home/ubuntu/.aws/config:/root/.aws/config

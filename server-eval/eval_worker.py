@@ -27,7 +27,7 @@ GATHER_DELAY_CURRENT_THREAD = 5
 GATHER_DELAY_REMOTE_CLIENTS = 10
 
 # start off by loading the configuration file
-with open('config.yaml', 'r') as file:
+with open('configs/settings.yml', 'r') as file:
     config = yaml.safe_load(file)
     RESULTS_DIR = str(config['results_dir'])
     SSH_KEY_PATH = str(config['ssh_key_path'])
@@ -207,13 +207,13 @@ class EvalClient():
             rpc = self.stub.RegisterBranchesDatastores
             datastores = []
             for i in range(self.metadata):
-                datastores.append(f"awesome-datastore-{i}")
+                datastores.append(f"fabulous-datastore-{i}")
             request = pb.RegisterBranchesDatastoresMessage(rid=str(task_id), datastores=datastores, regions=["EU", "US"])
         else:
             rpc = self.stub.RegisterBranch
             regions = []
             for i in range(self.metadata):
-                regions.append(f"awesome-region-{i}")
+                regions.append(f"fabulous-region-{i}")
             request = pb.RegisterBranchMessage(rid=str(task_id), service="service", regions=regions)
         
         while self.do_send_requests:
@@ -258,7 +258,8 @@ class EvalClient():
         cmd = f'./eval.py run-local -c {client_id} -d {self.duration} -t {self.threads} -m {self.metadata} -ts {self.timestamp}'
         if self.words23:
             cmd += ' -w'
-        client.exec_command(f"cd {EVAL_DIR} && {cmd}", get_pty=True)
+        client.exec_command(f"cd {EVAL_DIR} && {cmd}")
+        client.close()
             
     def run_clients(self):
         print(f"[EVAL] START TIME: {self.timestamp}")
@@ -304,7 +305,7 @@ def _restart_server_native(client):
     # connect to the tmux session with:
     # > tmux attach-session -t rendezvous-server
     tmux_session_name = 'rendezvous-server'
-    tmux_command = './manager.sh local run server eu' #FIXME add single.json at the end
+    tmux_command = './manager.sh local run server eu single.json'
 
     client.exec_command(f"tmux kill-session -t {tmux_session_name}")
     # start server but do not wait for command to be executed

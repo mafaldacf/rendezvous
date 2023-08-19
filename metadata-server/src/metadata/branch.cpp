@@ -22,6 +22,10 @@ std::string Branch::getTag() {
     return _tag;
 }
 
+bool Branch::hasTag() {
+    return !_tag.empty();
+}
+
 std::string Branch::getService() {
     return _service;
 }
@@ -31,6 +35,20 @@ bool Branch::isClosed(std::string region) {
         return _opened_regions == 0;
     }
     return _regions[region] == CLOSED;
+}
+
+int Branch::getStatus(std::string region) {
+    if (region.empty()) {
+        if (_opened_regions == 0) {
+            return CLOSED;
+        }
+        return OPENED;
+    }
+    auto region_it = _regions.find(region);
+    if (region_it == _regions.end()) {
+        return UNKNOWN;
+    }
+    return _regions[region];
 }
 
 int Branch::close(const std::string &region) {

@@ -139,7 +139,8 @@ def plot_words23(annotate):
     fig, axes = plt.subplots(1, 2)
 
     # plot datapoints with datastore variation and force secondary color of searborn palette
-    ax_datastores = sns.lineplot(data=df_datastores, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[0])
+    ax_datastores = sns.lineplot(data=df_datastores, x="throughput", y="latency", hue='variation', 
+        style='variation', markers=['o'], ax=axes[0])
     ax_datastores.set_xlabel(None)
     ax_datastores.set_ylabel(None)
     ax_datastores.legend_.set_title(None)
@@ -150,7 +151,8 @@ def plot_words23(annotate):
         _annotate_datastores(ax_datastores, dps_datastores)
 
     # plot datapoints with client variation
-    ax_clients = sns.lineplot(data=df_clients, x="throughput", y="latency", hue='variation', style='variation', markers=['o'], ax=axes[1], palette=[sns.color_palette()[1]])
+    ax_clients = sns.lineplot(data=df_clients, x="throughput", y="latency", hue='variation', 
+        style='variation', markers=['o'], ax=axes[1], palette=[sns.color_palette()[1]])
     ax_clients.set_xlabel(None)
     ax_clients.set_ylabel(None)
     ax_clients.legend_.set_title(None)
@@ -198,14 +200,12 @@ def plot_thesis():
     
     df = pd.DataFrame.from_records(data)
     pp(df)
-    ax = sns.lineplot(data=df, x="throughput", y="latency", hue='regions', marker='o')
-    # reverse legend
-    handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles[::-1], labels[::-1],)
+    ax = sns.lineplot(data=df, x="throughput", y="latency", hue='regions', 
+        style='regions', markers=True, dashes=False, linewidth = 3)
 
     ax.set_xlabel('Throughput (req/s)')
     ax.set_ylabel('Latency (ms)')
-    ax.legend_.set_title(None)
+    ax.legend_.set_title('metadata')
 
     plot_name = f'plots/throughput_latency_thesis_{time.time()}.png'
     plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)

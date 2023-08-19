@@ -56,7 +56,9 @@ namespace replicas {
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, std::string id = "", int version = 0);
+            void sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+                const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
+                std::string id = "", int version = 0);
 
             /**
              * Send close branch call to all replicas

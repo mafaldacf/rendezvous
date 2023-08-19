@@ -24,24 +24,26 @@
 namespace metadata {
 
     class Request {
-
-        typedef struct ServiceBranchingStruct {
-            int num_opened_branches;
-            bool global;
-            std::unordered_map<std::string, int> opened_regions;
-            std::unordered_map<std::string, metadata::Branch*> tagged_branches;
-        } ServiceBranching;
-
-        /* request status */
-        static const int OPENED = 0;
-        static const int CLOSED = 1;
-        static const int UNKNOWN = 2;
-
-        /* branch tracking */
-        static const int REGISTER = 1;
-        static const int REMOVE = -1;
+        
+        public:
+            /* helper for checking detailed requests' status */
+            typedef struct StatusStruct {
+                int status;
+                std::map<std::string, int> detailed;
+            } Status;
 
         private:
+            /* track all branching information of a service */
+            typedef struct ServiceBranchingStruct {
+                int num_opened_branches;
+                std::unordered_map<std::string, int> opened_regions;
+                std::unordered_map<std::string, metadata::Branch*> tagged_branches;
+            } ServiceBranching;
+
+            /* request status */
+            static const int OPENED = 0;
+            static const int CLOSED = 1;
+            static const int UNKNOWN = 2;
 
             const std::string _rid;
             std::atomic<long> _next_id;
@@ -57,8 +59,11 @@ namespace metadata {
             /* -------------------- */
             // number of opened branches globally
             std::atomic<int> _num_opened_branches;
-            std::unordered_map<std::string, metadata::Branch*> _branches; // <bid, branch ptr>
+            // <bid, branch ptr>
+            std::unordered_map<std::string, metadata::Branch*> _branches;
+            // <service, service branching ptr>
             std::unordered_map<std::string, ServiceBranching> _service_branching;
+            // <region, STATUS>
             std::unordered_map<std::string, int> _opened_regions;
 
             /* ------------------- */
@@ -130,7 +135,8 @@ namespace metadata {
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, const std::string& tag, const utils::ProtoVec& regions);
+            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, 
+                const std::string& tag, const utils::ProtoVec& regions);
 
             /**
              * Remove a branch from the request
@@ -143,14 +149,14 @@ namespace metadata {
             int closeBranch(const std::string& bid, const std::string& region);
 
             /**
-             * Track branch (add or remove) according to its context (service, region or none) in the corresponding maps
+             * Untrack (remove) branch according to its context (service, region or none) in the corresponding maps
              *
              * @param service The service context
              * @param region The region context
-             * @param value The value (-1 if we are removing or 1 if we are adding) to be added to the current value in the map
-             * @param branch If we want to specify the tag for the service we need to provided the branch
+             * 
+             * @return true if successful and false otherwise
              */
-            void untrackBranch(const std::string& service, const std::string& region, long value, metadata::Branch * branch = nullptr);
+            bool untrackBranch(const std::string& service, const std::string& region);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
@@ -159,8 +165,11 @@ namespace metadata {
              * @param regions The regions for each branch
              * @param num The number of new branches
              * @param branch If we want to specify the tag for the service we need to provided the branch
+             * 
+             * @return true if successful and false otherwise
              */
-            void trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch = nullptr);
+            bool trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
+                metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed
@@ -188,7 +197,7 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              */
-            int waitOnService(const std::string& service, const std::string& tag, bool async, int timeout);
+            int waitService(const std::string& service, const std::string& tag, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
@@ -203,7 +212,7 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              */
-            int waitOnRegion(const std::string& region, bool async, int timeout);
+            int waitRegion(const std::string& region, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service and region)
@@ -220,7 +229,8 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              */
-            int waitOnServiceAndRegion(const std::string& service, const std::string& region, const std::string& tag, bool async, int timeout);
+            int waitServiceRegion(const std::string& service, const std::string& region, 
+                const std::string& tag, bool async, int timeout);
 
             /**
              * Check status of request
@@ -229,7 +239,7 @@ namespace metadata {
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            int getStatus();
+            Status getStatus();
 
             /**
              * Check status of request for a given context (region)
@@ -241,32 +251,34 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            int getStatusOnRegion(const std::string& region);
+            Status getStatusRegion(const std::string& region);
 
             /**
              * Check status of request for a given context (service)
              *
              * @param service The name of the service that defines the waiting context
+             * @param detailed Detailed description of status for all tagged branches
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            int getStatusOnService(const std::string& service);
+            Status getStatusService(const std::string& service, bool detailed = false);
 
             /**
              * Check status of request for a given context (service and region)
              *
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
+             * @param detailed Detailed description of status for all tagged branches
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            int getStatusOnServiceAndRegion(const std::string& service, const std::string& region);
+            Status getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
 
             /**
              * Check status of request for each available region and for a given contex (service)

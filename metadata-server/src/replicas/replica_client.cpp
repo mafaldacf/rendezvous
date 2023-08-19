@@ -20,11 +20,8 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
         const size_t tag = size_t(tagPtr);
         const grpc::Status & status = *(req_helper.statuses[tag-1].get());
 
-        if (status.ok()) {
-            //spdlog::debug("{} RPC #{} OK", request.c_str(), tag);
-        }
-        else {
-            //spdlog::debug("{} RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
+        if (!status.ok()) {
+            spdlog::error("[REPLICA CLIENT - {}] RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
         }
     }
 }
@@ -52,16 +49,16 @@ void ReplicaClient::sendRegisterRequest(const std::string& rid) {
             req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Register Request", req_helper);
+        waitCompletionQueue("RR", req_helper);
 
      }).detach();
 }
 
-void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, 
-    const std::string& service, const google::protobuf::RepeatedPtrField<std::string>& regions, 
+void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+    const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     std::string id, int version) {
 
-    std::thread([this, rid, bid, service, regions, id, version]() {
+    std::thread([this, rid, bid, service, tag, regions, monitor, id, version]() {
         struct RequestHelper req_helper;
 
         for (const auto& server : _servers) {
@@ -78,6 +75,8 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
             request.set_rid(rid);
             request.set_bid(bid);
             request.set_service(service);
+            request.set_tag(tag);
+            request.set_monitor(monitor);
             request.mutable_regions()->CopyFrom(regions);
 
             if (CONTEXT_PROPAGATION) {
@@ -93,7 +92,7 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
             req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Register Branches", req_helper);
+        waitCompletionQueue("RB", req_helper);
 
     }).detach();
 }
@@ -131,7 +130,7 @@ void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& r
             req_helper.nrpcs++;
         }
 
-        waitCompletionQueue("Close Branch", req_helper);
+        waitCompletionQueue("CB", req_helper);
 
     }).detach();
 }

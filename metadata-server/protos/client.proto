@@ -5,7 +5,6 @@ package rendezvous;
 service ClientService {
   /* Streaming */
   rpc Subscribe(SubscribeMessage) returns (stream SubscribeResponse);
-
   /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
@@ -17,56 +16,48 @@ service ClientService {
 }
 
 /* Helpers */
-
 enum RequestStatus {
   OPENED = 0;
   CLOSED = 1;
   UNKNOWN = 2;
 }
-
 message Empty {
 
 }
 
 /* Metadata for server replication */
-
 message RequestContext {
   map<string, int32> versions = 1;
 }
 
 /* Publish-Subscribe */
-
 message SubscribeMessage {
   string service = 1;
   string region = 2;
 }
-
 message SubscribeResponse {
   string bid = 1;
   string tag = 2;
 }
 
 /* Register Request */
-
 message RegisterRequestMessage {
   string rid = 1;
 }
-
 message RegisterRequestResponse {
   string rid = 1;
   RequestContext context = 2;
 }
 
 /* Registers Branches */
-
 message RegisterBranchMessage {
   string rid = 1;
   string service = 2;
   string tag = 3;
   repeated string regions = 4;
-  RequestContext context = 5;
+  bool monitor = 5;
+  RequestContext context = 6;
 }
-
 message RegisterBranchResponse {
   string rid = 1;
   string bid = 2;
@@ -74,13 +65,11 @@ message RegisterBranchResponse {
 }
 
 /* Register Branches - SERVERLESS VERSION */
-
 message DatastoreBranching {
   string datastore = 1;
   string tag = 2;
   repeated string regions = 3;
 }
-
 message RegisterBranchesDatastoresMessage {
   string rid = 1;
   repeated string datastores = 2;
@@ -89,7 +78,6 @@ message RegisterBranchesDatastoresMessage {
   repeated DatastoreBranching branches = 5;
   RequestContext context = 6;
 }
-
 message RegisterBranchesDatastoresResponse {
   string rid = 1;
   repeated string bids = 2;
@@ -97,15 +85,14 @@ message RegisterBranchesDatastoresResponse {
 }
 
 /* Close Branch */
-
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
-  RequestContext context = 3;
+  bool force = 3;
+  RequestContext context = 4;
 }
 
 /* Wait Request */
-
 message WaitRequestMessage {
   string rid = 1;
   string service = 2;
@@ -115,14 +102,12 @@ message WaitRequestMessage {
   //bool async = 6;
   RequestContext context = 7;
 }
-
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
   bool timed_out = 2;
 }
 
 /* Check Request */
-
 message CheckRequestMessage {
   string rid = 1;
   string service = 2;
@@ -130,20 +115,17 @@ message CheckRequestMessage {
   bool detailed = 4;
   RequestContext context = 5;
 }
-
 message CheckRequestResponse {
   RequestStatus status = 1;
+  map<string, RequestStatus> detailed = 2;
 }
 
 /* Check Request by Regions */
-
 message CheckRequestByRegionsMessage {
   string rid = 1;
   string service = 2;
-  bool detailed = 3;
-  RequestContext context = 4;
+  RequestContext context = 3;
 }
-
 message CheckRequestByRegionsResponse {
-  map<string, RequestStatus> statuses = 1;
+  map<string, RequestStatus> status = 1;
 }

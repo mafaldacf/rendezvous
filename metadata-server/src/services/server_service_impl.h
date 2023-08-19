@@ -18,6 +18,7 @@ namespace service {
     class ServerServiceImpl final : public rendezvous_server::ServerService::Service {
 
         private:
+            bool _CONSISTENCY_CHECKS;
             std::shared_ptr<rendezvous::Server> _server;
 
         public:

@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(CONFIG_ONLY "Compile only config.json file" OFF)
+option(TESTS "Compile rendezvous with GTests" OFF)
 
 if(NOT TARGET spdlog)
     # Stand-alone build
@@ -12,24 +13,25 @@ if(NOT TARGET spdlog)
 endif()
 
 
-if (CONFIG_ONLY)
-    message("[INFO] Copying config files...")
-    configure_file(configs/config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
-    configure_file(configs/docker.json ${CMAKE_CURRENT_BINARY_DIR}/docker.json COPYONLY)
-    configure_file(configs/local.json ${CMAKE_CURRENT_BINARY_DIR}/local.json COPYONLY)
-    configure_file(configs/single.json ${CMAKE_CURRENT_BINARY_DIR}/single.json COPYONLY)
-else()
-    message("[INFO] Building rendezvous...")
-    configure_file(configs/config.json ${CMAKE_CURRENT_BINARY_DIR}/config.json COPYONLY)
-    configure_file(configs/docker.json ${CMAKE_CURRENT_BINARY_DIR}/docker.json COPYONLY)
-    configure_file(configs/local.json ${CMAKE_CURRENT_BINARY_DIR}/local.json COPYONLY)
-    configure_file(configs/single.json ${CMAKE_CURRENT_BINARY_DIR}/single.json COPYONLY)
+message("[INFO] Copying config files...")
+# Copy all JSON config files from configs/ directory
+file(GLOB config_files ${CMAKE_SOURCE_DIR}/configs/*.json)
+foreach(config ${config_files})
+    get_filename_component(config_filename ${config} NAME)
+    configure_file(${config} ${CMAKE_CURRENT_BINARY_DIR}/${config_filename} COPYONLY)
+endforeach()
+
+if(NOT CONFIG_ONLY)
+    message("[INFO] Building rendezvous project")
     include(cmake/FindgRPC.cmake)
     include(cmake/CompileProtos.cmake)
     #include(cmake/FindTBB.cmake)
     compile_protos(client)
     compile_protos(server)
-
     add_subdirectory(src)
-    #add_subdirectory(test)
+
+    if (TESTS)
+        message("[INFO] Building rendezvous tests")
+        add_subdirectory(test)
+    endif()
 endif()

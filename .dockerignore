@@ -1,0 +1,6 @@
+server-eval/
+metadata-server/cmake/build
+Dockerfile.deps
+README.md
+deps.sh
+docker-compose.yml

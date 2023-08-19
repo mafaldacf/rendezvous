@@ -161,13 +161,13 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   ASSERT_EQ(true, found_region);
 
   // Sanity Check - ensure that locks still work
-  bid =  server.registerBranchRegion(request, "storage", "EU", _TAG); // bid = 4
+  bid =  server.registerBranchRegion(request, "storage", "EU", "tagA"); // bid = 4
   ASSERT_EQ(_getFullBid(request->getRid(), 4), bid);
 
-  bid =  server.registerBranchRegion(request, "storage", "US", _TAG); // bid = 5
+  bid =  server.registerBranchRegion(request, "storage", "US", "tagB"); // bid = 5
   ASSERT_EQ(_getFullBid(request->getRid(), 5), bid);
 
-  bid =  server.registerBranchRegion(request, "notification", "GLOBAL", _TAG); // bid = 6
+  bid =  server.registerBranchRegion(request, "notification", "GLOBAL", "tagC"); // bid = 6
   ASSERT_EQ(_getFullBid(request->getRid(), 6), bid);
 
   threads.emplace_back([&server, request] {

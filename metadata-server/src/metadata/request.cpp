@@ -49,9 +49,13 @@ metadata::Branch * Request::registerBranch(const std::string& bid, const std::st
     }
 
     metadata::Branch * branch = new metadata::Branch(service, tag, regions);
-    _branches[bid] = branch;
     int num = regions.size();
-    trackBranch(service, regions, num, branch);
+    // error tracking branch (tag already exists!)
+    if (!trackBranch(service, regions, num, branch)) {
+        delete branch;
+        return nullptr;
+    }
+    _branches[bid] = branch;
     refreshLastTs();
     return branch;
 }
@@ -71,94 +75,88 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
 
     int r = branch->close(region);
     if (r == 1) {
-        untrackBranch(service, region, REMOVE);
+        untrackBranch(service, region);
         refreshLastTs();
         _cond_branches.notify_all();
     }
     return r;
 }
 
-void Request::untrackBranch(const std::string& service, const std::string& region, long value, metadata::Branch * branch) {
-    _num_opened_branches.fetch_add(value);
+bool Request::untrackBranch(const std::string& service, const std::string& region) {
+    _num_opened_branches.fetch_add(-1);
 
-    // service context
+    /* --------------- */
+    /* service context */
+    /* --------------- */
     if (!service.empty()) {
         std::unique_lock<std::mutex> lock(_mutex_service_branching);
-        _service_branching[service].num_opened_branches += value;
+        _service_branching[service].num_opened_branches -= 1;
         // service and region context
         if (!region.empty()) {
-            _service_branching[service].opened_regions[region] += value;
+            _service_branching[service].opened_regions[region] -= 1;
         }
 
-        // specify tag for service operation
-        if (branch != nullptr) {
-            _service_branching[service].tagged_branches[branch->getTag()] = branch;
-        }
-        // branch is global to the current service (no tag specified)
-        else {
-            _service_branching[service].global = true;
-        }
-
-        // notify upon removal and creation (due to async waits)
-        if (value == REMOVE) {
-            _cond_service_branching.notify_all();
-        } else {
-            _cond_new_service_branching.notify_all();
-        }
+        // notify creation of new branch
+        _cond_service_branching.notify_all();
     }
-    // region context
+
+    /* -------------- */
+    /* region context */
+    /* -------------- */
     if (!region.empty()) {
         std::unique_lock<std::mutex> lock(_mutex_opened_regions);
-        _opened_regions[region] += value;
+        _opened_regions[region] -= 1;
 
-        // notify upon removal and creation (due to async waits)
-        if (value == REMOVE) {
-            _cond_opened_regions.notify_all();
-        } else {
-            _cond_new_opened_regions.notify_all();
-        }
+        // notify creation of new branch
+        _cond_opened_regions.notify_all();
     }
+    return true;
 }
 
-void Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch) {
+bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch) {
     _num_opened_branches.fetch_add(num);
-
-    // service context
+    /* --------------- */
+    /* service context */
+    /* --------------- */
     if (!service.empty()) {
+        // validate tag
         std::unique_lock<std::mutex> lock_services(_mutex_service_branching);
+        if (branch->hasTag()) {
+            // unique tag already exists: undo changes and return error
+            if (_service_branching[service].tagged_branches.count(branch->getTag()) != 0) {
+                _num_opened_branches.fetch_add(-num);
+                return false;
+            }
+            _service_branching[service].tagged_branches[branch->getTag()] = branch;
+        }
+
+        // track on <service, region> and <region> contexts
         _service_branching[service].num_opened_branches += num;
-        // service and region context + region only context
         std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
         for (const auto& region : regions) {
             if (!region.empty()) {
-                _service_branching[service].opened_regions[region] += 1; // SERVICE + REGION
-                _opened_regions[region] += 1; // REGION
+                _service_branching[service].opened_regions[region] += 1;
+                _opened_regions[region] += 1;
             }
         }
-        // specify tag for service operation
-        if (branch != nullptr) {
-            _service_branching[service].tagged_branches[branch->getTag()] = branch;
-        }
-        // branch is global to the current service (no tag specified)
-        else {
-            _service_branching[service].global = true;
-        }
-
         // notify upon creation (due to async waits)
         _cond_new_service_branching.notify_all();
     }
-    // region context
+
+    /* -------------- */
+    /* region context */
+    /* -------------- */
     else {
         std::unique_lock<std::mutex> lock(_mutex_opened_regions);
         for (const auto& region : regions) {
             if (!region.empty()) {
-                _opened_regions[region] += 1; // REGION
+                _opened_regions[region] += 1;
             }
         }
-
         // notify upon creation (due to async waits)
         _cond_new_opened_regions.notify_all();
     }
+    return true;
 }
 
 std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time) {
@@ -186,7 +184,7 @@ int Request::wait(int timeout) {
     return inconsistency;
 }
 
-int Request::waitOnService(const std::string& service, const std::string& tag, bool async, int timeout) {
+int Request::waitService(const std::string& service, const std::string& tag, bool async, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -247,7 +245,7 @@ int Request::waitOnService(const std::string& service, const std::string& tag, b
     return inconsistency;
 }
 
-int Request::waitOnRegion(const std::string& region, bool async, int timeout) {
+int Request::waitRegion(const std::string& region, bool async, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -287,7 +285,7 @@ int Request::waitOnRegion(const std::string& region, bool async, int timeout) {
     return inconsistency;
 }
 
-int Request::waitOnServiceAndRegion(const std::string& service, const std::string& region, 
+int Request::waitServiceRegion(const std::string& service, const std::string& region, 
 const::std::string& tag, bool async, int timeout) {
 
     int inconsistency = 0;
@@ -355,49 +353,87 @@ const::std::string& tag, bool async, int timeout) {
     return inconsistency;
 }
 
-int Request::getStatus() {
+Request::Status Request::getStatus() {
     if (_num_opened_branches.load() == 0) {
-        return CLOSED;
+        return {CLOSED};
     }
-    return OPENED;
+    return {OPENED};
 }
 
-int Request::getStatusOnService(const std::string& service) {
-    std::unique_lock<std::mutex> lock(_mutex_service_branching);
-    if (!_service_branching.count(service)) {
-        return UNKNOWN;
-    }
-    if (_service_branching[service].num_opened_branches == 0) {
-        return CLOSED;
-    }
-    return OPENED;
-}
-
-int Request::getStatusOnRegion(const std::string& region) {
+Request::Status Request::getStatusRegion(const std::string& region) {
     std::unique_lock<std::mutex> lock(_mutex_opened_regions);
     if (!_opened_regions.count(region)) {
-        return UNKNOWN;
+        return {UNKNOWN};
     }
     if (_opened_regions[region] == 0) {
-        return CLOSED;
+        return {CLOSED};
     }
-    return OPENED;
+    return {OPENED};
 }
 
-int Request::getStatusOnServiceAndRegion(const std::string& service, const std::string& region) {
+Request::Status Request::getStatusService(const std::string& service, bool detailed) {
     std::unique_lock<std::mutex> lock(_mutex_service_branching);
+    int status;
+
+    // find out if service context exists
+    if (!_service_branching.count(service)) {
+        return {UNKNOWN};
+    }
+    
+    // get overall status of request
+    if (_service_branching[service].num_opened_branches == 0) {
+        status = CLOSED;
+    } else {
+        status = OPENED;
+    }
+
+    // return if client only wants basic information (status)
+    if (!detailed) {
+        return {status};
+    }
+
+    // otherwise, return detailed information
+    Request::Status res;
+    res.status = status;
+    for (const auto& branch_it: _service_branching[service].tagged_branches) {
+        res.detailed[branch_it.first] = branch_it.second->getStatus();
+    }
+    return res;
+}
+
+Request::Status Request::getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
+    std::unique_lock<std::mutex> lock(_mutex_service_branching);
+    int status;
+
+    // find out if service context exists
     auto service_it = _service_branching.find(service);
     if (service_it == _service_branching.end()) {
-        return UNKNOWN;
+        return {UNKNOWN};
     }
     auto region_it = service_it->second.opened_regions.find(region);
     if (region_it == service_it->second.opened_regions.end()) {
-        return UNKNOWN;
+        return {UNKNOWN};
     }
+    
+    // get overall status of request
     if (_service_branching[service].opened_regions[region] == 0) {
-        return CLOSED;
+        status = CLOSED;
+    } else {
+        status = OPENED;
     }
-    return OPENED;
+
+    // return if client only wants basic information (status)
+    if (!detailed) {
+        return {status};
+    }
+
+    // otherwise, return detailed information
+    Request::Status res;
+    res.status = status;
+    for (const auto& branch_it: _service_branching[service].tagged_branches) {
+        res.detailed[branch_it.first] = branch_it.second->getStatus();
+    }
+    return res;
 }
 
 std::map<std::string, int> Request::getStatusByRegions() {

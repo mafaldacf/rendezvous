@@ -1,103 +1,199 @@
-# Rendezvous
+Instituto Superior Técnico
 
-Request workflow monitor for microservice-web based applications.
+Master's Degree in Computer Science and Engineering
 
-Available commands:
+Thesis 2022/2023
 
-- `Register Request` - register a new request in the system
-- `Register Branch` - register a new branch concerning a previously registered request
+# Rendezvous: Request Workflow Monitor for Microservice-based Web Applications
+
+## Rendezvous API Overview
+
+**Metadata Server API**
+
+- `Register Request` - register a new request 
+- `Register Branch` - register a new branch
 - `Close Branch` - close a branch
-- `Wait Request` - wait until a request is completed, i.e., all branches are closed given a context
-- `Check Request` - check request status according to its branches
-- `Check Request by Regions` - check request status per region according to its branches
-- `Get Prevented Inconsistencies` - check number of inconsistencies prevented so far
+- `Wait Request` - wait until a request is completed for a given context
+- `Check Request` - check request status for a given status
+- `Check Request by Regions` - check request status per region for a given status
+
+**Client Shim API**
+
+- `write(k, v, m)` - intermediates communication between a subsystem and a datastore and injects rendezvous metadata
+
+**Datastore Monitor Shim API**
+
+- `find(m)` - lookup for injected metadata in a datastore and return acknowledgment to datastore monitor
 
 ## Requirements
 
-- C++
-- Python
-- gRPC: framework of remote procedure calls that supports client and server communication
-- Protobuf: cross-platform data used to serialize structured data
-- CMake: open-source build system generator that manages the build process
-- GoogleTest: unit testing library for C++
+- **C++** (version used: 11.4.0)
+- **Python** (version used: 3.10.12)
+- **Docker** (version used: 20.10.21)
+- **Docker Compose** (version used: 1.29.2)
+
+Local deployment:
+
+- [gRPC](https://grpc.io/): *Modern open source high performance Remote Procedure Call (RPC) framework*
+- [Protobuf](https://protobuf.dev/): *Language-neutral, platform-neutral extensible mechanisms for serializing structured data*
+- [CMake](https://cmake.org/): *Open-source, cross-platform family of tools designed to build, test and package software*
+- [GoogleTest](http://google.github.io/googletest/): *Google's C++ testing and mocking framework*
+- [nlohmann JSON](https://github.com/nlohmann/json): *JSON for Modern C++*
+- [spdlog](https://github.com/gabime/spdlog): *Very fast, header-only/compiled, C++ logging library*
 
 ## Getting Started
 
-Install gRPC and its dependencies for C++: [gRPC Quick Start](https://grpc.io/docs/languages/cpp/quickstart/#install-grpc)
-Install gRPC and its dependencies for Python: [gRPC Quick Start](https://grpc.io/docs/languages/python/quickstart/)
+Install Python dependencies for evaluation:
 
-Install GoogleTest: [Generic Build Instructions: Standalone CMake Project](https://github.com/google/googletest/blob/main/googletest/README.md#standalone-cmake-project)
+    pip install -r server-eval/requirements.txt
 
-## Deploying server on AWS EC2 using Docker
+Install Python dependencies for local deployment (optional):
 
-1. Go to AWS and create a repository in Elastic Container Registry (ECR) in `eu-central-1` region
-    - Repository name: `rendezvous`
-    - Obtain the repository URI
+    pip install -r datastore-monitor/requirements.txt
 
-2. Push docker image to ECR
-    - Install and configure aws cli to setup keys (access key & secret access key) and default region `eu-central-1`
-        > sudo apt install awscli
-        > aws configure
-    - Build and upload docker image
-    [NOTE]: when trying to login to aws ecr use the following 2nd command instead of the one provided in the aws instructions, otherwise it won't work ([ref](https://stackoverflow.com/questions/60583847/aws-ecr-saying-cannot-perform-an-interactive-login-from-a-non-tty-device-after))
-    [NOTE]: make sure you tag your new docker image as stated in the 3rd command (`<ecr_uri>:latest`)
-        > docker build -t rendezvous .
-        > aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin 851889773113.dkr.ecr.eu-central-1.amazonaws.com
-        > docker tag rendezvous:latest 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
-        > docker push 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
+Install C++ dependencies for local deployment (optional):
 
-3. Go to AWS and create an EC2 instance:
-    - Instance name: `rendezvous`
-    - Generate a new key pair `<rendezvous-eu>`
-    - Save the private key in a secure directory (e.g. `~/.ssh/`), otherwise you will not be able to establish a SSH connection
-        > cp rendezvous-eu.pem ~/.ssh/
-        > sudo chmod 400 ~/.ssh/rendezvous-eu.pem
-    - Obtain the public ip of your EC2 instance
-    - Go to to AWS VPC and configure the security group selected for your new instance:
-      - Add the following inbound rules:
-        - SSH connections on port 22 from your public IP (just to be cautious)
-        - TCP connections on port 8000 from any IPv4 address (0.0.0.0/0)
-        - TCP connections on port 8000 from any IPv6 address (::/0)
-      - Add the following outbound rules:
-        - All traffic to any IPv4 address (0.0.0.0/0)
-        - All traffic to any IPv6 address (::/0)
+    ./deps.sh
 
-4. Connect to your EC2 instance via SSH and retrieve docker image from repository
-    - Connect via SSH
-        > ssh -i "~/.ssh/rendezvous-eu.pem" ubuntu@ec2-3-127-152-89.eu-central-1.compute.amazonaws.com
-        > ssh -i "~/.ssh/rendezvous-us.pem" ubuntu@ec2-52-207-103-61.compute-1.amazonaws.com
-    - Install the necessary tools and configure aws cli to setup keys (access key & secret access key) and default region `eu-central-1`
-        > sudo apt-get update -y
-        > sudo apt install docker.io awscli -y
-        > aws configure
-    - Pull the docker image
-        > sudo docker login -u AWS -p $(aws ecr get-login-password --region eu-central-1) 851889773113.dkr.ecr.eu-central-1.amazonaws.com
-        > sudo docker pull 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
+## Testing Rendezvous Metadata Server Locally
 
-5. Run rendezvous server inside your EC2 instance
+Go to `metadata-server/configs` and configure your own json file. 
+You can use `single.json` to run a single server locally.
 
-    [NOTE]: make sure you bind your server to *0.0.0.0* to listen to all interfaces, otherwise it won't work and you'll get connection refused ([ref](https://pythonspeed.com/articles/docker-connection-refused/))
+Make sure you have installed all the necessary local dependencies for Python and C++.
 
-    > sudo docker run -it -p 8001:8001 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous
-    > sudo docker run -it -p 8002:8002 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous
+### Metadata Server Deployment (1/2): Native OS
 
-## Running server on local Docker container
+Build and run project
 
-> docker build -t rendezvous .
-> docker run -it -p 8000:8000 rendezvous
+    ./manager.sh local build
+    ./manager.sh local run server <region> <config>
 
-## Running project locally
+Clean generated files
 
-- Build and run project
+    ./manager.sh local clean
 
-> ./start.sh make
-> ./start.sh run server
-> ./start.sh run client
-
-- Clean generated files
-
-> ./start.sh clean
-
-- Run tests
+Run GoogleTest tests
   
-> ./start.sh run tests
+    ./manager.sh local run tests
+
+### Metadata Server Deployment (2/2): Docker
+
+Build project:
+
+    docker build -t rendezvous .
+
+Run with docker:
+
+    docker run -it -p 8000:8000 rendezvous ./manager.sh run server eu single.json
+
+Or run with docker-compose:
+
+    docker-compose run metadata-server-eu
+
+### Testing Metadata Server with a Simple Client
+
+Generate Python Protobuf files
+
+    ./manager.sh local build-py-proto
+
+Run your client
+
+    ./manager.sh local run client
+
+You can also test the monitor example that simply subscribes the server
+
+    ./manager.sh local run monitor
+
+## Evaluation
+
+This section presents a quick guide on how to deploy Rendezvous for all three evaluations.
+
+### Getting Started
+
+Both Post-Notification and Rendezvous Metadata Server evaluations will be using AWS EC2 instances. For that reason, we create the following AMI:
+
+1. Go to AWS EC2 in `eu-central-1` and create a new key pair `rendezvous-eu`, add permissions `sudo chmod 500 rendezvous-eu.pem`, and copy to `~/.ssh/rendezvous-eu`.
+2. Go to Instances and launch a new instance with the following settings:
+    - AMI: `Ubuntu 22.04 LTS`
+    - Instance type: `t2.medium` (cheaper instances with fewer vCPUs will not be able to build the project with CMake)
+    - Select the previously created keypair `rendezvous-eu`
+    - For now you can use the default VPC and Security Group settings
+3. In the local project folder, edit the `manager.sh` script with the public IP and keypair path of the new instance
+4. Upload the project with `./manager.sh remote deploy`. Note that this might take a long time. If you encounter any problems (especially running the dependencies script or building the C++ project) you should do it mannually
+5. In AWS EC2 Instances, select your instance and go to 'Actions' -> 'Image and Templates' -> 'Create Image' to create a new `rendezvous` AMI
+6. When the AMI is ready, select it, go to 'Actions' -> 'Copy AMI', choose the US East (N. Virginia) (`us-east-1`) and copy the AMI
+
+Now you have two `rendezvous` AWS EC2 AMIs in `eu-central-1` and `us-east-1` =)
+
+At the end, perform the 1st step but now from `us-east-1` region and `rendezvous-us` keypair.
+
+### Post-Notification
+
+For this microbenchmark, Rendezvous is deployed AWS, in two EC2 `t2.xlarge` (4 vCPU and 16 GiB RAM) instances for both primary (`eu-central-1`) and secondary (`us-east-1`) regions. Before preciding, make sure you already setup the Post-Notification VPC according to the README of the `antipode-post-notification` repository.
+
+For both `eu-central-1` and `us-east-1` do the following:
+1. Create a new Security Group `rendezvous` for the Post-Notification VPC `antipode-mq`
+2. Add the following inbound rules
+   - SSH from any IPv4 source (0.0.0.0/0)
+   - Custom TCP from any IPv4 source (0.0.0.0/0). Port is `8001` if in EU and `8002` if in US.
+3. Launch a new EC2 instance:
+   - AMI: previous created `rendezvous` image from 'My AMIs'
+   - Instance type: `t2.xlarge`
+   - Keypair: `rendezvous-eu` if in EU and `rendezvous-us` if in US
+   - Select the `antipode-mq` VPC and the previously created Security Group
+   - Make sure a public IP is assigned (for deployment with `redis`, the private IP is the one used for the connections file of the Post Notification)
+
+Now that both instances are running, go to your local project folder  
+    - Edit the `manager.sh` parameters for public IPs and keypair paths
+    - Edit the `metadata-server/configs/remote.json` with the public IPs
+
+
+Prior to each Post-Notification deployment of the post-storage (dynamo, s3, cache, redis) and notification-storage (sns), run:
+    
+    ./manager.sh remote start {dynamo, s3, cache, mysql}
+
+After each deployment, stop Rendezvous:
+
+    ./manager.sh remote stop 
+
+At the end, don't forget to terminate both instances.
+
+#### (Easy and) Alternative Rendezvous Deployment
+
+Although Rendezvous was deployed in native OS for the **official** evaluation with Post-Notification, it can also be deployed using Docker, which is way easier. After creating the EC2 instance for both regions, configure the `manager.sh` script parameters and run the following commands as required:
+
+    ./manager.sh docker deploy
+    ./manager.sh docker start {dynamo, s3, cache, mysql}
+    ./manager.sh docker stop
+
+### DeathStarBench
+
+For this benchmark, Rendezvous is deployed using Docker along with the remaining microservices.
+
+You just simply need to build Rendezvous and you are ready to go with the README instructions of the `antipode-deathstarbench` repository:
+
+    docker build -t rendezvous .
+
+In the `antipode-deathstarbench` repository, the plots and results are obtained by configuring `plots/configs/rendezvous.yml`:
+
+    ./plot plots/configs/rendezvous.yml --plots throughput_latency_with_consistency_window
+    ./plot plots/configs/rendezvous.yml --plots storage_overhead
+    ./plot plots/configs/rendezvous.yml --plots rendezvous_info
+
+### Rendezvous Metadata Server
+
+For this evaluation, we deployed 1 metadata server and 1-5 clients in AWS using EC2 instances in `eu-central-1` with the previously created AMI:
+
+1. Go to AWS EC2 and launch 1 instance for the `metadata server` and 5 instances for the `clients` (you can select the number of instances to launch instead of doing it manually). For each instance, use the following settings:
+   - AMI: previous created `rendezvous` image from 'My AMIs'
+   - Instance type: `t2.xlarge`
+   - Keypair: `rendezvous-eu`
+   - Select the `antipode-mq` VPC and the previously created Security Group
+   - Make sure a public IP is assigned
+2. Configure your instance connections in `server-eval/configs/settings.yaml`
+3. Configure your deployment types (by default, these correspond to the combinations used in the **official** evaluation)
+
+You can now relax and run the evaluation from the `server-eval` folder:
+
+    ./eval_master.py

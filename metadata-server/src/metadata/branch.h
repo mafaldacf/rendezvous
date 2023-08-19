@@ -13,6 +13,7 @@ namespace metadata {
         
         static const int OPENED = 0;
         static const int CLOSED = 1;
+        static const int UNKNOWN = 2;
 
         private:
             const std::string _service;
@@ -34,6 +35,13 @@ namespace metadata {
             std::string getTag();
 
             /**
+             * Return whether a tag was assigned to this branch
+             * 
+             * @return true if tag exists and false otherwise
+             */
+            bool hasTag();
+
+            /**
              * Get service of the object
              * 
              * @return service 
@@ -41,11 +49,18 @@ namespace metadata {
             std::string getService();
 
             /**
-             * Check if branch is closed for a given region (or globally)
+             * Check if branch is closed for a given region or globally
              * 
              * @param region if empty, status is checked globally
             */
             bool isClosed(std::string region = "");
+
+            /**
+             * Return branch status for a given region or globally
+             * 
+             * @param region if empty, status is checked globally
+            */
+            int getStatus(std::string region = "");
 
             /**
              * Set status to close for a given region

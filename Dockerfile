@@ -3,11 +3,5 @@ FROM mafaldacf/rendezvous-deps:latest
 WORKDIR /app
 COPY . .
 
-RUN cd datastore-monitor ;\
-    pip install -r requirements.txt
-
-RUN cd server-eval ;\
-    pip install -r requirements.txt
-
-RUN ./manager.sh local clean ;\
-    ./manager.sh local build
+RUN pip install -r datastore-monitor/requirements.txt
+RUN ./manager.sh local clean && ./manager.sh local build

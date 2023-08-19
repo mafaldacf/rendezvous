@@ -31,7 +31,6 @@ std::unique_ptr<grpc::Server> server;
 std::unique_ptr<service::ClientServiceImpl> client_service;
 std::unique_ptr<service::ServerServiceImpl> server_service;
 
-// NOTE: causes mutex deadlock because of server->Wait
 void sigintHandler(int sig) {
   server->Shutdown();
 }
@@ -102,7 +101,7 @@ void loadConfig() {
 }
 
 void usage(char *argv[]) {
-  spdlog::error("Usage: {} <replica_id> <config_file>", argv[0]);
+  spdlog::error("Usage: {} REPLICA_ID CONFIG", argv[0]);
 
   // TODO for oficial code
   // std::cout << "Usage: " << argv[0] << " [--debug] [--logs] [--no_consistency_checks] <_replica_id>" << std::endl;
