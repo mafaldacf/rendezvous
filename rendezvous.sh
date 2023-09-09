@@ -1,8 +1,25 @@
 #!/bin/bash
 
+# ----------------
+# AWS EC2 settings
+# ----------------
+EC2_USERNAME="ubuntu"
+HOSTNAME_EU="3.127.70.27"
+HOSTNAME_US="54.204.137.41"
+SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
+SSH_KEY_US="~/.ssh/rendezvous-us.pem"
+SERVER_PORT_EU=8001
+SERVER_PORT_US=8002
+
+# -----------------
+# Docker deployment
+# -----------------
+DOCKER_REPOSITORY_USERNAME="mafaldacf"
+AWS_ACCOUNT_ID=851889773113
+
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
+    echo "> ./rendezvous.sh local clean, build, deploy [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
     echo "> ./rendezvous.sh remote {deploy {eu, us}, update {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
     echo "> ./rendezvous.sh docker {deploy {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
@@ -14,17 +31,6 @@ exit_usage() {
     usage
     exit 1
 }
-
-HOSTNAME_EU="18.184.132.153"
-HOSTNAME_US="52.87.244.150"
-
-SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
-SSH_KEY_US="~/.ssh/rendezvous-us.pem"
-
-SERVER_PORT_EU=8001
-SERVER_PORT_US=8002
-
-DOCKER_REPOSITORY_USERNAME="mafaldacf"
 
 # ------
 # LOCAL
@@ -118,21 +124,21 @@ remote_deploy() {
     echo "(1/6) Cleaned local cmake files"
 
     cmd="rm -rf rendezvous && mkdir rendezvous"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "(2/6) Cleaned EC2 instance workspace"
 
-    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "ubuntu@$hostname:rendezvous"
+    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "${EC2_USERNAME}@$hostname:rendezvous"
     echo "(3/6) Copied project"
 
     cmd="sudo chmod 700 *.sh"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "(4/6) Granted access to rendezvous scripts"
 
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname"
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname"
     sudo ./deps.sh
     echo "(5/6) Installed dependencies"
 
-    ssh -i "$ssh_key" "ubuntu@$hostname"
+    ssh -i "$ssh_key" "${EC2_USERNAME}@$hostname"
     sudo ./rendezvous.sh local build
     exit
     echo "(6/6) Built metadata server"
@@ -146,14 +152,14 @@ remote_update() {
     ssh_key=$2
     region=$3
 
-    scp -i "$ssh_key" metadata-server/config.json "ubuntu@$hostname:rendezvous/metadata-server"
+    scp -i "$ssh_key" metadata-server/config.json "${EC2_USERNAME}@$hostname:rendezvous/metadata-server"
     echo "Copied config files to '$region' instance"
 
     if [ $region != "eu" ]; then
-        scp -i "$ssh_key" datastore-monitor/config/* "ubuntu@$hostname:rendezvous/datastore-monitor/config"
+        scp -i "$ssh_key" datastore-monitor/config/* "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor/config"
         echo "Copied connections-$region.yaml file to '$region' instance"
 
-        scp -i "$ssh_key" -r datastore-monitor/*.py "ubuntu@$hostname:rendezvous/datastore-monitor"
+        scp -i "$ssh_key" -r datastore-monitor/*.py "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor"
         echo "Copied python code to '$region' instance"
     fi
 }
@@ -165,17 +171,17 @@ remote_start() {
     datastore=$4
 
     cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "Built project"
 
     cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build && ./rendezvous.sh local run server $region remote.json"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started rendezvous server in '$region' instance"
 
     # datastore monitor only runs in the secondary region
     if [ $region != "eu" ]; then
         cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
-        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
+        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
         echo "Started client process in '$region' instance"
     fi
 }
@@ -187,13 +193,13 @@ remote_stop() {
     port=$4
     
     cmd="fuser -k $port/tcp"
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "Killed rendezvous server process listening on port $port in '$region' instance"
 
     # datastore monitor only runs in the secondary region
     if [ $region != "eu" ]; then
         cmd="pkill -9 python"
-        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
+        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
         echo "Killed python client process in '$region' instance"
     fi
 }
@@ -201,26 +207,48 @@ remote_stop() {
 # ------
 # DOCKER
 # ------
+docker_build() {
+  # Build and publish rendezvous docker image in AWS ECR
+  docker build -t rendezvous .
+  aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com
+  docker tag rendezvous:latest ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
+  docker push 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
+  echo ""
+  echo done!
+}
 
 docker_deploy() {
-  docker build -t {DOCKER_REPOSITORY_USERNAME}/rendezvous .
-  docker login -u ${DOCKER_REPOSITORY_USERNAME}
-  docker push {DOCKER_REPOSITORY_USERNAME}/rendezvous .
+  if [[ "$1" == "eu" ]]; then
+    ssh_key=${SSH_KEY_EU}
+    hostname=${HOSTNAME_EU}
+  elif [[ "$1" == "us" ]]; then
+    ssh_key=${SSH_KEY_US}
+    hostname=${HOSTNAME_US}
+  else
+    exit_usage
+  fi
 
-  scp -i $ssh_key docker-compose.yml ubuntu@${hostname}:
-  echo "(1/4) Copied docker compose file @ ${1}"
+  # Install aws cli
+  cmd="sudo apt-get update -y && sudo apt install docker.io docker-compose awscli -y"
+  ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
+  echo "(1/4) Installed AWS CLI"
 
-  cmd="sudo docker login -u ${DOCKER_REPOSITORY_USERNAME}"
-  ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
-  echo "(2/4) Logged into docker @ ${1}"
+  # Copy docker-compose-files
+  scp -i $ssh_key docker-compose.yml ${EC2_USERNAME}@${hostname}:
+  echo "(2/4) Copied docker compose file @ ${hostname}"
 
-  cmd="sudo docker pull mafaldacf/rendezvous-deps; sudo docker pull ${DOCKER_REPOSITORY_USERNAME}/rendezvous"
-  ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
-  echo "(3/4) Pulled docker images @ ${1}"
+  # Copy AWS credentials
+  scp -i $ssh_key -r ~/.aws ${EC2_USERNAME}@${hostname}:.aws
+  echo "(3/4) Copied AWS credentials"
 
-  cmd="sudo docker tag ${DOCKER_REPOSITORY_USERNAME}/rendezvous:latest rendezvous:latest"
-  ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
-  echo "(4/4) Tagged rendezvous docker image @ ${1}"
+  # Pull rendezvous image
+  cmd="sudo docker login -u AWS -p $(aws ecr get-login-password --region eu-central-1) ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com"
+  ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
+  cmd="sudo docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest"
+  ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
+  cmd="sudo docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest rendezvous:latest"
+  ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
+  echo "(4/4) Pulled rendezvous docker image"
 
   echo ""
   echo done!
@@ -245,12 +273,9 @@ docker_start() {
     exit_usage
   fi
 
-  cmd="sudo docker-compose up --force-recreate metadata-server-${region} datastore-monitor-${db}-${region}"
-  ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
-  echo "(1/1) Started rendezvous @ ${1}"
-
-  echo ""
-  echo done!
+  cmd="sudo docker-compose up -d --force-recreate metadata-server-${region} datastore-monitor-${db}-${region}"
+  ssh -o StrictHostKeyChecking=no -i $ssh_key ${EC2_USERNAME}@${hostname} $cmd
+  echo "Rendezvous server running @ ${hostname} (${1})"
 }
 
 docker_stop() {
@@ -267,7 +292,7 @@ docker_stop() {
   fi
 
   cmd="sudo docker-compose down"
-  ssh -o StrictHostKeyChecking=no -i $ssh_key ubuntu@${hostname} $cmd
+  ssh -o StrictHostKeyChecking=no -i $ssh_key ${EC2_USERNAME}@${hostname} $cmd
   echo "(1/1) Stopped rendezvous @ ${1}"
 
   echo ""
@@ -326,9 +351,11 @@ elif [ "$#" -eq 2 ] && [ $1 = "remote" ]  && [ $2 = "stop" ]; then
 # ------
 # DOCKER
 # ------
+elif [ "$#" -eq 2 ] && [ $1 = "docker" ] && [ $2 = "build" ]; then
+  docker_build
 elif [ "$#" -eq 2 ] && [ $1 = "docker" ] && [ $2 = "deploy" ]; then
-  docker_deploy
-  docker_deploy
+  docker_deploy eu
+  docker_deploy us
 elif [ "$#" -eq 3 ] && [ $1 = "docker" ] && [ $2 = "start" ]; then
   docker_start eu $3
   docker_start us $3

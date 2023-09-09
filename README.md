@@ -66,16 +66,16 @@ Make sure you have installed all the necessary local dependencies for Python and
 
 Build and run project
 
-    ./manager.sh local build
-    ./manager.sh local run server <region> <config>
+    ./rendezvous.sh local build
+    ./rendezvous.sh local run server <region> <config>
 
 Clean generated files
 
-    ./manager.sh local clean
+    ./rendezvous.sh local clean
 
 Run GoogleTest tests
   
-    ./manager.sh local run tests
+    ./rendezvous.sh local run tests
 
 ### Metadata Server Deployment (2/2): Docker
 
@@ -85,7 +85,7 @@ Build project:
 
 Run with docker:
 
-    docker run -it -p 8000:8000 rendezvous ./manager.sh run server eu single.json
+    docker run -it -p 8000:8000 rendezvous ./rendezvous.sh run server eu single.json
 
 Or run with docker-compose:
 
@@ -95,15 +95,15 @@ Or run with docker-compose:
 
 Generate Python Protobuf files
 
-    ./manager.sh local build-py-proto
+    ./rendezvous.sh local build-py-proto
 
 Run your client
 
-    ./manager.sh local run client
+    ./rendezvous.sh local run client
 
 You can also test the monitor example that simply subscribes the server
 
-    ./manager.sh local run monitor
+    ./rendezvous.sh local run monitor
 
 ## Evaluation
 
@@ -119,8 +119,8 @@ Both Post-Notification and Rendezvous Metadata Server evaluations will be using 
     - Instance type: `t2.medium` (cheaper instances with fewer vCPUs will not be able to build the project with CMake)
     - Select the previously created keypair `rendezvous-eu`
     - For now you can use the default VPC and Security Group settings
-3. In the local project folder, edit the `manager.sh` script with the public IP and keypair path of the new instance
-4. Upload the project with `./manager.sh remote deploy`. Note that this might take a long time. If you encounter any problems (especially running the dependencies script or building the C++ project) you should do it mannually
+3. In the local project folder, edit the `rendezvous.sh` script with the public IP and keypair path of the new instance
+4. Upload the project with `./rendezvous.sh remote deploy`. Note that this might take a long time. If you encounter any problems (especially running the dependencies script or building the C++ project) you should do it mannually
 5. In AWS EC2 Instances, select your instance and go to 'Actions' -> 'Image and Templates' -> 'Create Image' to create a new `rendezvous` AMI
 6. When the AMI is ready, select it, go to 'Actions' -> 'Copy AMI', choose the US East (N. Virginia) (`us-east-1`) and copy the AMI
 
@@ -145,27 +145,38 @@ For both `eu-central-1` and `us-east-1` do the following:
    - Make sure a public IP is assigned (for deployment with `redis`, the private IP is the one used for the connections file of the Post Notification)
 
 Now that both instances are running, go to your local project folder  
-    - Edit the `manager.sh` parameters for public IPs and keypair paths
+    - Edit the `rendezvous.sh` parameters for public IPs and keypair paths
     - Edit the `metadata-server/configs/remote.json` with the public IPs
 
 
 Prior to each Post-Notification deployment of the post-storage (dynamo, s3, cache, redis) and notification-storage (sns), run:
     
-    ./manager.sh remote start {dynamo, s3, cache, mysql}
+    ./rendezvous.sh remote start {dynamo, s3, cache, mysql}
 
 After each deployment, stop Rendezvous:
 
-    ./manager.sh remote stop 
+    ./rendezvous.sh remote stop 
 
 At the end, don't forget to terminate both instances.
 
 #### (Easy and) Alternative Rendezvous Deployment
 
-Although Rendezvous was deployed in native OS for the **official** evaluation with Post-Notification, it can also be deployed using Docker, which is way easier. After creating the EC2 instance for both regions, configure the `manager.sh` script parameters and run the following commands as required:
+Although Rendezvous was deployed in native OS for the **official** evaluation with Post-Notification, it can also be deployed using Docker, which is way easier. 
 
-    ./manager.sh docker deploy
-    ./manager.sh docker start {dynamo, s3, cache, mysql}
-    ./manager.sh docker stop
+After creating the EC2 instance for both regions (`eu-central-1` and `us-east-1`) with the correct Security Groups and SSH Key Pairs:
+1. Make sure you already have `aws cli` installed and configured with your credentials running `aws configure`.
+2. Configure the `rendezvous.sh` script with the necessary parameters
+3. Configure the `metadata-server/configs/remote.json` file with the EC2 instances public ips
+4. Make sure the `datastore-monitor/config/connections.yaml` file for rendezvous server corresponds to the hostname used in the docker compose file (`rendezvous-eu` and `rendezvous-us`)
+
+Build and deploy rendezvous:
+
+    ./rendezvous.sh docker build
+    ./rendezvous.sh docker deploy
+
+For each deployment:
+    ./rendezvous.sh docker start {dynamo, s3, cache, mysql}
+    ./rendezvous.sh docker stop
 
 ### DeathStarBench
 
