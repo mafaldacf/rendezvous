@@ -4,4 +4,4 @@ WORKDIR /app
 COPY . .
 
 RUN pip install -r datastore-monitor/requirements.txt
-RUN ./manager.sh local clean && ./manager.sh local build
+RUN ./rendezvous.sh local clean && ./rendezvous.sh local build

@@ -20,7 +20,6 @@ import pandas as pd
 import glob
 import shutil
 import sys
-from plumbum import FG, local
 
 EVAL_DIR = 'server-eval'
 GATHER_DELAY_CURRENT_THREAD = 5
@@ -34,17 +33,6 @@ with open('configs/settings.yml', 'r') as file:
     CLIENTS_IP = list(config['clients_ip'])
     SERVER_IP = str(config['server_ip'])
     SERVER_ADDRESS = str(SERVER_IP) + ':' + str(config['server_port'])                          
-
-def _ssh_connect(ip):
-    try:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
-        client.connect(ip, username='ubuntu', pkey=private_key)
-        return client
-    except Exception as e:
-        print(f"[ERROR] An error occurred for {SERVER_IP}: {e}")
-        exit(-1)
 
 class EvalClient():
     def __init__(self, duration=None, threads=None, metadata=None, words23=None, clients=None, timestamp=None, variation=None, client_id=None):
@@ -276,6 +264,17 @@ class EvalClient():
             t.join()
 
         self._gather_remote_clients()
+
+def _ssh_connect(ip):
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+        client.connect(ip, username='ubuntu', pkey=private_key)
+        return client
+    except Exception as e:
+        print(f"[ERROR] An error occurred for {SERVER_IP}: {e}")
+        exit(-1)
 
 def deploy_clients():
     for client_id, client_hostname in enumerate(CLIENTS_IP):

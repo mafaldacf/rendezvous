@@ -17,6 +17,10 @@ with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
     RESULTS_DIR = str(config['results_dir'])
 
+# ---------------------------
+# (Hardcoded) plot annotation
+# ---------------------------
+
 ANNOTATION_CLIENTS_DPS = [
     {
         '#': 5,
@@ -36,6 +40,10 @@ ANNOTATION_DATASTORES_DPS = [
         'pos': [(10, 5), (5, 5), (5, 5), (5, 5), (5, 5), (5, 5), (5, 5)]
     }
 ]
+
+# -------
+# Helpers
+# -------
 
 def _annotate_clients(plt, datapoints):
     pos = None

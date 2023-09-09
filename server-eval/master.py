@@ -11,17 +11,12 @@ with open('configs/master.yml', 'r') as f:
     WORDS23 = bool(config['words23'])
     PARAMS = config['params'] 
 
-eval_worker = local["./eval_worker.py"] 
-eval_worker['deploy-clients'] & FG
+eval_client = local["./client.py"] 
+eval_client['deploy-clients'] & FG
 for i, types in enumerate(PARAMS):
     clients, metadata = types
-    eval_worker['restart-server'] & FG
-
-    run_args = ['run-clients', 
-        '-d', DURATION,
-        '-t', THREADS,
-        '-c', clients,
-        '-m', metadata]
+    eval_client['restart-server'] & FG
+    run_args = ['run-clients', '-d', DURATION , '-t', THREADS, '-c', clients, '-m', metadata]
     if WORDS23:
         run_args.append('-words')
     
@@ -29,5 +24,5 @@ for i, types in enumerate(PARAMS):
     print(f'##### Running eval {i+1}/{len(PARAMS)} for: {clients} clients, {metadata} metadata')
     print('##### -----------------------------------------------\n')
 
-    eval_worker[run_args] & FG
+    eval_client[run_args] & FG
     

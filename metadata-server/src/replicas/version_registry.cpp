@@ -27,7 +27,7 @@ void VersionRegistry::updateRemoteVersion(const std::string& id, const int& vers
         _cond_versions.wait_for(lock, std::chrono::seconds(_wait_replica_timeout_s));
     }
     _versions[id] = version;
-    spdlog::debug("[Versioning] Update remote version: {} -> {}", id, version);
+    //spdlog::debug("[Versioning] Update remote version: {} -> {}", id, version);
     _cond_versions.notify_all();
 }
 
@@ -37,7 +37,7 @@ void VersionRegistry::waitRemoteVersions(const rendezvous::RequestContext& info)
     for (const auto & pair : info.versions()) {
         const std::string& sid = pair.first;
         while (pair.second != _versions[sid]) {
-            spdlog::debug("[Versioning] Wait remote version: {} -> {}", pair.first, pair.second);
+            //spdlog::debug("[Versioning] Wait remote version: {} -> {}", pair.first, pair.second);
             _cond_versions.wait_for(lock, std::chrono::seconds(_wait_replica_timeout_s));
         }
     }

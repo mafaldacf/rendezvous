@@ -13,7 +13,7 @@ ServerServiceImpl::ServerServiceImpl(std::shared_ptr<rendezvous::Server> server)
 }
 grpc::Status ServerServiceImpl::RegisterRequest(grpc::ServerContext* context, const rendezvous_server::RegisterRequestMessage* request, rendezvous_server::Empty* response) {
   if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
-  spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
+  //spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
   metadata::Request * rdv_request;
   std::string rid = request->rid();
   _server->getOrRegisterRequest(rid);
@@ -26,7 +26,6 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-
   const std::string& service = request->service();
   const std::string& tag = request->tag();
   const std::string& rid = request->rid();
@@ -35,8 +34,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   bool monitor = request->monitor();
   int num = request->regions().size();
 
-  spdlog::trace("> [REPLICATED RB] register #{} branches with bid '{}' for request '{}' on service '{}' (monitor={})", 
-    num, full_bid, rid, service, monitor);
+  //spdlog::trace("> [REPLICATED RB] register #{} branches with bid '{}' for request '{}' on service '{}' (monitor={})", num, full_bid, rid, service, monitor);
 
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   // parse bid from <bid>:<rid>
@@ -52,7 +50,7 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
 
   if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
   
-  spdlog::trace("> [REPLICATED CB] closing branch with full bid '{}' on region '{}'", request->bid(), request->region());
+  //spdlog::trace("> [REPLICATED CB] closing branch with full bid '{}' on region '{}'", request->bid(), request->region());
   
   // parse identifiers from <bid>:<rid>
   auto ids = _server->parseFullBid(request->bid());
@@ -66,11 +64,11 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   // always force close branch when dealing with replicated requests
   int res = _server->closeBranch(rdv_request, bid, request->region(), true);
   if (res == 0) {
-    spdlog::trace("> [REPLICATED CB] Error: branch with full bid '{}' not found", request->bid());
+    spdlog::error("> [REPLICATED CB] Error: branch with full bid '{}' not found", request->bid());
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
   }
   else if (res == -1) {
-    spdlog::trace("> [REPLICATED CB] Error: invalid region {} for branch with full bid {}", 
+    spdlog::error("> [REPLICATED CB] Error: invalid region {} for branch with full bid {}", 
       request->region(), request->bid());
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }

@@ -2,9 +2,9 @@
 
 usage() {
     echo "Usage:"
-    echo "> ./manager.sh local clean, build [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
-    echo "> ./manager.sh remote {deploy {eu, us}, update {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
-    echo "> ./manager.sh docker {deploy {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
+    echo "> ./rendezvous.sh local clean, build [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
+    echo "> ./rendezvous.sh remote {deploy {eu, us}, update {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
+    echo "> ./rendezvous.sh docker {deploy {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
     exit 1
 }
@@ -114,14 +114,14 @@ remote_deploy() {
     hostname=$1
     ssh_key=$2
 
-    ./manager.sh local clean
+    ./rendezvous.sh local clean
     echo "(1/6) Cleaned local cmake files"
 
     cmd="rm -rf rendezvous && mkdir rendezvous"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
     echo "(2/6) Cleaned EC2 instance workspace"
 
-    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ manager.sh deps.sh  "ubuntu@$hostname:rendezvous"
+    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "ubuntu@$hostname:rendezvous"
     echo "(3/6) Copied project"
 
     cmd="sudo chmod 700 *.sh"
@@ -133,7 +133,7 @@ remote_deploy() {
     echo "(5/6) Installed dependencies"
 
     ssh -i "$ssh_key" "ubuntu@$hostname"
-    sudo ./manager.sh local build
+    sudo ./rendezvous.sh local build
     exit
     echo "(6/6) Built metadata server"
 
@@ -164,11 +164,11 @@ remote_start() {
     region=$3
     datastore=$4
 
-    cmd="cd rendezvous/metadata-server && ./manager.sh local build"
+    cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd
     echo "Built project"
 
-    cmd="cd rendezvous/metadata-server && ./manager.sh local build && ./manager.sh local run server $region remote.json"
+    cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build && ./rendezvous.sh local run server $region remote.json"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "ubuntu@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started rendezvous server in '$region' instance"
 

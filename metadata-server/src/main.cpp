@@ -109,7 +109,8 @@ void usage(char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-  spdlog::set_level(spdlog::level::trace);
+  // levels: critical, error, warn, info, debug, trace
+  spdlog::set_level(spdlog::level::info);
 
   if (argc == 3) {
     _replica_id = argv[1];

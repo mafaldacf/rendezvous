@@ -21,7 +21,7 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
         const grpc::Status & status = *(req_helper.statuses[tag-1].get());
 
         if (!status.ok()) {
-            spdlog::error("[REPLICA CLIENT - {}] RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
+            spdlog::critical("[REPLICA CLIENT - {}] RPC #{} ERROR: {}", request.c_str(), tag, status.error_message().c_str());
         }
     }
 }

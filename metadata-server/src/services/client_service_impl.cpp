@@ -43,7 +43,7 @@ grpc::Status ClientServiceImpl::Subscribe(grpc::ServerContext * context,
     if (!subscribedBranch.bid.empty()) {
       response.set_bid(subscribedBranch.bid);
       response.set_tag(subscribedBranch.tag);
-      spdlog::debug("< [SUB] sending bid -->  '{}' for tag '{}'", subscribedBranch.bid, subscribedBranch.tag);
+      //spdlog::debug("< [SUB] sending bid -->  '{}' for tag '{}'", subscribedBranch.bid, subscribedBranch.tag);
       writer->Write(response);
     }
   }
@@ -59,7 +59,7 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
   std::string rid = request->rid();
   metadata::Request * rdv_request;
-  spdlog::trace("> [RR] register request '{}'", rid.c_str());
+  //spdlog::trace("> [RR] register request '{}'", rid.c_str());
   rdv_request = _server->getOrRegisterRequest(rid);
   response->set_rid(rdv_request->getRid());
 
@@ -88,7 +88,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   metadata::Request * rdv_request;
   int num = request->regions().size();
 
-  spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
+  //spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
   if (num == 0) {
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
   }
@@ -187,7 +187,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
   const std::string& region = request->region();
   bool force = request->force();
-  spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", request->bid(), region, force);
+  //spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", request->bid(), region, force);
 
   // parse identifiers from <bid>:<rid>
   auto ids = _server->parseFullBid(request->bid());
@@ -241,7 +241,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   //bool async = request->async();
   int timeout = request->timeout();
 
-  spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", rid, service, region);
+  //spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", rid, service, region);
 
   // validate parameters
   if (timeout < 0) {
@@ -273,7 +273,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   else if (result == -1) {
     response->set_timed_out(true);
   }
-  spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
+  //spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
   return grpc::Status::OK;
 }
 
@@ -287,8 +287,7 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   const std::string& region = request->region();
   bool detailed = request->detailed();
 
-  spdlog::trace("> [CR] query for request '{}' on service '{}' and region '{}' (detailed=)", 
-    rid, service, region, detailed);
+  //spdlog::trace("> [CR] query for request '{}' on service '{}' and region '{}' (detailed=)", rid, service, region, detailed);
   
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);
@@ -328,7 +327,7 @@ grpc::Status ClientServiceImpl::CheckRequestByRegions(grpc::ServerContext* conte
   const std::string& rid = request->rid();
   const std::string& service = request->service();
 
-  spdlog::trace("> [CRR] query for request '{}' on service '{}'", rid, service);
+  //spdlog::trace("> [CRR] query for request '{}' on service '{}'", rid, service);
   
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);
