@@ -53,12 +53,12 @@ class DatastoreMonitor:
     while self.running:
       try: 
         request = pb.SubscribeMessage(service=self.service, region=self.region)
-        print("[DEBUG] Subcription: going to subscribe...", flush=True)
+        print("[INFO] Subcription: going to subscribe...", flush=True)
         reader = self.stub.Subscribe(request)
         for response in reader:
           bid = response.bid
           tag = response.tag
-          print(f"[DEBUG] Subcription: received bid: {bid}", flush=True)
+          #print(f"[DEBUG] Subcription: received bid: {bid}", flush=True)
           with lock:
             bids.add((bid, tag))
             cond.notify_all()
@@ -75,27 +75,27 @@ class DatastoreMonitor:
     while self.running:
       with lock:
         while len(bids) == 0 and self.running:
-          print("[DEBUG] Closure: waiting for bids...", flush=True)
+          #print(f"[DEBUG] Closure: waiting for bids...", flush=True)
           cond.wait()
-        print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
+        #print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
         copy = bids.copy()
 
       closed = []
       for bid, tag in copy:
         try:
           if self.shim_layers[tag].find_metadata(bid):
-            print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
+            #print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
             self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
-            closed.append(bid)
+            closed.append((bid, tag))
 
         except grpc.RpcError as e:
           print(f"[ERROR] Failure closing branches: {e.details()}", flush=True)
           if not self._handle_grpc_error(e.code(), e.details()):
-            closed.append(bid) # unexpected error occured and so we need to remove this (invalid) bid
+            closed.append((bid, tag)) # unexpected error occured and so we need to remove this (invalid) bid
         except Exception as e:
           print(f"[ERROR] Unexpected error while monitoring datastore: {e}", flush=True)
-          closed.append(bid) # unexpected error occured and so we need to remove this (invalid) bid
+          closed.append((bid, tag)) # unexpected error occured and so we need to remove this (invalid) bid
 
       with lock:
-        for bid in closed:
-          bids.remove(bid)
+        for bid, tag in closed:
+          bids.remove((bid, tag))

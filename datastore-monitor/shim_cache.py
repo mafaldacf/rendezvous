@@ -16,7 +16,7 @@ class ShimCache:
 
   def find_metadata(self, bid):
     item = self.conn.get(self._cache_key_rendezvous(bid))
-    print("[DEBUG] Got item: ", item, flush=True)
+    #print("[DEBUG] [CACHE] Got item: ", item, flush=True)
     if item:
       return True
     return False

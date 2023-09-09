@@ -15,5 +15,5 @@ class ShimDynamo:
     if 'Items' in response and len(response['Items']) > 0:
       return True
     
-    print("[DynamoDB] Item not found :(", response)
+    #print("[DEBUG] [DynamoDB] Item not found :(", response)
     return False
