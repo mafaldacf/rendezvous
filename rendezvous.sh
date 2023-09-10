@@ -3,13 +3,15 @@
 # ----------------
 # AWS EC2 settings
 # ----------------
+# fixed
 EC2_USERNAME="ubuntu"
-HOSTNAME_EU="3.127.70.27"
-HOSTNAME_US="54.204.137.41"
-SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
-SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 SERVER_PORT_EU=8001
 SERVER_PORT_US=8002
+SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
+SSH_KEY_US="~/.ssh/rendezvous-us.pem"
+# dynamic for each instance
+HOSTNAME_EU="18.192.8.131"
+HOSTNAME_US="52.55.65.161"
 
 # -----------------
 # Docker deployment
@@ -20,8 +22,8 @@ AWS_ACCOUNT_ID=851889773113
 usage() {
     echo "Usage:"
     echo "> ./rendezvous.sh local clean, build, deploy [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
-    echo "> ./rendezvous.sh remote {deploy {eu, us}, update {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
-    echo "> ./rendezvous.sh docker {deploy {eu, us}, start {dynamo, s3, cache, mysql}, stop}"
+    echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
+    echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
     exit 1
 }
@@ -327,14 +329,11 @@ elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "tests" ]; t
 # -------
 # REMOTE
 # -------
-elif [ "$#" -eq 3 ] && [ $1 = "remote" ] && [ $2 = "deploy" ] && [ $3 = "eu" ]; then
+elif [ "$#" -eq 2 ] && [ $1 = "remote" ] && [ $2 = "deploy" ]; then
   remote_deploy $HOSTNAME_EU $SSH_KEY_EU
-elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ $2 = "deploy" ] && [ $3 = "us" ]; then
-  remote_deploy $HOSTNAME_US $SSH_KEY_US
-elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ $2 = "update" ] && [ $3 = "eu" ]; then
+elif [ "$#" -eq 2 ] && [ $1 = "remote" ]  && [ $2 = "update" ]; then
   remote_update $HOSTNAME_EU $SSH_KEY_EU eu
-elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ $2 = "update" ] && [ $3 = "us" ]; then
-  remote_update $HOSTNAME_US $SSH_KEY_US us
+  remote_update $HOSTNAME_EU $SSH_KEY_EU us
 elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ "$2" = "start" ]; then
   remote_start $HOSTNAME_EU $SSH_KEY_EU eu
   case "$3" in 

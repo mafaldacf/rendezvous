@@ -32,39 +32,41 @@ Thesis 2022/2023
 - **Docker** (version used: 20.10.21)
 - **Docker Compose** (version used: 1.29.2)
 
-Local deployment:
+Local deployment without Docker:
 
-- [gRPC](https://grpc.io/): *Modern open source high performance Remote Procedure Call (RPC) framework*
-- [Protobuf](https://protobuf.dev/): *Language-neutral, platform-neutral extensible mechanisms for serializing structured data*
-- [CMake](https://cmake.org/): *Open-source, cross-platform family of tools designed to build, test and package software*
-- [GoogleTest](http://google.github.io/googletest/): *Google's C++ testing and mocking framework*
-- [nlohmann JSON](https://github.com/nlohmann/json): *JSON for Modern C++*
-- [spdlog](https://github.com/gabime/spdlog): *Very fast, header-only/compiled, C++ logging library*
+- [gRPC](https://grpc.io/)
+- [Protobuf](https://protobuf.dev/)
+- [CMake](https://cmake.org/)
+- [GoogleTest](http://google.github.io/googletest/)
+- [nlohmann JSON](https://github.com/nlohmann/json)
+- [spdlog](https://github.com/gabime/spdlog)
 
 ## Getting Started
 
-Install Python dependencies for evaluation:
+Install Python dependencies for **official evaluation**:
 
     pip install -r server-eval/requirements.txt
 
-Install Python dependencies for local deployment (optional):
+Install Python dependencies for local deployment **without Docker** (optional):
 
     pip install -r datastore-monitor/requirements.txt
 
-Install C++ dependencies for local deployment (optional):
+Install C++ dependencies for local deployment **without Docker** (optional):
 
     ./deps.sh
 
-## Testing Rendezvous Metadata Server Locally
+## Running Rendezvous Metadata Server Locally
 
 Go to `metadata-server/configs` and configure your own json file. 
 You can use `single.json` to run a single server locally.
 
 Make sure you have installed all the necessary local dependencies for Python and C++.
 
-### Metadata Server Deployment (1/2): Native OS
+### Metadata Server Deployment (1/2)
 
-Build and run project
+Build and run project for the following available parameters:
+- region: `eu`, `us`
+- config: `docker.json`, `local.json`, `remote.json`, `single.json`
 
     ./rendezvous.sh local build
     ./rendezvous.sh local run server <region> <config>
@@ -73,11 +75,11 @@ Clean generated files
 
     ./rendezvous.sh local clean
 
-Run GoogleTest tests
+Test metadata server with GoogleTests framework
   
     ./rendezvous.sh local run tests
 
-### Metadata Server Deployment (2/2): Docker
+### Metadata Server Deployment (2/2) using Docker
 
 Build project:
 
@@ -91,17 +93,21 @@ Or run with docker-compose:
 
     docker-compose run metadata-server-eu
 
-### Testing Metadata Server with a Simple Client
+### Testing Metadata Server with Client Samples
 
 Generate Python Protobuf files
 
     ./rendezvous.sh local build-py-proto
 
-Run your client
+Run the metadata server:
+
+    ./rendezvous.sh local run server eu single.json
+
+Option 1/2: Run **client** in Python
 
     ./rendezvous.sh local run client
 
-You can also test the monitor example that simply subscribes the server
+Option 2/2: Run **datastore monitor** in Python that simply subscribes the server
 
     ./rendezvous.sh local run monitor
 
@@ -111,63 +117,85 @@ This section presents a quick guide on how to deploy Rendezvous for all three ev
 
 ### Getting Started
 
-Both Post-Notification and Rendezvous Metadata Server evaluations will be using AWS EC2 instances. For that reason, we create the following AMI:
+**SKIP** this section if you are running rendezvous using Docker (e.g. for post-notification micro-benchmark)!!!
 
-1. Go to AWS EC2 in `eu-central-1` and create a new key pair `rendezvous-eu`, add permissions `sudo chmod 500 rendezvous-eu.pem`, and copy to `~/.ssh/rendezvous-eu`.
-2. Go to Instances and launch a new instance with the following settings:
+#### Setting up EC2 AMIs and Key Pairs
+
+1. Go to AWS EC2 Key Pairs in `eu-central-1` and create a new key pair `rendezvous-eu`, add permissions `sudo chmod 500 rendezvous-eu.pem`, and copy to `~/.ssh/rendezvous-eu.pem`.
+2. Do the same but now for `us-east-1` and name the key pair as `rendezvous-us`.
+3. Go to AWS EC2 Instances in `eu-central-1` and launch a new instance with the following settings:
     - AMI: `Ubuntu 22.04 LTS`
     - Instance type: `t2.medium` (cheaper instances with fewer vCPUs will not be able to build the project with CMake)
     - Select the previously created keypair `rendezvous-eu`
     - For now you can use the default VPC and Security Group settings
-3. In the local project folder, edit the `rendezvous.sh` script with the public IP and keypair path of the new instance
-4. Upload the project with `./rendezvous.sh remote deploy`. Note that this might take a long time. If you encounter any problems (especially running the dependencies script or building the C++ project) you should do it mannually
-5. In AWS EC2 Instances, select your instance and go to 'Actions' -> 'Image and Templates' -> 'Create Image' to create a new `rendezvous` AMI
-6. When the AMI is ready, select it, go to 'Actions' -> 'Copy AMI', choose the US East (N. Virginia) (`us-east-1`) and copy the AMI
+4. In the local project folder, edit the `rendezvous.sh` script with the public IP and keypair path of the new instance
+5. Deploy the project with `./rendezvous.sh remote deploy`. Note that this might take a long time. If you encounter any problems (especially running the dependencies script `./deps.sh` or building the C++ project `./rendezvous.sh local build`, both remotely) you should do it mannually :(
+6. In AWS EC2 Instances, select your instance and go to ACTIONS -> IMAGES AND TEMPLATES -> CREATE IMAGE to create a new `rendezvous` AMI
+7. When the AMI is ready, select it, go to ACTIONS -> COPY AMI, choose the US East (N. Virginia) (`us-east-1`) and copy the AMI
 
 Now you have two `rendezvous` AWS EC2 AMIs in `eu-central-1` and `us-east-1` =)
 
-At the end, perform the 1st step but now from `us-east-1` region and `rendezvous-us` keypair.
-
 ### Post-Notification
 
-For this microbenchmark, Rendezvous is deployed AWS, in two EC2 `t2.xlarge` (4 vCPU and 16 GiB RAM) instances for both primary (`eu-central-1`) and secondary (`us-east-1`) regions. Before preciding, make sure you already setup the Post-Notification VPC according to the README of the `antipode-post-notification` repository.
+#### VPC Configuration
+
+For this microbenchmark, Rendezvous is deployed in two EC2 `t2.xlarge` (4 vCPU and 16 GiB RAM) instances for both primary (`eu-central-1`) and secondary (`us-east-1`) regions. 
+
+REQUIREMENTS: make sure you already setup the Post-Notification VPC according to the README of the `antipode-post-notification` repository.
 
 For both `eu-central-1` and `us-east-1` do the following:
 1. Create a new Security Group `rendezvous` for the Post-Notification VPC `antipode-mq`
+   - Name: `antipode-mq-rendezvous`
 2. Add the following inbound rules
    - SSH from any IPv4 source (0.0.0.0/0)
    - Custom TCP from any IPv4 source (0.0.0.0/0). Port is `8001` if in EU and `8002` if in US.
-3. Launch a new EC2 instance:
+
+#### Alternative 1/2 (OFFICIAL EVAL): Running Rendezvous in Native OS
+
+For each region (`eu-central-1` and `us-east-1`), start two EC2 instances:
    - AMI: previous created `rendezvous` image from 'My AMIs'
    - Instance type: `t2.xlarge`
-   - Keypair: `rendezvous-eu` if in EU and `rendezvous-us` if in US
-   - Select the `antipode-mq` VPC and the previously created Security Group
-   - Make sure a public IP is assigned (for deployment with `redis`, the private IP is the one used for the connections file of the Post Notification)
+   - Keypair: `rendezvous-eu` in EU or `rendezvous-us` in US
+   - Select the `antipode-mq` VPC and the previously created Security Group `antipode-mq-rendezvous`
+   - Make sure to **ENABLE** assignment of public IP
 
-Now that both instances are running, go to your local project folder  
-    - Edit the `rendezvous.sh` parameters for public IPs and keypair paths
-    - Edit the `metadata-server/configs/remote.json` with the public IPs
+Now that both instances are running, go to your local project folder:
+   1. Edit the main `rendezvous.sh` script parameters for public IPs and keypair paths
+   2. Edit the metadata server `metadata-server/configs/remote.json` config with the public IPs
+   3. Make sure that both servers' connections identified by `rendezvous` in `datastore-monitor/config/connections.yaml` match the following:
+       - `eu-central-1`: `localhost:8001` 
+       - `us-east-1`: `localhost:8002`
 
+Update the config file with the new ips to the remote instances:
 
-Prior to each Post-Notification deployment of the post-storage (dynamo, s3, cache, redis) and notification-storage (sns), run:
-    
+    ./rendezvous.sh remote update
+
+For each deployment:
+
     ./rendezvous.sh remote start {dynamo, s3, cache, mysql}
+    ./rendezvous.sh remote stop
 
-After each deployment, stop Rendezvous:
+**REMINDER**: At the end, don't forget to terminate both instances.
 
-    ./rendezvous.sh remote stop 
+#### Alternative 2/2 (CONVENIENCE TESTING): running Rendezvous using Docker
 
-At the end, don't forget to terminate both instances.
+Although Rendezvous was deployed in native OS for the **official** evaluation with Post-Notification, it can also be deployed using Docker, which is way easier.
 
-#### (Easy and) Alternative Rendezvous Deployment
+Install `aws cli` if not yet done and configure your credentials with `aws configure`.
 
-Although Rendezvous was deployed in native OS for the **official** evaluation with Post-Notification, it can also be deployed using Docker, which is way easier. 
+For each region (`eu-central-1` and `us-east-1`), start two EC2 instances:
+   - AMI: `Ubuntu 22.04 LTS`
+   - Instance type: user preference (can be `t2.micro`)
+   - Keypair: `rendezvous-eu` in EU or `rendezvous-us` in US
+   - Select the `antipode-mq` VPC and the previously created Security Group `antipode-mq-rendezvous`
+   - Make sure to **ENABLE** assignment of public IP
 
-After creating the EC2 instance for both regions (`eu-central-1` and `us-east-1`) with the correct Security Groups and SSH Key Pairs:
-1. Make sure you already have `aws cli` installed and configured with your credentials running `aws configure`.
-2. Configure the `rendezvous.sh` script with the necessary parameters
-3. Configure the `metadata-server/configs/remote.json` file with the EC2 instances public ips
-4. Make sure the `datastore-monitor/config/connections.yaml` file for rendezvous server corresponds to the hostname used in the docker compose file (`rendezvous-eu` and `rendezvous-us`)
+Now that both instances are running, go to your local project folder:
+   1. Edit the main `rendezvous.sh` script parameters for public IPs and keypair paths
+   2. Edit the metadata server `metadata-server/configs/remote.json` config with the public IPs
+   3. Make sure that both servers' connections identified by `rendezvous` in `datastore-monitor/config/connections.yaml` match the following:
+       - `eu-central-1`: `rendezvous-eu:8001` 
+       - `us-east-1`: `rendezvous-us:8002`
 
 Build and deploy rendezvous:
 
@@ -175,8 +203,11 @@ Build and deploy rendezvous:
     ./rendezvous.sh docker deploy
 
 For each deployment:
+
     ./rendezvous.sh docker start {dynamo, s3, cache, mysql}
     ./rendezvous.sh docker stop
+
+**REMINDER**: At the end, don't forget to terminate both instances.
 
 ### DeathStarBench
 
@@ -198,13 +229,19 @@ For this evaluation, we deployed 1 metadata server and 1-5 clients in AWS using 
 
 1. Go to AWS EC2 and launch 1 instance for the `metadata server` and 5 instances for the `clients` (you can select the number of instances to launch instead of doing it manually). For each instance, use the following settings:
    - AMI: previous created `rendezvous` image from 'My AMIs'
-   - Instance type: `t2.xlarge`
+   - Instance type: `t2.xlarge` for the `metadata server` and `t2.large` for the `clients`
    - Keypair: `rendezvous-eu`
-   - Select the `antipode-mq` VPC and the previously created Security Group
-   - Make sure a public IP is assigned
+   - Select the `antipode-mq` VPC and the previously created Security Group `antipode-mq-rendezvous`
+   - Make sure to **ENABLE** assignment of public IP
 2. Configure your instance connections in `server-eval/configs/settings.yaml`
-3. Configure your deployment types (by default, these correspond to the combinations used in the **official** evaluation)
+3. If desired, configure your deployment types in `server-eval/configs/master.yaml` (by default, these correspond to the combinations used in the **official** evaluation):
+    - If `words23` is enabled, the metadata variations corresponds to number of datastores (ideally ranging 1, 5, 10, 15 and 20)
+    - Otherwise, the metadata variations corresponds to number of regions (ideally ranging 1, 10 and 100) used in the thesis evaluation.
 
-You can now relax and run the evaluation from the `server-eval` folder:
+You can now relax and run the evaluation from the `server-eval` folder
 
-    ./eval_master.py
+    ./master.py
+
+Plot for `thesis` or `words23`. If doing it for `words23`, you can add the flag `--annotate` to hardcode annotate the datapoints (these can be changed in the python script)
+
+    ./plot.py {thesis, words23}

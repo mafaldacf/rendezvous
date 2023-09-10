@@ -48,7 +48,7 @@ def load_connections_config(datastore, region):
             info_datastore[key_to_insert] = value_to_insert
 
         # parse rendezvous address specific to current region
-        rendezvous_address = info['rendezvous']['address_region_'+region]
+        rendezvous_address = info['rendezvous'][region]
         return info_datastore, rendezvous_address 
 
 def init_monitor(datastore, region):
