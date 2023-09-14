@@ -54,7 +54,7 @@ namespace metadata {
             // <bid, branch ptr>
             std::unordered_map<std::string, metadata::Branch*> _branches;
             // <service, service branching ptr>
-            std::unordered_map<std::string, ServiceNode> _service_nodes;
+            std::unordered_map<std::string, ServiceNode*> _service_nodes;
             // <region, STATUS>
             std::unordered_map<std::string, int> _opened_regions;
 

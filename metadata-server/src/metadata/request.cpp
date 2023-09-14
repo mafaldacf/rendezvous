@@ -8,12 +8,18 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
     _opened_regions = std::unordered_map<std::string, int>();
-    _service_nodes = std::unordered_map<std::string, ServiceNode>();
+    _service_nodes = std::unordered_map<std::string, ServiceNode*>();
+
+    // add root node
+    _service_nodes[""] = new ServiceNode({""});
 }
 
 Request::~Request() {
     for (const auto& branch_it : _branches) {
         delete branch_it.second;
+    }
+    for (const auto& service_node_it : _service_nodes) {
+        delete service_node_it.second;
     }
     delete _versions_registry;
 }
@@ -105,12 +111,12 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
         std::unique_lock<std::mutex> lock(_mutex_service_nodes);
         // service and region context
         if (!region.empty()) {
-            _service_nodes[service].opened_regions[region] -= 1;
+            _service_nodes[service]->opened_regions[region] -= 1;
         }
 
         if (fully_closed) {
             // decrease opened branches in all direct parents
-            ServiceNodeStruct * parent_node = &_service_nodes[service];
+            ServiceNodeStruct * parent_node = _service_nodes[service];
             do {
                 parent_node->num_opened_branches--;
                 parent_node = parent_node->parent;
@@ -143,25 +149,25 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
     /* service context */
     /* --------------- */
     if (!service.empty()) {
-        // check if service does not exist yet and add node
+        // check if service does not exist yet and add new node node
         if (_service_nodes.count(service) == 0) {
-            _service_nodes[service].name = service;
+            _service_nodes[service] = new ServiceNode({service});
         }
 
         // validate tag
         std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
         if (branch->hasTag()) {
             // ABORT - unique tag already exists
-            if (_service_nodes[service].tagged_branches.count(branch->getTag()) != 0) {
+            if (_service_nodes[service]->tagged_branches.count(branch->getTag()) != 0) {
                 _num_opened_branches.fetch_add(-num);
                 return false;
             }
             // track on SERVICE TAG
-            _service_nodes[service].tagged_branches[branch->getTag()] = branch;
+            _service_nodes[service]->tagged_branches[branch->getTag()] = branch;
         }
 
         // increment opened branches in all direct parents
-        ServiceNodeStruct * parent_node = &_service_nodes[service];
+        ServiceNodeStruct * parent_node = _service_nodes[service];
         do {
             parent_node->num_opened_branches++;
             parent_node = parent_node->parent;
@@ -172,7 +178,7 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
             std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
             for (const auto& region : regions) {
                 if (!region.empty()) {
-                    _service_nodes[service].opened_regions[region] += 1;
+                    _service_nodes[service]->opened_regions[region] += 1;
                     _opened_regions[region] += 1;
                 }
             }
@@ -248,7 +254,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
             return -2;
         }
         // no current branch for this service (non async) tag
-        if (!tag.empty() && _service_nodes[service].tagged_branches.count(tag) == 0) {
+        if (!tag.empty() && _service_nodes[service]->tagged_branches.count(tag) == 0) {
             return -2;
         }
     }
@@ -258,7 +264,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     //-----------
     // tag-specific
     if (!tag.empty()) {
-        metadata::Branch * branch = _service_nodes[service].tagged_branches[tag];
+        metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag];
         while (!branch->isClosed()) {
             inconsistency = 1;
             _cond_service_nodes.wait_for(lock, remaining_timeout);
@@ -270,7 +276,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     }
     // overall service
     else {
-        int * num_branches_ptr = &(_service_nodes[service].num_opened_branches);
+        int * num_branches_ptr = &(_service_nodes[service]->num_opened_branches);
         while (*num_branches_ptr != 0) {
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
@@ -345,7 +351,7 @@ const::std::string& tag, bool async, int timeout) {
             }
             service_it = _service_nodes.find(service);
         }
-        auto opened_regions_it = service_it->second.opened_regions;
+        auto opened_regions_it = service_it->second->opened_regions;
         auto region_it = opened_regions_it.find(region);
         while (region_it == opened_regions_it.end()) {
             _cond_new_service_nodes.wait_for(lock, remaining_timeout);
@@ -357,7 +363,7 @@ const::std::string& tag, bool async, int timeout) {
         }
     }
     // context not found
-    else if (_service_nodes.count(service) == 0 || _service_nodes[service].opened_regions.count(region) == 0) {
+    else if (_service_nodes.count(service) == 0 || _service_nodes[service]->opened_regions.count(region) == 0) {
         return -2;
     }
 
@@ -366,7 +372,7 @@ const::std::string& tag, bool async, int timeout) {
     //-----------
     // tag-specific
     if (!tag.empty()) {
-        metadata::Branch * branch = _service_nodes[service].tagged_branches[tag];
+        metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag];
         while (!branch->isClosed(region)) {
             inconsistency = 1;
             _cond_service_nodes.wait_for(lock, remaining_timeout);
@@ -378,7 +384,7 @@ const::std::string& tag, bool async, int timeout) {
     }
     // overall service
     else {
-        int * num_branches_ptr = &_service_nodes[service].opened_regions[region];
+        int * num_branches_ptr = &_service_nodes[service]->opened_regions[region];
         while (*num_branches_ptr != 0) {
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
@@ -429,7 +435,7 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
     }
     
     // get overall status of request
-    if (_service_nodes[service].num_opened_branches == 0) {
+    if (_service_nodes[service]->num_opened_branches == 0) {
         res.status = CLOSED;
     } else {
         res.status = OPENED;
@@ -442,16 +448,16 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
 
     // otherwise, return detailed information
     // get tagged branches within the same service
-    for (const auto& branch_it: _service_nodes[service].tagged_branches) {
+    for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus();
     }
     // get children nodes of current service
-    for (auto node_it = _service_nodes[service].children.begin(); node_it != _service_nodes[service].children.end(); ++node_it) {
+    for (auto node_it = _service_nodes[service]->children.begin(); node_it != _service_nodes[service]->children.end(); ++node_it) {
         int status = (*node_it)->num_opened_branches == 0 ? CLOSED : OPENED;
         res.children[(*node_it)->name] = status;
     }
     // get all regions status
-    for (const auto& region_it: _service_nodes[service].opened_regions) {
+    for (const auto& region_it: _service_nodes[service]->opened_regions) {
         res.regions[region_it.first] = region_it.second == 0 ? CLOSED : OPENED;
     }
     return res;
@@ -467,14 +473,14 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
         res.status = UNKNOWN;
         return res;
     }
-    auto region_it = service_it->second.opened_regions.find(region);
-    if (region_it == service_it->second.opened_regions.end()) {
+    auto region_it = service_it->second->opened_regions.find(region);
+    if (region_it == service_it->second->opened_regions.end()) {
         res.status = UNKNOWN;
         return res;
     }
     
     // get overall status of request
-    if (_service_nodes[service].opened_regions[region] == 0) {
+    if (_service_nodes[service]->opened_regions[region] == 0) {
         res.status = CLOSED;
     } else {
         res.status = OPENED;
@@ -486,11 +492,11 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
     }
 
     // otherwise, return detailed information
-    for (const auto& branch_it: _service_nodes[service].tagged_branches) {
+    for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus(region);
     }
     // get children nodes of current service
-    for (auto node_it = _service_nodes[service].children.begin(); node_it != _service_nodes[service].children.end(); ++node_it) {
+    for (auto node_it = _service_nodes[service]->children.begin(); node_it != _service_nodes[service]->children.end(); ++node_it) {
         // by default, if region is not found then status is set to UNKNOWN
         int status = UNKNOWN;
         if ((*node_it)->opened_regions.count(region) > 0) {
