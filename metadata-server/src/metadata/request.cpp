@@ -84,8 +84,9 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
     const std::string& tag = branch->getTag();
 
     int r = branch->close(region);
+    bool fully_closed = branch->isClosed();
     if (r == 1) {
-        untrackBranch(service, region);
+        untrackBranch(service, region, fully_closed);
         _cond_branches.notify_all();
     }
     else if (r == -1) {
@@ -94,7 +95,7 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
     return r;
 }
 
-bool Request::untrackBranch(const std::string& service, const std::string& region) {
+bool Request::untrackBranch(const std::string& service, const std::string& region, bool fully_closed) {
     _num_opened_branches.fetch_add(-1);
 
     /* --------------- */
@@ -107,12 +108,14 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
             _service_nodes[service].opened_regions[region] -= 1;
         }
 
-        // decrease opened branches in all direct parents
-        ServiceNodeStruct * parent_node = &_service_nodes[service];
-        do {
-            parent_node->num_opened_branches--;
-            parent_node = parent_node->parent;
-        } while (parent_node != nullptr);
+        if (fully_closed) {
+            // decrease opened branches in all direct parents
+            ServiceNodeStruct * parent_node = &_service_nodes[service];
+            do {
+                parent_node->num_opened_branches--;
+                parent_node = parent_node->parent;
+            } while (parent_node != nullptr);
+        }
 
         // notify creation of new branch
         _cond_service_nodes.notify_all();
@@ -157,18 +160,12 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
             _service_nodes[service].tagged_branches[branch->getTag()] = branch;
         }
 
-        // add parent node and add current node to the parent's children list
-        ServiceNodeStruct * parent_node = &_service_nodes[parent_name];
-        _service_nodes[service].parent = parent_node;
-        parent_node->children.emplace_back(&_service_nodes[service]);
-        // increment opened branches in all parents
-        while (parent_node != nullptr) {
+        // increment opened branches in all direct parents
+        ServiceNodeStruct * parent_node = &_service_nodes[service];
+        do {
             parent_node->num_opened_branches++;
             parent_node = parent_node->parent;
-        }
-
-        // track on SERVICE
-        _service_nodes[service].num_opened_branches += num;
+        } while (parent_node != nullptr);
 
         // track on REGIONS of SERVICE
         if (regions.size() > 0) {

@@ -142,7 +142,7 @@ namespace metadata {
              * 
              * @return true if successful and false otherwise
              */
-            bool untrackBranch(const std::string& service, const std::string& region);
+            bool untrackBranch(const std::string& service, const std::string& region, bool fully_closed);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps

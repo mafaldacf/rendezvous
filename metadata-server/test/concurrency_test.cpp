@@ -252,7 +252,6 @@ TEST(ServerConcurrencyTest, WaitRequest) {
 
   threads.emplace_back([&server, request] {
     int status = server.wait(request, "storage", "");
-    std::cout << "[storage, ]" << std::endl;
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
