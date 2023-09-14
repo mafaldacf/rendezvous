@@ -220,24 +220,25 @@ namespace metadata {
 
             /**
              * Check status of request
-             *
+             * @param detailed Detailed description of status for all tagged branches
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            Status getStatus();
+            Status checkStatus(bool detailed = false);
 
             /**
              * Check status of request for a given context (region)
              *
              * @param region The name of the region that defines the waiting context
+             * @param detailed Detailed description of status for all tagged branches
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            Status getStatusRegion(const std::string& region);
+            Status checkStatusRegion(const std::string& region, bool detailed = false);
 
             /**
              * Check status of request for a given context (service)
@@ -250,7 +251,7 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            Status getStatusService(const std::string& service, bool detailed = false);
+            Status checkStatusService(const std::string& service, bool detailed = false);
 
             /**
              * Check status of request for a given context (service and region)
@@ -264,24 +265,7 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            Status getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
-
-            /**
-             * Check status of request for each available region and for a given contex (service)
-             *
-             * @return Map of status of the request (OPENED or CLOSED) for each region
-             */
-            std::map<std::string, int> getStatusByRegions();
-
-            /**
-             * Check status of request for each available region and for a given contex (service)
-             *
-             * @param service The name of the service that defines the waiting context
-             *
-             * @return Map of status of the request (OPENED or CLOSED) for each region
-             */
-            std::map<std::string, int> getStatusByRegionsOnService(const std::string& service);
-
+            Status checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
         };
     
 }

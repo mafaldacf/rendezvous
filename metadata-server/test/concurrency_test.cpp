@@ -67,22 +67,22 @@ TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   metadata::Request * request = server.getOrRegisterRequest(_RID);
   ASSERT_EQ(_RID, request->getRid());
 
-  status = server.waitRequest(request, "wrong_service", "");
+  status = server.wait(request, "wrong_service", "");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  status = server.waitRequest(request, "", "wrong_region");
+  status = server.wait(request, "", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  status = server.waitRequest(request, "wrong_service", "wrong_region");
+  status = server.wait(request, "wrong_service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   std::string bid = server.registerBranchRegion(request, "service", "region", _TAG); // bid = 0
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
-  status = server.waitRequest(request, "service", "wrong_region");
+  status = server.wait(request, "service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  status = server.waitRequest(request, "wrong_service", "region");
+  status = server.wait(request, "wrong_service", "region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 }
 
@@ -96,11 +96,79 @@ TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid =  server.registerBranchRegion(request, "service", "region", _EMPTY_TAG);
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
 
-  status = server.waitRequest(request, "service", "region", _EMPTY_TAG, false, 1);
+  status = server.wait(request, "service", "region", _EMPTY_TAG, false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.waitRequest(request, "service2", "", _EMPTY_TAG, true, 1);
+  status = server.wait(request, "service2", "", _EMPTY_TAG, true, 1);
   ASSERT_EQ(TIMED_OUT, status);
+}
+
+TEST(ServerConcurrencyTest, SimpleWaitRequest) { 
+  std::vector<std::thread> threads;
+  rendezvous::Server server(_SID);
+  std::string bid;
+  int status;
+  bool found_region;;
+
+  metadata::Request * request = server.getOrRegisterRequest(_RID);
+  ASSERT_EQ(_RID, request->getRid());
+
+  status = server.wait(request, "", "");
+  ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
+
+  utils::ProtoVec regions;
+  regions.Add("EU");
+  regions.Add("US");
+  std::string bid_0 = server.registerBranch(request, "service", regions, "tag", "");
+  ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
+
+  threads.emplace_back([&server, request] {
+    server.wait(request, "", "");
+  });
+
+  sleep(0.5);
+  found_region = server.closeBranch(request, _getBid(request->getRid(), 0), "EU"); // bid 0
+  found_region = server.closeBranch(request, _getBid(request->getRid(), 0), "US"); // bid 0
+  ASSERT_EQ(1, found_region);
+
+  // wait for all threads
+  for(auto& thread : threads) {
+    if (thread.joinable()) {
+        thread.join();
+    }
+  }
+}
+
+TEST(ServerConcurrencyTest, SimpleWaitRequestTwo) { 
+  std::vector<std::thread> threads;
+  rendezvous::Server server(_SID);
+  std::string bid;
+  int status;
+  bool found_region;;
+
+  metadata::Request * request = server.getOrRegisterRequest(_RID);
+  ASSERT_EQ(_RID, request->getRid());
+
+  status = server.wait(request, "", "");
+  ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
+
+  bid =  server.registerBranchRegion(request, "", "region1", _TAG); // bid = 0
+  ASSERT_EQ(_getFullBid(request->getRid(), 0), bid);
+
+  threads.emplace_back([&server, request] {
+    server.wait(request, "", "");
+  });
+
+  sleep(0.5);
+  found_region = server.closeBranch(request, _getBid(request->getRid(), 0), "region1"); // bid 0
+  ASSERT_EQ(1, found_region);
+
+  // wait for all threads
+  for(auto& thread : threads) {
+    if (thread.joinable()) {
+        thread.join();
+    }
+  }
 }
 
 TEST(ServerConcurrencyTest, WaitRequest) { 
@@ -108,12 +176,12 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   rendezvous::Server server(_SID);
   std::string bid;
   int status;
-  bool found_region = false;
+  int found_region;;
 
   metadata::Request * request = server.getOrRegisterRequest(_RID);
   ASSERT_EQ(_RID, request->getRid());
 
-  status = server.waitRequest(request, "", "");
+  status = server.wait(request, "", "");
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
   bid =  server.registerBranchRegion(request, "", "", _TAG); // bid = 0
@@ -129,36 +197,36 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   ASSERT_EQ(_getFullBid(request->getRid(), 3), bid);
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "");
+    int status = server.wait(request, "", "");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service1", "");
+    int status = server.wait(request, "service1", "");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "region1");
+    int status = server.wait(request, "", "region1");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service2", "region2");
+    int status = server.wait(request, "service2", "region2");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   sleep(0.5);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 0), ""); // bid 0
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 1), ""); // bid 1
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 2), "region1"); // bid 2
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
 
   // Sanity Check - ensure that locks still work
   bid =  server.registerBranchRegion(request, "storage", "EU", "tagA"); // bid = 4
@@ -171,25 +239,26 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   ASSERT_EQ(_getFullBid(request->getRid(), 6), bid);
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "");
+    int status = server.wait(request, "", "");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "storage", "US");
+    int status = server.wait(request, "storage", "US");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "storage", "");
+    int status = server.wait(request, "storage", "");
+    std::cout << "[storage, ]" << std::endl;
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "", "GLOBAL");
+    int status = server.wait(request, "", "GLOBAL");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
@@ -197,13 +266,13 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   sleep(0.5);
 
   found_region = server.closeBranch(request, _getBid(request->getRid(), 3), "region2"); // bid 3
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 4), "EU"); // bid 4
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 5), "US"); // bid 5
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, _getBid(request->getRid(), 6), "GLOBAL"); // bid 6
-  ASSERT_EQ(true, found_region);
+  ASSERT_EQ(1, found_region);
   
   // wait for all threads
   for(auto& thread : threads) {
@@ -227,23 +296,23 @@ TEST(ServerConcurrencyTest, WaitServiceTag) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranch(request, "service", regions, "tag");
+  std::string bid_0 = server.registerBranch(request, "service", regions, "tag", "");
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
 
   sleep(1);
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "EU", "tag", true);
+    int status = server.wait(request, "service", "EU", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "US", "tag", true);
+    int status = server.wait(request, "service", "US", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "", "tag", true);
+    int status = server.wait(request, "service", "", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -267,17 +336,17 @@ TEST(ServerConcurrencyTest, WaitServiceTagForceAsync) {
   metadata::Request * request = server.getOrRegisterRequest(_RID);
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "EU", "tag", true);
+    int status = server.wait(request, "service", "EU", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "US", "tag", true);
+    int status = server.wait(request, "service", "US", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.waitRequest(request, "service", "", "tag", true);
+    int status = server.wait(request, "service", "", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -286,7 +355,7 @@ TEST(ServerConcurrencyTest, WaitServiceTagForceAsync) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranch(request, "service", regions, "tag");
+  std::string bid_0 = server.registerBranch(request, "service", regions, "tag", "");
   ASSERT_EQ(_getFullBid(request->getRid(), 0), bid_0);
 
   sleep(1);

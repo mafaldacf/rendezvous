@@ -223,9 +223,9 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
-grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context, 
-  const rendezvous::WaitRequestMessage* request, 
-  rendezvous::WaitRequestResponse* response) {
+grpc::Status ClientServiceImpl::Wait(grpc::ServerContext* context, 
+  const rendezvous::WaitMessage* request, 
+  rendezvous::WaitResponse* response) {
   if (!_consistency_checks) return grpc::Status::OK;
   
   const std::string& rid = request->rid();
@@ -260,7 +260,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   }
   
   // provide in-depth info about effectiveness of wait request (prevented inconsistency, timedout, etc)
-  int result = _server->waitRequest(rdv_request, service, region, tag, true, timeout);
+  int result = _server->wait(rdv_request, service, region, tag, true, timeout);
   if (result == 1) {
     response->set_prevented_inconsistency(true);
   }
@@ -271,9 +271,9 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
-grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context, 
-  const rendezvous::CheckRequestMessage* request, 
-  rendezvous::CheckRequestResponse* response) {
+grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context, 
+  const rendezvous::CheckStatusMessage* request, 
+  rendezvous::CheckStatusResponse* response) {
   if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
@@ -281,23 +281,19 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   const std::string& region = request->region();
   bool detailed = request->detailed();
 
-  spdlog::trace("> [CR] query for request '{}' on service '{}' and region '{}' (detailed=)", rid, service, region, detailed);
+  spdlog::trace("> [CS] query for request '{}' on service '{}' and region '{}' (detailed=)", rid, service, region, detailed);
   
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::error("< [CR] Error: invalid request '{}'", rid);
+    spdlog::error("< [CS] Error: invalid request '{}'", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
+  auto result = _server->checkStatus(rdv_request, service, region, detailed);
+
   // detailed information with status of all tagged branches
   if (detailed) {
-    if (service.empty()) {
-      spdlog::error("< [CR] Error: service not specified for detailed query");
-      return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, utils::ERR_MSG_FAILED_DETAILED_QUERY);
-    }
-    auto result = _server->checkDetailedRequest(rdv_request, service, region);
-
     // get info for tagged branches
     auto * tagged = response->mutable_tagged();
     response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
@@ -322,37 +318,7 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
       (*regions)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
     }
   }
-  // basic information for current context
-  else {
-    int result = _server->checkRequest(rdv_request, service, region);
-    response->set_status(static_cast<rendezvous::RequestStatus>(result));
-  }
-  return grpc::Status::OK;
-}
 
-grpc::Status ClientServiceImpl::CheckRequestByRegions(grpc::ServerContext* context, 
-  const rendezvous::CheckRequestByRegionsMessage* request, 
-  rendezvous::CheckRequestByRegionsResponse* response) {
-  if (!_consistency_checks) return grpc::Status::OK;
-  
-  const std::string& rid = request->rid();
-  const std::string& service = request->service();
-
-  spdlog::trace("> [CRR] query for request '{}' on service '{}'", rid, service);
-  
-  // check if request exists
-  metadata::Request * rdv_request = _getRequest(rid);
-  if (rdv_request == nullptr) {
-    spdlog::error("< [CRR] Error: invalid request '{}'", rid);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
-  }
-
-  // output info
-  std::map<std::string, int> result = _server->checkRequestByRegions(rdv_request, service);
-  auto * status = response->mutable_status();
-  for (auto pair = result.begin(); pair != result.end(); pair++) {
-    // <region, status>
-    (*status)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
-  }
+  response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
   return grpc::Status::OK;
 }

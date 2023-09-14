@@ -38,24 +38,24 @@ def closeBranch(stub, bid, region):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def waitRequest(stub, rid, service, region, ctx=None):
+def wait(stub, rid, service, region, ctx=None):
     try:
         request = pb.WaitRequestMessage(rid=rid, region=region, service=service)
         #request.context.CopyFrom(fromBytes(ctx))
         print(f"[Wait Request] > waiting: {request}")
-        response = stub.WaitRequest(request)
+        response = stub.Wait(request)
         print(f"[Wait Request] < returning: {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def checkRequest(stub, rid, service, region, detailed=False, ctx=None):
+def checkStatus(stub, rid, service, region, detailed=False, ctx=None):
     try:
-        #response = stub.CheckRequest(pb.CheckRequestMessage(rid=rid, service=service, region=region, serverctx=fromBytes(ctx)))
-        response = stub.CheckRequest(pb.CheckRequestMessage(rid=rid, service=service, region=region, detailed=detailed))
+        #response = stub.CheckStatus(pb.CheckRequestMessage(rid=rid, service=service, region=region, serverctx=fromBytes(ctx)))
+        response = stub.CheckStatus(pb.CheckRequestMessage(rid=rid, service=service, region=region, detailed=detailed))
         
         # python does not output OPENED (denoted as 0) values if we print the whole response
         status = pb.RequestStatus.Name(response.status)
-        print(f"[Check Request] status:\"{status}\"")
+        print(f"[Check Status] status:\"{status}\"")
         if detailed:
             print(f'--> tagged status: {response.tagged}')
             print(f'--> dependencies status: {response.dependencies}')
@@ -67,7 +67,7 @@ def checkRequestByRegions(stub, rid, service, ctx=None):
     try:
         #response = stub.CheckRequestByRegions(pb.CheckRequestByRegionsMessage(rid=rid, service=service, serverctx=fromBytes(ctx)))
         response = stub.CheckRequestByRegions(pb.CheckRequestByRegionsMessage(rid=rid, service=service))
-        print(f"[Check Request By Regions]:")
+        print(f"[Check Status By Regions]:")
         for regionStatus in response.regionStatus:
             status = rdv.RequestStatus.Name(regionStatus.status)
             print(f"\t{regionStatus.region} : {status}")
@@ -81,9 +81,8 @@ REGISTER_BRANCH_WITH_TAG = "rbtag";
 REGISTER_BRANCH_CHILD = "rbchild";
 CLOSE_BRANCH = "cb";
 WAIT_REQUEST = "wr";
-CHECK_REQUEST = "cr";
-CHECK_DETAILED_REQUEST = "cdr";
-CHECK_REQUEST_BY_REGIONS = "crr";
+CHECK_STATUS = "cr";
+CHECK_DETAILED_STATUS = "cdr";
 CHANGE_STUB = "stub"
 SLEEP = "sleep";
 EXIT = "exit";
@@ -95,9 +94,8 @@ def showOptions():
     print(f"- Register Branch child: \t \t {REGISTER_BRANCH_CHILD} <rid> <service> <regions> <parent_service> ")
     print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <bid> <region>")
     print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
-    print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> <service> <region>")
-    print(f"- Check Detailed Request: \t \t {CHECK_DETAILED_REQUEST} <rid> <service> <region>")
-    print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> <service>")
+    print(f"- Check Status: \t \t \t {CHECK_STATUS} <rid> <service> <region>")
+    print(f"- Check Detailed Status: \t \t {CHECK_DETAILED_STATUS} <rid> <service> <region>")
     print(f"- Sleep: \t \t \t \t {SLEEP} <time in seconds>")
     print(f"- Exit: \t \t \t \t {EXIT}")
     print(f"- Change Stub: \t \t \t \t {CHANGE_STUB} 0|1")
@@ -157,25 +155,20 @@ def readInput(stubs):
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            t = threading.Thread(target=waitRequest, args=(stub, rid, service, region, ctx))
+            t = threading.Thread(target=wait, args=(stub, rid, service, region, ctx))
             t.start()
 
-        elif command == CHECK_REQUEST and len(args) >= 1 and len(args) <= 3:
+        elif command == CHECK_STATUS and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            checkRequest(stub, rid, service, region, False, ctx)
+            checkStatus(stub, rid, service, region, False, ctx)
 
-        elif command == CHECK_DETAILED_REQUEST and len(args) >= 1 and len(args) <= 3:
+        elif command == CHECK_DETAILED_STATUS and len(args) >= 1 and len(args) <= 3:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            checkRequest(stub, rid, service, region, True, ctx)
-
-        elif command == CHECK_REQUEST_BY_REGIONS and len(args) >= 1 and len(args) <= 2:
-            rid = args[0]
-            service = args[1] if len(args) >= 2 else None
-            checkRequestByRegions(stub, rid, service, ctx)
+            checkStatus(stub, rid, service, region, True, ctx)
 
         elif command == SLEEP:
             sleepTime = float(args[0])

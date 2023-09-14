@@ -233,17 +233,17 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   return request;
 }
 
-// ---------------------
-// Main Rendezvous Logic
-//----------------------
-
 // testing purposes
 std::string Server::registerBranchRegion(metadata::Request * request, const std::string& service, const std::string& region, 
 const std::string& tag, std::string bid) {
   utils::ProtoVec regions;
   regions.Add(region.c_str());
-  return registerBranch(request, service, regions, tag, "parent_service", true, bid);
+  return registerBranch(request, service, regions, tag, "", true, bid);
 }
+
+// ---------------------
+// Main Rendezvous Logic
+//----------------------
 
 std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
@@ -284,7 +284,7 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return r;
 }
 
-int Server::waitRequest(metadata::Request * request, const std::string& service, const::std::string& region, 
+int Server::wait(metadata::Request * request, const std::string& service, const::std::string& region, 
   std::string tag, bool async, int timeout) {
 
   int result;
@@ -308,30 +308,17 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
   return result;
 }
 
-int Server::checkRequest(metadata::Request * request, const std::string& service, const std::string& region) {
+utils::Status Server::checkStatus(metadata::Request * request, const std::string& service, 
+  const std::string& region, bool detailed) {
+    
   utils::Status res;
 
   if (!service.empty() && !region.empty())
-    res = request->getStatusServiceRegion(service, region);
+    return request->checkStatusServiceRegion(service, region, detailed);
   else if (!service.empty())
-    res = request->getStatusService(service);
+    return request->checkStatusService(service, detailed);
   else if (!region.empty())
-    res = request->getStatusRegion(region);
-  else
-    res = request->getStatus();
+    return request->checkStatusRegion(region, detailed);
 
-  // parse request status and ignore detailed field
-  return res.status;
-}
-
-utils::Status Server::checkDetailedRequest(metadata::Request * request, const std::string& service, const std::string& region) {
-  if (!service.empty() && !region.empty())
-    return request->getStatusServiceRegion(service, region, true);
-  return request->getStatusService(service, true);
-}
-
-std::map<std::string, int> Server::checkRequestByRegions(metadata::Request * request, const std::string& service) {
-  if (!service.empty())
-    return request->getStatusByRegionsOnService(service);
-  return request->getStatusByRegions();
+  return request->checkStatus();
 }

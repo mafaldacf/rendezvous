@@ -210,7 +210,7 @@ namespace rendezvous {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              */
-            int waitRequest(metadata::Request * request, const std::string& service, const::std::string& region, 
+            int wait(metadata::Request * request, const std::string& service, const::std::string& region, 
                 std::string tag = "", bool async = false, int timeout = 0);
             
             /**
@@ -224,32 +224,8 @@ namespace rendezvous {
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            int checkRequest(metadata::Request * request, const std::string& service, const std::string& region);
-
-            /**
-             * Check DETAILED status of the request for a given context (none, service, region or service and region)
-             * 
-             * @param request Request where the branch is registered
-             * @param service The service context
-             * @param region The region context
-             * @return Return status for current context as well as status for all tagged branches. Status can either be:
-             * - 0 if request is OPENED 
-             * - 1 if request is CLOSED
-             * - 2 if context was not found
-             */
-            utils::Status checkDetailedRequest(metadata::Request * request, 
-                const std::string& service, const std::string& region);
-            
-            /**
-             * Check status of request for each available region and for a given contex (service)
-             *
-             * @param request Request where the branch is registered
-             * @param service The name of the service that defines the waiting context
-             *
-             * @return Map of status of the request (OPENED or CLOSED) for each region
-             */
-            
-            std::map<std::string, int> checkRequestByRegions(metadata::Request * request, const std::string& service);
+            utils::Status checkStatus(metadata::Request * request, const std::string& service, 
+                const std::string& region, bool detailed = false);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

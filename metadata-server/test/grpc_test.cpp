@@ -146,7 +146,7 @@ void waitRequest(std::string rid, std::string service, std::string region) {
   rendezvous::Empty response;
   request.set_rid(rid);
 
-  auto status = stub->waitRequest(&context, request, &response);
+  auto status = stub->wait(&context, request, &response);
   ASSERT_TRUE(status.ok());
 }
 
@@ -161,7 +161,7 @@ void waitRequestAndAssertError(std::string rid, std::string service, std::string
   request.set_service(service);
   request.set_region(region);
 
-  auto status = stub->waitRequest(&context, request, &response);
+  auto status = stub->wait(&context, request, &response);
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(expectedStatus, status.error_code());
 }
