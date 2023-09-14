@@ -49,7 +49,7 @@ metadata::Branch * Request::registerBranch(const std::string& bid, const std::st
     int num = regions.size();
 
     // branch with specified regions
-    if (num > 1) {
+    if (num > 0) {
         branch = new metadata::Branch(service, tag, regions);
     }
 
@@ -61,6 +61,7 @@ metadata::Branch * Request::registerBranch(const std::string& bid, const std::st
 
     // error tracking branch (tag already exists!)
     if (!trackBranch(service, regions, num, parent_service, branch)) {
+        spdlog::error("Error creating branch for service = {} and #{} regions", service, num);
         delete branch;
         return nullptr;
     }
@@ -87,6 +88,9 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
         untrackBranch(service, region);
         _cond_branches.notify_all();
     }
+    else if (r == -1) {
+        spdlog::error("Error closing branch for service = {} on region = {}", service, region);
+    }
     return r;
 }
 
@@ -98,19 +102,17 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
     /* --------------- */
     if (!service.empty()) {
         std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-        _service_nodes[service].num_opened_branches -= 1;
         // service and region context
         if (!region.empty()) {
             _service_nodes[service].opened_regions[region] -= 1;
         }
 
-        // get parent node
+        // decrease opened branches in all direct parents
         ServiceNodeStruct * parent_node = &_service_nodes[service];
-        // decrease opened branches in all parents
-        while (parent_node != nullptr) {
+        do {
             parent_node->num_opened_branches--;
             parent_node = parent_node->parent;
-        }
+        } while (parent_node != nullptr);
 
         // notify creation of new branch
         _cond_service_nodes.notify_all();
@@ -126,12 +128,13 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
         // notify creation of new branch
         _cond_opened_regions.notify_all();
     }
+
     return true;
 }
 
 bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
     const std::string& parent_name, metadata::Branch * branch) {
-        
+    
     _num_opened_branches.fetch_add(num);
     /* --------------- */
     /* service context */
@@ -391,48 +394,56 @@ const::std::string& tag, bool async, int timeout) {
     return inconsistency;
 }
 
-utils::Status Request::getStatus() {
+utils::Status Request::checkStatus(bool detailed) {
+    utils::Status res;
+
     if (_num_opened_branches.load() == 0) {
-        return {CLOSED};
+        res.status = CLOSED;
     }
-    return {OPENED};
+    else {
+        res.status = OPENED;
+    }
+    return res;
 }
 
-utils::Status Request::getStatusRegion(const std::string& region) {
+utils::Status Request::checkStatusRegion(const std::string& region, bool detailed) {
+    utils::Status res;
     std::unique_lock<std::mutex> lock(_mutex_opened_regions);
     if (!_opened_regions.count(region)) {
-        return {UNKNOWN};
+        res.status = UNKNOWN;
     }
-    if (_opened_regions[region] == 0) {
-        return {CLOSED};
+    else if (_opened_regions[region] == 0) {
+        res.status = CLOSED;
     }
-    return {OPENED};
+    else {
+        res.status = OPENED;
+    }
+    return res;
 }
 
-utils::Status Request::getStatusService(const std::string& service, bool detailed) {
+utils::Status Request::checkStatusService(const std::string& service, bool detailed) {
+    utils::Status res;
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    int status;
 
     // find out if service context exists
     if (!_service_nodes.count(service)) {
-        return {UNKNOWN};
+        res.status = UNKNOWN;
+        return res;
     }
     
     // get overall status of request
     if (_service_nodes[service].num_opened_branches == 0) {
-        status = CLOSED;
+        res.status = CLOSED;
     } else {
-        status = OPENED;
+        res.status = OPENED;
     }
 
     // return if client only wants basic information (status)
     if (!detailed) {
-        return {status};
+        return res;
     }
 
     // otherwise, return detailed information
-    utils::Status res;
-    res.status = status;
     // get tagged branches within the same service
     for (const auto& branch_it: _service_nodes[service].tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus();
@@ -449,35 +460,35 @@ utils::Status Request::getStatusService(const std::string& service, bool detaile
     return res;
 }
 
-utils::Status Request::getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
+utils::Status Request::checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    int status;
+    utils::Status res;
 
     // find out if service context exists
     auto service_it = _service_nodes.find(service);
     if (service_it == _service_nodes.end()) {
-        return {UNKNOWN};
+        res.status = UNKNOWN;
+        return res;
     }
     auto region_it = service_it->second.opened_regions.find(region);
     if (region_it == service_it->second.opened_regions.end()) {
-        return {UNKNOWN};
+        res.status = UNKNOWN;
+        return res;
     }
     
     // get overall status of request
     if (_service_nodes[service].opened_regions[region] == 0) {
-        status = CLOSED;
+        res.status = CLOSED;
     } else {
-        status = OPENED;
+        res.status = OPENED;
     }
 
     // return if client only wants basic information (status)
     if (!detailed) {
-        return {status};
+        return res;
     }
 
     // otherwise, return detailed information
-    utils::Status res;
-    res.status = status;
     for (const auto& branch_it: _service_nodes[service].tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus(region);
     }
@@ -491,32 +502,4 @@ utils::Status Request::getStatusServiceRegion(const std::string& service, const 
         res.children[(*node_it)->name] = status;
     }
     return res;
-}
-
-std::map<std::string, int> Request::getStatusByRegions() {
-    std::unique_lock<std::mutex> lock(_mutex_opened_regions);
-    std::map<std::string, int> result = std::map<std::string, int>();
-    for (const auto& it : _opened_regions) {
-        result[it.first] = it.second == 0 ? CLOSED : OPENED;
-    }
-    return result;
-}
-
-std::map<std::string, int> Request::getStatusByRegionsOnService(const std::string& service) {
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    std::map<std::string, int> result = std::map<std::string, int>();
-    auto service_it = _service_nodes.find(service);
-
-    // no status found for a given service
-    if (service_it == _service_nodes.end()) {
-        return result;
-    }
-    // <service, <region, number of opened branches>>
-    for (const auto& region_it : service_it->second.opened_regions) {
-        // sanity check: skip branches with no region
-        if (!region_it.first.empty()) {
-            result[region_it.first] = region_it.second == 0 ? CLOSED : OPENED;
-        }
-    }
-    return result;
 }

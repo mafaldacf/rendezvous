@@ -20,6 +20,8 @@ namespace metadata {
             std::unordered_map<std::string, int> _regions;
             int _opened_regions;
 
+            const std::string GLOBAL_REGION = "";
+
         public:
             Branch(std::string service, std::string tag, std::string region);
             Branch(std::string service, std::string tag, const utils::ProtoVec& vector_regions);
