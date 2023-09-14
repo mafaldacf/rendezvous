@@ -3,6 +3,7 @@
 #include "../src/server.h"
 #include "gtest/gtest.h"
 #include <grpcpp/grpcpp.h>
+#include "utils.h"
 #include <thread>
 #ifdef _WIN32
 #include <Windows.h>
@@ -10,17 +11,9 @@
 #include <unistd.h>
 #endif
 
-/* -----------------------------------------------------
-
-FULL COVERAGE TESTING OF gRPC CHANNELS AND SERVER LOGIC 
--> REQUIRES RUNNING SERVER!
-
--------------------------------------------------------- */
-
-const int OPENED = 0;
-const int CLOSED = 1;
-
-const std::string RID = "myrequestid";
+// -------------
+// GRPS API TEST
+// -------------
 
 /* ------------
 

@@ -3,46 +3,11 @@
 #include "gtest/gtest.h"
 #include <thread>
 #include <string>
+#include "utils.h"
 
-/* ---------------
-
-TEST SERVER LOGIC
-
------------------ */
-const int OK = 0;
-const int PREVENTED_INCONSISTENCY = 1;
-
-const int INVALID_REQUEST = -1;
-const int CONTEXT_NOT_FOUND = 2;
-const int INVALID_BRANCH_SERVICE = -2;
-const int INVALID_BRANCH_REGION = -3;
-
-const std::string SID = "eu-central-1";
-const std::string RID = "myrequestid";
-const std::string EMPTY_TAG = "";
-
-std::string getRid(int id) {
-  return SID + ':' + std::to_string(id);
-}
-
-// for closing branches
-std::string getBid(int bid) {
-  return SID + '_' + std::to_string(bid);
-}
-std::string parseFullBid(rendezvous::Server * server, metadata::Request * request, std::string bid, int bid_idx=-1) {
-  // just a workaround for a quick sanity check!
-  // getBid() computes the id which should match the one parsed by the server
-  // we return "ERR" to force the test to fail if the following condition is not true (which should never happen if everything is ok)
-  if (bid_idx != -1 && getBid(bid_idx) == server->parseFullBid(bid).first) {
-    return server->parseFullBid(bid).first;
-  }
-  return "ERR";
-}
-
-// for register branches
-std::string getFullBid(std::string rid, int id) {
-  return SID + '_' + std::to_string(id) + ":" + rid;
-}
+// ---------
+// CORE TEST
+// ---------
 
 TEST(ServerTest, getOrRegisterRequest_WithNoRid) { 
   rendezvous::Server server(SID);
@@ -286,7 +251,7 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
 
   /* global verifications */
   res = server.checkStatus(request, "post-notifications", "");
-  ASSERT_EQ(CONTEXT_NOT_FOUND, res.status);
+  ASSERT_EQ(UNKNOWN, res.status);
   res = server.checkStatus(request, "", "EU");
   ASSERT_EQ(CLOSED, res.status);
   res = server.checkStatus(request, "", "US");
@@ -319,11 +284,11 @@ TEST(ServerTest, CheckRequest_ContextNotFound) {
   server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
 
   res = server.checkStatus(request, "s1", "");
-  ASSERT_EQ(CONTEXT_NOT_FOUND, res.status);
+  ASSERT_EQ(UNKNOWN, res.status);
   res = server.checkStatus(request, "", "r1");
-  ASSERT_EQ(CONTEXT_NOT_FOUND, res.status);
+  ASSERT_EQ(UNKNOWN, res.status);
   res = server.checkStatus(request, "s1", "r1");
-  ASSERT_EQ(CONTEXT_NOT_FOUND, res.status);
+  ASSERT_EQ(UNKNOWN, res.status);
 }
 
 // sanity check
