@@ -21,7 +21,7 @@ AWS_ACCOUNT_ID=851889773113
 
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build, deploy [{config, tests}], build-py-proto, run {server <replica id> <config>, tests, client, monitor}"
+    echo "> ./rendezvous.sh local clean, build [{config, tests, py}], run {server <replica id> <config>, tests, client, monitor}"
     echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
@@ -57,7 +57,7 @@ local_build() {
   echo done!
 }
 
-local_build_cfg() {
+local_build_config() {
   cd metadata-server
   mkdir -p cmake/build
   cd cmake/build
@@ -73,7 +73,7 @@ local_build_tests() {
   echo done!
 }
 
-local_build_py_proto() {
+local_build_py() {
   # need to specify package name in -I <package_name>=... for proto files to find absolute file during imports
   # https://github.com/protocolbuffers/protobuf/issues/1491
   # consequently, we have to remove part of the path from the output flags (the path will be complemented with the package name)
@@ -310,11 +310,11 @@ elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "clean" ]; then
 elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ]; then
   local_build
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "config" ]; then
-  local_build_cfg
+  local_build_config
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "tests" ]; then
   local_build_tests
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build-py-proto" ]; then
-  local_build_py_proto
+elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "py" ]; then
+  local_build_py
 elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
   local_run_server $4 $5
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
