@@ -34,11 +34,11 @@ namespace metadata {
 
         private:
             /* track all branching information of a service */
-            typedef struct ServiceBranchingStruct {
+            typedef struct ServiceNodeStruct {
                 int num_opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
-            } ServiceBranching;
+            } ServiceNode;
 
             /* request status */
             static const int OPENED = 0;
@@ -62,7 +62,7 @@ namespace metadata {
             // <bid, branch ptr>
             std::unordered_map<std::string, metadata::Branch*> _branches;
             // <service, service branching ptr>
-            std::unordered_map<std::string, ServiceBranching> _service_branching;
+            std::unordered_map<std::string, ServiceNode> _service_nodes;
             // <region, STATUS>
             std::unordered_map<std::string, int> _opened_regions;
 
@@ -70,14 +70,14 @@ namespace metadata {
             /* concurrency control */
             /* ------------------- */
             std::mutex _mutex_branches;
-            std::mutex _mutex_service_branching;
+            std::mutex _mutex_service_nodes;
             std::mutex _mutex_opened_regions;
             std::condition_variable _cond_branches;
-            std::condition_variable _cond_service_branching;
+            std::condition_variable _cond_service_nodes;
             std::condition_variable _cond_opened_regions;
 
             // for wait with async option
-            std::condition_variable _cond_new_service_branching;
+            std::condition_variable _cond_new_service_nodes;
             std::condition_variable _cond_new_opened_regions;
 
             /**
