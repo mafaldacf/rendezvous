@@ -174,6 +174,7 @@ namespace rendezvous {
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
+             * @param parent_service The parent service in the dependency graph
              * @param monitor Monitor branch by publishing identifier to subscribers
              * @param bid The set of branches identifier: empty if request is from client
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)

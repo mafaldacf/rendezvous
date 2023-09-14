@@ -167,7 +167,7 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              */
-            int wait(int timeout);
+            int wait(int timeout, std::string prev_service = "");
 
             /**
              * Wait until request is closed for a given context (service)

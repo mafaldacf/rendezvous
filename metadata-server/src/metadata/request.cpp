@@ -116,7 +116,7 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
 
         if (fully_closed) {
             // decrease opened branches in all direct parents
-            ServiceNodeStruct * parent_node = _service_nodes[service];
+            ServiceNode * parent_node = _service_nodes[service];
             do {
                 parent_node->num_opened_branches--;
                 parent_node = parent_node->parent;
@@ -166,8 +166,13 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
             _service_nodes[service]->tagged_branches[branch->getTag()] = branch;
         }
 
+        _service_nodes[service]->num_opened_branches++;
+
+        // add current node to the parent's children nodes
+        ServiceNode * parent_node = _service_nodes[parent_name];
+        _service_nodes[service]->parent = parent_node;
+        parent_node->children.emplace_back(_service_nodes[service]);
         // increment opened branches in all direct parents
-        ServiceNodeStruct * parent_node = _service_nodes[service];
         do {
             parent_node->num_opened_branches++;
             parent_node = parent_node->parent;
@@ -212,19 +217,41 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
-int Request::wait(int timeout) {
+int Request::wait(int timeout, std::string prev_service) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
     std::unique_lock<std::mutex> lock(_mutex_branches);
-    while (_num_opened_branches.load() != 0) {
-        _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
-        inconsistency = 1;
-        remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-        if (remaining_timeout <= std::chrono::seconds(0)) {
-            return -1;
+
+    // transverse parents algorithm:
+    // - only wait for top/left neighboors
+    // - discard direct parents
+    ServiceNode * stop = nullptr;
+    ServiceNode * parent = _service_nodes[prev_service];
+    do {
+        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            if (*it == stop) {
+                break;
+            }
+
+            // ----------
+            // wait logic
+            // ----------
+            while ((*it)->num_opened_branches != 0) {
+                _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
+                inconsistency = 1;
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
+                }
+            }
+            // ----------
+            // ----------
         }
-    }
+        stop = parent;
+        parent = parent->parent;
+    } while (parent != nullptr);
+    
     return inconsistency;
 }
 
