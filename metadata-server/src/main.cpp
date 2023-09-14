@@ -22,10 +22,11 @@
 using json = nlohmann::json;
 
 static std::string _replica_id;
-static std::string _config_file;
+static std::string _connections_filename;
 static std::string _replica_addr;
 static std::vector<std::string> _replicas_addrs;
 static json _settings;
+static bool _async_replication;
 
 std::unique_ptr<grpc::Server> server;
 std::unique_ptr<service::ClientServiceImpl> client_service;
@@ -45,8 +46,8 @@ void shutdown() {
 
 void run() {
   auto rendezvous_server = std::make_shared<rendezvous::Server> (_replica_id, _settings);
-  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs);
-  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server);
+  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs, _async_replication);
+  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server, _async_replication);
 
   grpc::ServerBuilder builder;
   builder.AddListeningPort(_replica_addr, grpc::InsecureServerCredentials());
@@ -66,21 +67,37 @@ void run() {
 }
 
 void loadConfig() {
-  std::ifstream file("../" + _config_file);
-  if (!file.is_open()) {
-    spdlog::error("Error opening JSON config");
+  /* Parse settings config */
+  std::ifstream settings_file("../config/settings.json");
+  if (!settings_file.is_open()) {
+    spdlog::error("Error opening 'settings.json' config");
+    exit(-1);
+  }
+  spdlog::info("Parsing 'settings.json'...");
+  try {
+    json root;
+    settings_file >> root;
+    _settings = root;
+    _async_replication = _settings["async_replication"].get<bool>();
+  }
+  catch (json::exception &e) {
+    spdlog::error("Error parsing 'settings.json'");
     exit(-1);
   }
 
-  spdlog::info("Parsing " + _config_file + "...");
-
+  /* Parse connections config */
+  std::ifstream connections_file("../config/connections/" + _connections_filename);
+  if (!connections_file.is_open()) {
+    spdlog::error("Error opening JSON config");
+    exit(-1);
+  }
+  spdlog::info("Parsing connections file '" + _connections_filename + "'...");
   try {
     json root;
-    file >> root;
-    _settings = root["local_settings"];
+    connections_file >> root;
 
     // load replicas addresses
-    for (const auto &replica : root["replicas"].items()) {
+    for (const auto &replica : root.items()) {
       std::string id = replica.key();
       std::string addr = replica.value()["host"].get<std::string>() + ':' + std::to_string(replica.value()["port"].get<int>());
 
@@ -114,7 +131,7 @@ int main(int argc, char *argv[]) {
 
   if (argc == 3) {
     _replica_id = argv[1];
-    _config_file = argv[2];
+    _connections_filename = argv[2];
   }
   else {
     spdlog::error("Invalid number of arguments");

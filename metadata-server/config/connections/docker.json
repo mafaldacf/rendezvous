@@ -1,0 +1,10 @@
+{
+  "eu": {
+    "host": "rendezvous-eu",
+    "port": 8001
+  },
+  "us": {
+    "host": "rendezvous-us",
+    "port": 8002
+  }
+}

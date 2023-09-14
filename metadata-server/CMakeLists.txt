@@ -15,10 +15,16 @@ endif()
 
 message("[INFO] Copying config files...")
 # Copy all JSON config files from configs/ directory
-file(GLOB config_files ${CMAKE_SOURCE_DIR}/configs/*.json)
+file(GLOB config_files ${CMAKE_SOURCE_DIR}/config/*.json)
 foreach(config ${config_files})
     get_filename_component(config_filename ${config} NAME)
-    configure_file(${config} ${CMAKE_CURRENT_BINARY_DIR}/${config_filename} COPYONLY)
+    configure_file(${config} ${CMAKE_CURRENT_BINARY_DIR}/config/${config_filename} COPYONLY)
+endforeach()
+
+file(GLOB config_files ${CMAKE_SOURCE_DIR}/config/connections/*.json)
+foreach(config ${config_files})
+    get_filename_component(config_filename ${config} NAME)
+    configure_file(${config} ${CMAKE_CURRENT_BINARY_DIR}/config/connections/${config_filename} COPYONLY)
 endforeach()
 
 if(NOT CONFIG_ONLY)

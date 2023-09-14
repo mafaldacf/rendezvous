@@ -1,17 +1,9 @@
 {
-  "local_settings": {
     "cleanup_requests_interval_m": -1,
     "cleanup_requests_validity_m": -1,
     "cleanup_subscribers_interval_m": -1,
     "cleanup_subscribers_validity_m": -1,
     "subscribers_refresh_interval_s": 30,
-    "wait_replica_timeout_s": 10
-  },
-
-  "replicas": {
-    "eu": {
-      "host": "localhost",
-      "port": 8001
-    }
-  }
+    "wait_replica_timeout_s": 10,
+    "async_replication": false
 }

@@ -4,10 +4,6 @@
 #include <string>
 
 namespace utils {
-    // request context versioning
-    #ifndef CONTEXT_PROPAGATION
-    #define CONTEXT_PROPAGATION 1
-    #endif
 
     /* --------------------- */
     /* gRPC structure helper */

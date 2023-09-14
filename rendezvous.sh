@@ -10,8 +10,8 @@ SERVER_PORT_US=8002
 SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
 SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 # dynamic for each instance
-HOSTNAME_EU="18.192.8.131"
-HOSTNAME_US="52.55.65.161"
+HOSTNAME_EU="3.121.222.110"
+HOSTNAME_US="34.227.172.92"
 
 # -----------------
 # Docker deployment
@@ -277,7 +277,7 @@ docker_start() {
 
   cmd="sudo docker-compose up -d --force-recreate metadata-server-${region} datastore-monitor-${db}-${region}"
   ssh -o StrictHostKeyChecking=no -i $ssh_key ${EC2_USERNAME}@${hostname} $cmd
-  echo "Rendezvous server running @ ${hostname} (${1})"
+  echo "Rendezvous running @ ${hostname} (${1})"
 }
 
 docker_stop() {
@@ -295,10 +295,7 @@ docker_stop() {
 
   cmd="sudo docker-compose down"
   ssh -o StrictHostKeyChecking=no -i $ssh_key ${EC2_USERNAME}@${hostname} $cmd
-  echo "(1/1) Stopped rendezvous @ ${1}"
-
-  echo ""
-  echo done!
+  echo "Stopped rendezvous @ ${hostname} (${1})"
 }
 
 # -------------------------------------------------------------------------------------------

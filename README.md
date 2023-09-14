@@ -57,8 +57,8 @@ Install C++ dependencies for local deployment **without Docker** (optional):
 
 ## Running Rendezvous Metadata Server Locally
 
-Go to `metadata-server/configs` and configure your own json file. 
-You can use `single.json` to run a single server locally.
+Go to `metadata-server/config` and configure your `params` json file as well as the connections in the `connections` folder. 
+You can use `metadata-server/config/connections/single.json` to run a single server locally.
 
 Make sure you have installed all the necessary local dependencies for Python and C++.
 
@@ -66,10 +66,10 @@ Make sure you have installed all the necessary local dependencies for Python and
 
 Build and run project for the following available parameters:
 - region: `eu`, `us`
-- config: `docker.json`, `local.json`, `remote.json`, `single.json`
+- connections_filename: `docker.json`, `local.json`, `remote.json`, `single.json`
 
     ./rendezvous.sh local build
-    ./rendezvous.sh local run server <region> <config>
+    ./rendezvous.sh local run server <region> <connections_filename>
 
 Clean generated files
 
@@ -161,7 +161,7 @@ For each region (`eu-central-1` and `us-east-1`), start two EC2 instances:
 
 Now that both instances are running, go to your local project folder:
    1. Edit the main `rendezvous.sh` script parameters for public IPs and keypair paths
-   2. Edit the metadata server `metadata-server/configs/remote.json` config with the public IPs
+   2. Edit the metadata server `metadata-server/config/connections/remote.json` config with the public IPs
    3. Make sure that both servers' connections identified by `rendezvous` in `datastore-monitor/config/connections.yaml` match the following:
        - `eu-central-1`: `localhost:8001` 
        - `us-east-1`: `localhost:8002`
@@ -192,7 +192,7 @@ For each region (`eu-central-1` and `us-east-1`), start two EC2 instances:
 
 Now that both instances are running, go to your local project folder:
    1. Edit the main `rendezvous.sh` script parameters for public IPs and keypair paths
-   2. Edit the metadata server `metadata-server/configs/remote.json` config with the public IPs
+   2. Edit the metadata server `metadata-server/config/remote.json` config with the public IPs
    3. Make sure that both servers' connections identified by `rendezvous` in `datastore-monitor/config/connections.yaml` match the following:
        - `eu-central-1`: `rendezvous-eu:8001` 
        - `us-east-1`: `rendezvous-us:8002`

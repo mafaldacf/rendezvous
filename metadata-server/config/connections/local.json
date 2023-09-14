@@ -1,0 +1,10 @@
+{
+  "eu": {
+    "host": "localhost",
+    "port": 8001
+  },
+  "us": {
+    "host": "localhost",
+    "port": 8002
+  }
+}

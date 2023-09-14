@@ -14,7 +14,7 @@ dynamo:
   region: eu-central-1
   client_table: blobs
 s3:
-  bucket_region_eu-central-1: antipode-lambda-posts-eu-test
+  bucket_region_eu-central-1: antipode-lambda-posts-eu-rendezvous
   bucket_region_us-east-1: antipode-lambda-posts-us-rendezvous
   rendezvous_path: rendezvous
 cache:

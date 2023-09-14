@@ -2,7 +2,9 @@
 
 using namespace replicas;
 
-ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
+ReplicaClient::ReplicaClient(std::vector<std::string> addrs, bool async_replication): 
+    _async_replication(async_replication) {
+
     // by default, addrs does not contain the address of the current replica
     for (const auto& addr : addrs) {
       auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
@@ -11,7 +13,7 @@ ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
     }
 }
 
-void ReplicaClient::waitCompletionQueue(const std::string& request, struct RequestHelper& req_helper) {
+void ReplicaClient::_waitCompletionQueue(const std::string& request, struct RequestHelper& req_helper) {
     for(int i = 0; i < req_helper.nrpcs; i++) {
         void * tagPtr;
         bool ok = false;
@@ -26,41 +28,44 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
     }
 }
 
-void ReplicaClient::sendRegisterRequest(const std::string& rid) {
-    std::thread([this, rid]() {
-        struct RequestHelper req_helper;
+void ReplicaClient::_doRegisterRequest(const std::string& rid) {
+    struct RequestHelper req_helper;
+    for (const auto& server : _servers) {
+        grpc::ClientContext * context = new grpc::ClientContext();
+        req_helper.contexts.emplace_back(context);
 
-        for (const auto& server : _servers) {
-            grpc::ClientContext * context = new grpc::ClientContext();
-            req_helper.contexts.emplace_back(context);
+        grpc::Status * status = new grpc::Status();
+        req_helper.statuses.emplace_back(status);
 
-            grpc::Status * status = new grpc::Status();
-            req_helper.statuses.emplace_back(status);
+        rendezvous_server::Empty * response = new rendezvous_server::Empty();
+        req_helper.responses.emplace_back(response);
 
-            rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            req_helper.responses.emplace_back(response);
+        rendezvous_server::RegisterRequestMessage request;
+        request.set_rid(rid);
+        
+        req_helper.rpcs.emplace_back(server->AsyncRegisterRequest(context, request, &req_helper.queue));
+        req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
 
-            rendezvous_server::RegisterRequestMessage request;
-            request.set_rid(rid);
-            
-            req_helper.rpcs.emplace_back(server->AsyncRegisterRequest(context, request, &req_helper.queue));
-            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
-
-            req_helper.nrpcs++;
-        }
-
-        waitCompletionQueue("RR", req_helper);
-
-     }).detach();
+        req_helper.nrpcs++;
+    }
+    _waitCompletionQueue("RR", req_helper);
 }
 
-void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+void ReplicaClient::registerRequest(const std::string& rid) {
+    if (_async_replication) {
+        std::thread([this, rid]() {
+            _doRegisterRequest(rid);
+        }).detach();
+    }
+    else {
+        _doRegisterRequest(rid);
+    }
+}
+
+void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
     const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     std::string id, int version) {
-
-    std::thread([this, rid, bid, service, tag, regions, monitor, id, version]() {
         struct RequestHelper req_helper;
-
         for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
             req_helper.contexts.emplace_back(context);
@@ -79,7 +84,8 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
             request.set_monitor(monitor);
             request.mutable_regions()->CopyFrom(regions);
 
-            if (CONTEXT_PROPAGATION) {
+            // async replication requires context propagation
+            if (_async_replication) {
                 rendezvous_server::ReplicaRequestContext ctx;
                 ctx.set_replica_id(id);
                 ctx.set_request_version(version);
@@ -91,18 +97,26 @@ void ReplicaClient::sendRegisterBranch(const std::string& rid, const std::string
 
             req_helper.nrpcs++;
         }
+        _waitCompletionQueue("RB", req_helper);
+    }
 
-        waitCompletionQueue("RB", req_helper);
-
-    }).detach();
-}
-
-void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& region, 
+void ReplicaClient::registerBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+    const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     std::string id, int version) {
 
-    std::thread([this, bid, region, id, version]() {
-        struct RequestHelper req_helper;
+        if (_async_replication) {
+        std::thread([this, rid, bid, service, tag, regions, monitor, id, version]() {
+            _doRegisterBranch(rid, bid, service, tag, regions, monitor, id, version);
+        }).detach();
+        }
+        else {
+            _doRegisterBranch(rid, bid, service, tag, regions, monitor, id, version);
+        }
+}
 
+void ReplicaClient::_doCloseBranch(const std::string& bid, const std::string& region, 
+    std::string id, int version) {
+        struct RequestHelper req_helper;
         for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
             req_helper.contexts.emplace_back(context);
@@ -117,7 +131,8 @@ void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& r
             request.set_bid(bid);
             request.set_region(region);
 
-            if (CONTEXT_PROPAGATION) {
+            // async replication requires context propagation
+            if (_async_replication) {
                 rendezvous_server::ReplicaRequestContext ctx;
                 ctx.set_replica_id(id);
                 ctx.set_request_version(version);
@@ -129,8 +144,19 @@ void ReplicaClient::sendCloseBranch(const std::string& bid, const std::string& r
 
             req_helper.nrpcs++;
         }
+        _waitCompletionQueue("CB", req_helper);
+    }
 
-        waitCompletionQueue("CB", req_helper);
+void ReplicaClient::closeBranch(const std::string& bid, const std::string& region, 
+    std::string id, int version) {
 
-    }).detach();
+    if (_async_replication) {
+        std::thread([this, bid, region, id, version]() {
+            _doCloseBranch(bid, region, id, version);
+        }).detach();
+    }
+    else {
+        _doCloseBranch(bid, region, id, version);
+    }
+
 }

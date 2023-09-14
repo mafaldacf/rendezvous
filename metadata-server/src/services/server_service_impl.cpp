@@ -2,18 +2,19 @@
 
 using namespace service;
 
-ServerServiceImpl::ServerServiceImpl(std::shared_ptr<rendezvous::Server> server)
-    : _server(server) {
+ServerServiceImpl::ServerServiceImpl(std::shared_ptr<rendezvous::Server> server, bool async_replication)
+    : _server(server), _async_replication(async_replication) {
       auto consistency_checks_env = std::getenv("CONSISTENCY_CHECKS");
       if (consistency_checks_env) {
-      _CONSISTENCY_CHECKS = (atoi(consistency_checks_env) == 1);
+      _consistency_checks = (atoi(consistency_checks_env) == 1);
     } else { // true by default
-      _CONSISTENCY_CHECKS = true;
+      _consistency_checks = true;
     }
 }
 grpc::Status ServerServiceImpl::RegisterRequest(grpc::ServerContext* context, const rendezvous_server::RegisterRequestMessage* request, rendezvous_server::Empty* response) {
-  if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  if (!_consistency_checks) return grpc::Status::OK;
   //spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
+
   metadata::Request * rdv_request;
   std::string rid = request->rid();
   _server->getOrRegisterRequest(rid);
@@ -24,7 +25,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const rendezvous_server::RegisterBranchMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& service = request->service();
   const std::string& tag = request->tag();
@@ -40,7 +41,10 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   // parse bid from <bid>:<rid>
   std::string bid = _server->parseFullBid(full_bid).first;
   std::string res = _server->registerBranch(rdv_request, service, regions, tag, monitor, bid);
-  rdv_request->getVersionsRegistry()->updateRemoteVersion(request->context().replica_id(), request->context().request_version());
+  
+  if (_async_replication) {
+    rdv_request->getVersionsRegistry()->updateRemoteVersion(request->context().replica_id(), request->context().request_version());
+  }
   return grpc::Status::OK;
 }
 
@@ -48,7 +52,7 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   const rendezvous_server::CloseBranchMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_CONSISTENCY_CHECKS) return grpc::Status::OK;
+  if (!_consistency_checks) return grpc::Status::OK;
   
   //spdlog::trace("> [REPLICATED CB] closing branch with full bid '{}' on region '{}'", request->bid(), request->region());
   
@@ -59,10 +63,11 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (rid.empty() || bid.empty()) {
     return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_BID);
   }
-
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+
   // always force close branch when dealing with replicated requests
   int res = _server->closeBranch(rdv_request, bid, request->region(), true);
+
   if (res == 0) {
     spdlog::error("> [REPLICATED CB] Error: branch with full bid '{}' not found", request->bid());
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);

@@ -26,26 +26,34 @@ namespace replicas {
 
         private:
             std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
-
-        public:
-            ReplicaClient(std::vector<std::string> addrs);
+            bool _async_replication;
 
             /**
-             * gRPC helper to wait for completion queue of async requests
+             * Wait for completion queue of async requests
              * 
              * @param request The type of request that is being handled
              * @param cq The completion queue
              * @param statuses Vector of status for each request
              * @param rpcs Number of RPCs performed
              */
-            void waitCompletionQueue(const std::string& request, struct RequestHelper& rh);
+            void _waitCompletionQueue(const std::string& request, struct RequestHelper& rh);
+
+            /* Helpers */
+            void _doRegisterRequest(const std::string& rid);
+            void _doRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+                const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
+                std::string id = "", int version = 0);
+            void _doCloseBranch(const std::string& bid, const std::string& region, std::string id = "", int version = 0);
+
+        public:
+            ReplicaClient(std::vector<std::string> addrs, bool async_replication);
 
             /**
              * Send register request call to all replicas
              * 
              * @param rid The identifier of the request
              */
-            void sendRegisterRequest(const std::string& rid);
+            void registerRequest(const std::string& rid);
             /**
              * Send register branches call to all replicas
              * 
@@ -56,7 +64,7 @@ namespace replicas {
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void sendRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
+            void registerBranch(const std::string& rid, const std::string& bid, const std::string& service, 
                 const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 std::string id = "", int version = 0);
 
@@ -68,7 +76,7 @@ namespace replicas {
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void sendCloseBranch(const std::string& bid, const std::string& region, std::string id = "", int version = 0);
+            void closeBranch(const std::string& bid, const std::string& region, std::string id = "", int version = 0);
 
         };
     

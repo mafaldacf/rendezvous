@@ -23,9 +23,11 @@ namespace service {
     class ClientServiceImpl final : public rendezvous::ClientService::Service {
 
         private:
-            bool _CONSISTENCY_CHECKS;
+            bool _consistency_checks;
+            bool _async_replication;
             std::shared_ptr<rendezvous::Server> _server;
             replicas::ReplicaClient _replica_client;
+            
             // debugging purposes
             std::atomic<int> _num_wait_calls;
             int _num_replicas;
@@ -33,7 +35,8 @@ namespace service {
             metadata::Request * _getRequest(const std::string& rid);
 
         public:
-            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs);
+            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs, 
+                bool async_replication);
 
             grpc::Status Subscribe(grpc::ServerContext * context,
                 const rendezvous::SubscribeMessage * request,
