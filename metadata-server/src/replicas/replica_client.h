@@ -42,8 +42,9 @@ namespace replicas {
             void _doRegisterRequest(const std::string& rid);
             void _doRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
                 const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                std::string id = "", int version = 0);
-            void _doCloseBranch(const std::string& bid, const std::string& region, std::string id = "", int version = 0);
+                const rendezvous::RequestContext& ctx);
+            void _doCloseBranch(const std::string& bid, const std::string& region, 
+                const rendezvous::RequestContext& ctx);
 
         public:
             ReplicaClient(std::vector<std::string> addrs, bool async_replication);
@@ -66,7 +67,7 @@ namespace replicas {
              */
             void registerBranch(const std::string& rid, const std::string& bid, const std::string& service, 
                 const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                std::string id = "", int version = 0);
+                const rendezvous::RequestContext& ctx);
 
             /**
              * Send close branch call to all replicas
@@ -76,7 +77,8 @@ namespace replicas {
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void closeBranch(const std::string& bid, const std::string& region, std::string id = "", int version = 0);
+            void closeBranch(const std::string& bid, const std::string& region, 
+                const rendezvous::RequestContext& ctx);
 
         };
     

@@ -95,7 +95,7 @@ def showOptions():
     print(f"- Check Request by Regions: \t \t {CHECK_REQUEST_BY_REGIONS} <rid> <service>")
     print(f"- Sleep: \t \t \t \t {SLEEP} <time in seconds>")
     print(f"- Exit: \t \t \t \t {EXIT}")
-    print(f"- Change Stub: \t \t \t \t {SLEEP} 0|1")
+    print(f"- Change Stub: \t \t \t \t {CHANGE_STUB} 0|1")
     print()
 
 def readInput(stubs):

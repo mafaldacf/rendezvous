@@ -40,11 +40,18 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   // parse bid from <bid>:<rid>
   std::string bid = _server->parseFullBid(full_bid).first;
-  std::string res = _server->registerBranch(rdv_request, service, regions, tag, monitor, bid);
   
+  // wait for all remote versions in the context
   if (_async_replication) {
-    rdv_request->getVersionsRegistry()->updateRemoteVersion(request->context().replica_id(), request->context().request_version());
+    auto versions_registry = rdv_request->getVersionsRegistry();
+    // pair: <sid, version>
+    for (const auto& v : request->context().versions()) {
+      versions_registry->updateRemoteVersion(v.first, v.second);
+    }
   }
+
+  std::string res = _server->registerBranch(rdv_request, service, regions, tag, monitor, bid);
+
   return grpc::Status::OK;
 }
 
@@ -64,6 +71,15 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_BID);
   }
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
+
+  // wait for all remote versions in the context
+  if (_async_replication) {
+    auto versions_registry = rdv_request->getVersionsRegistry();
+    // pair: <sid, version>
+    for (const auto& v : request->context().versions()) {
+      versions_registry->updateRemoteVersion(v.first, v.second);
+    }
+  }
 
   // always force close branch when dealing with replicated requests
   int res = _server->closeBranch(rdv_request, bid, request->region(), true);

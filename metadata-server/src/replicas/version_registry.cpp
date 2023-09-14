@@ -24,6 +24,7 @@ void VersionRegistry::updateRemoteVersion(const std::string& id, const int& vers
     std::unique_lock<std::mutex> lock(_mutex_versions);
     // ensure replicated requests are processed in FIFO order
     while (version != _versions[id] + 1) {
+        //spdlog::debug("[Versioning] Waiting for remote version: {} -> {}", id, version);
         _cond_versions.wait_for(lock, std::chrono::seconds(_wait_replica_timeout_s));
     }
     _versions[id] = version;

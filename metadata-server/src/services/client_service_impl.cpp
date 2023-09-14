@@ -71,7 +71,7 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
     if (_async_replication) {
-      // initialize empty metadata
+      // initialize empty metadata for client to propagate
       rendezvous::RequestContext ctx;
       response->mutable_context()->CopyFrom(ctx);
     }
@@ -114,17 +114,15 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
+    rendezvous::RequestContext ctx = request->context();
     if (_async_replication) {
-      rendezvous::RequestContext ctx = request->context();
+      // update current context
       std::string sid = _server->getSid();
       int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
       ctx.mutable_versions()->insert({sid, version});
       response->mutable_context()->CopyFrom(ctx);
-      _replica_client.registerBranch(rdv_request->getRid(), bid, service, tag, regions, monitor, sid, version);
     }
-    else {
-      _replica_client.registerBranch(rdv_request->getRid(), bid, service, tag, regions, monitor);
-    }
+    _replica_client.registerBranch(rdv_request->getRid(), bid, service, tag, regions, monitor, ctx);
   }
   return grpc::Status::OK;
 }
@@ -222,15 +220,8 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
-    if (_async_replication) {
-      rendezvous::RequestContext ctx = request->context();
-      std::string sid = _server->getSid();
-      int version = rdv_request->getVersionsRegistry()->getLocalVersion(sid);
-      _replica_client.closeBranch(request->bid(), region, sid, version);
-    }
-    else {
-      _replica_client.closeBranch(request->bid(), region);
-    }
+    rendezvous::RequestContext ctx = request->context();
+    _replica_client.closeBranch(request->bid(), region, ctx);
   }
   return grpc::Status::OK;
 }
