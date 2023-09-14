@@ -64,7 +64,7 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   if (!_consistency_checks) return grpc::Status::OK;
   std::string rid = request->rid();
   metadata::Request * rdv_request;
-  //spdlog::trace("> [RR] register request '{}'", rid.c_str());
+  spdlog::trace("> [RR] register request '{}'", rid.c_str());
   rdv_request = _server->getOrRegisterRequest(rid);
   response->set_rid(rdv_request->getRid());
   
@@ -93,10 +93,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   metadata::Request * rdv_request;
   int num = request->regions().size();
 
-  //spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
-  if (num == 0) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_EMPTY_REGION);
-  }
+  spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
 
   const auto& regions = request->regions();
   rdv_request = _getRequest(rid);
@@ -104,7 +101,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     spdlog::error("< [RB] Error: invalid request '{}'", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
-  std::string bid = _server->registerBranch(rdv_request, service, regions, tag, monitor);
+  std::string bid = _server->registerBranch(rdv_request, service, regions, tag, ctx.parent_service(), monitor);
   if (bid.empty()) {
     spdlog::error("< [RB] Error: tag '{}' already exists for service '{}' in request '{}'", tag, service, rid);
     return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, utils::ERR_MSG_TAG_ALREADY_EXISTS);
@@ -142,7 +139,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   // client specifies different regions for each datastores using the DatastoreBranching type
   if (request->branches().size() > 0){
     for (const auto& branches : request->branches()) {
-      std::string bid = _server->registerBranch(rdv_request, branches.datastore(), branches.regions(), branches.tag());
+      std::string bid = _server->registerBranch(rdv_request, branches.datastore(), branches.regions(), branches.tag(), "parent_service");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -156,7 +153,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
     auto tags = request->tags();
     int i = 0;
     for (const auto& datastore: request->datastores()) {
-      std::string bid = _server->registerBranch(rdv_request, datastore, regions, tags[i]);
+      std::string bid = _server->registerBranch(rdv_request, datastore, regions, tags[i], "parent_service");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -191,7 +188,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (!_consistency_checks) return grpc::Status::OK;
   const std::string& region = request->region();
   bool force = request->force();
-  //spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", request->bid(), region, force);
+  spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", request->bid(), region, force);
 
   // parse identifiers from <bid>:<rid>
   auto ids = _server->parseFullBid(request->bid());
@@ -238,7 +235,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   //bool async = request->async();
   int timeout = request->timeout();
 
-  //spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", rid, service, region);
+  spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", rid, service, region);
 
   // validate parameters
   if (timeout < 0) {
@@ -270,7 +267,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   else if (result == -1) {
     response->set_timed_out(true);
   }
-  //spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
+  spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
   return grpc::Status::OK;
 }
 
@@ -284,7 +281,7 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   const std::string& region = request->region();
   bool detailed = request->detailed();
 
-  //spdlog::trace("> [CR] query for request '{}' on service '{}' and region '{}' (detailed=)", rid, service, region, detailed);
+  spdlog::trace("> [CR] query for request '{}' on service '{}' and region '{}' (detailed=)", rid, service, region, detailed);
   
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);
@@ -296,16 +293,33 @@ grpc::Status ClientServiceImpl::CheckRequest(grpc::ServerContext* context,
   // detailed information with status of all tagged branches
   if (detailed) {
     if (service.empty()) {
-      spdlog::error("< [CR] Error: service not specified for detaile query");
+      spdlog::error("< [CR] Error: service not specified for detailed query");
       return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, utils::ERR_MSG_FAILED_DETAILED_QUERY);
     }
     auto result = _server->checkDetailedRequest(rdv_request, service, region);
-    auto * detailed = response->mutable_detailed();
-    response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
-    for (auto pair = result.detailed.begin(); pair != result.detailed.end(); pair++) {
-      // <service, status>
-      (*detailed)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
 
+    // get info for tagged branches
+    auto * tagged = response->mutable_tagged();
+    response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
+    for (auto pair = result.tagged.begin(); pair != result.tagged.end(); pair++) {
+      // <service, status>
+      (*tagged)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
+    }
+
+    // get info for children/dependencies branches
+    auto * children = response->mutable_direct_dependencies();
+    response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
+    for (auto pair = result.children.begin(); pair != result.children.end(); pair++) {
+      // <child service name, status>
+      (*children)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
+    }
+
+    // get info for regions
+    auto * regions = response->mutable_regions();
+    response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
+    for (auto pair = result.regions.begin(); pair != result.regions.end(); pair++) {
+      // <region, status>
+      (*regions)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
     }
   }
   // basic information for current context
@@ -324,7 +338,7 @@ grpc::Status ClientServiceImpl::CheckRequestByRegions(grpc::ServerContext* conte
   const std::string& rid = request->rid();
   const std::string& service = request->service();
 
-  //spdlog::trace("> [CRR] query for request '{}' on service '{}'", rid, service);
+  spdlog::trace("> [CRR] query for request '{}' on service '{}'", rid, service);
   
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);

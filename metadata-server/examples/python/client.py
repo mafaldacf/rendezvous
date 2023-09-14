@@ -22,9 +22,10 @@ def registerRequest(stub, rid):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def registerBranch(stub, rid, service, regions, tag=""):
+def registerBranch(stub, rid, service, regions, tag="", parent_service=""):
     try:
-        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, monitor=True))
+        context = pb.RequestContext(parent_service=parent_service)
+        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, context=context, monitor=True))
         print(f"[Register Branches] {response}")
         return toBytes(response.context)
     except grpc.RpcError as e:
@@ -56,7 +57,9 @@ def checkRequest(stub, rid, service, region, detailed=False, ctx=None):
         status = pb.RequestStatus.Name(response.status)
         print(f"[Check Request] status:\"{status}\"")
         if detailed:
-            print(f'--> detailed status: {response.detailed}')
+            print(f'--> tagged status: {response.tagged}')
+            print(f'--> dependencies status: {response.dependencies}')
+            print(f'--> regions status: {response.regions}')
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -75,6 +78,7 @@ def checkRequestByRegions(stub, rid, service, ctx=None):
 REGISTER_REQUEST = "rr";
 REGISTER_BRANCH = "rb";
 REGISTER_BRANCH_WITH_TAG = "rbtag";
+REGISTER_BRANCH_CHILD = "rbchild";
 CLOSE_BRANCH = "cb";
 WAIT_REQUEST = "wr";
 CHECK_REQUEST = "cr";
@@ -88,6 +92,7 @@ def showOptions():
     print(f"- Register Request: \t \t \t {REGISTER_REQUEST} <rid>")
     print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <regions>")
     print(f"- Register Branch w/ tag: \t \t {REGISTER_BRANCH_WITH_TAG} <rid> <service> <regions> <tag> ")
+    print(f"- Register Branch child: \t \t {REGISTER_BRANCH_CHILD} <rid> <service> <regions> <parent_service> ")
     print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <bid> <region>")
     print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
     print(f"- Check Request: \t \t \t {CHECK_REQUEST} <rid> <service> <region>")
@@ -102,7 +107,7 @@ def readInput(stubs):
     stub = stubs[0]
     ctx = None
     while True:
-        user_input = input()
+        user_input = input("> ")
         parts = user_input.split()
         command = parts[0]
         args = parts[1:]
@@ -130,6 +135,17 @@ def readInput(stubs):
 
             tag = regions.pop()
             ctx = registerBranch(stub, rid, service, regions, tag)
+
+        elif command == REGISTER_BRANCH_CHILD and len(args) >= 3:
+            rid = args[0]
+            service = args[1]
+
+            regions = []
+            for region in args[2:]:
+                regions.append(region)
+
+            parent_service = regions.pop()
+            ctx = registerBranch(stub, rid, service, regions, parent_service=parent_service)
 
         elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 2:
             bid = args[0]

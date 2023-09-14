@@ -18,6 +18,14 @@ Branch::Branch(std::string service, std::string tag, const utils::ProtoVec& vect
         _opened_regions = vector_regions.size();
     }
 
+Branch::Branch(std::string service, std::string tag)
+    : _service(service), _tag(tag) {
+        _regions = std::unordered_map<std::string, int>();
+        // empty represents GLOBAL
+        _regions[""] = OPENED;
+        _opened_regions = 1;
+    }
+
 std::string Branch::getTag() {
     return _tag;
 }

@@ -2,8 +2,26 @@
 #define UTILS_H
 
 #include <string>
+#include <map>
 
 namespace utils {
+
+    /* ------------------------------------------- */
+    /* status info for CheckRequest remote request */
+    /* ------------------------------------------- */
+    typedef struct StatusStruct {
+        int status;
+        std::map<std::string, int> tagged;
+        std::map<std::string, int> children;
+        std::map<std::string, int> regions;
+    } Status;
+    
+    /* --------------*/
+    /* status values */
+    /* ------------- */
+    const int CLOSED = 0;
+    const int OPENED = 1;
+    const int UNKNOWN = 2;
 
     /* --------------------- */
     /* gRPC structure helper */
@@ -21,11 +39,11 @@ namespace utils {
     const std::string ERR_MSG_INVALID_BRANCH_SERVICE = "No branch was found for the provided service";
     const std::string ERR_MSG_INVALID_BRANCH_REGION = "No branch was found for the provided service";
     const std::string ERR_MSG_EMPTY_REGION = "Region cannot be empty";
-    const std::string ERR_MSG_INVALID_TIMEOUT = "Invalid timeout. Value needs to be greater than 0";
+    const std::string ERR_MSG_INVALID_TIMEOUT = "Invalid timeout. Value must to be greater than 0";
     const std::string ERR_MSG_REGISTER_BRANCHES_INVALID_DATASTORES = "Invalid datastores arguments";
     const std::string ERR_MSG_INVALID_TAG_USAGE = "Tag can only be specified when service is specified";
     const std::string ERR_MSG_FAILED_DETAILED_QUERY = "Cannot provide detailed information without specifying service";
-    const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and needs to be unique";
+    const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and must to be unique";
 
     /* server gRPC custom error m essages */
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context provided";

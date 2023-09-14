@@ -21,29 +21,21 @@
 #include <sstream>
 #include <thread>
 
+using namespace utils;
+
 namespace metadata {
 
     class Request {
-        
-        public:
-            /* helper for checking detailed requests' status */
-            typedef struct StatusStruct {
-                int status;
-                std::map<std::string, int> detailed;
-            } Status;
-
         private:
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
+                std::string name;
                 int num_opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
+                struct ServiceNodeStruct * parent;
+                std::list<struct ServiceNodeStruct*> children;
             } ServiceNode;
-
-            /* request status */
-            static const int OPENED = 0;
-            static const int CLOSED = 1;
-            static const int UNKNOWN = 2;
 
             const std::string _rid;
             std::atomic<long> _next_id;
@@ -99,12 +91,6 @@ namespace metadata {
             std::chrono::time_point<std::chrono::system_clock> getLastTs();
 
             /**
-             * Refresh timestamp of last modification to now
-             * 
-             */
-            void refreshLastTs();
-
-            /**
              * Get the identifier (rid) of the object
              * 
              * @return rid
@@ -136,7 +122,7 @@ namespace metadata {
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
             metadata::Branch * registerBranch(const std::string& bid, const std::string& service, 
-                const std::string& tag, const utils::ProtoVec& regions);
+                const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service);
 
             /**
              * Remove a branch from the request
@@ -168,7 +154,7 @@ namespace metadata {
              * 
              * @return true if successful and false otherwise
              */
-            bool trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
+            bool trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, const std::string& parent,
                 metadata::Branch * branch = nullptr);
 
             /**

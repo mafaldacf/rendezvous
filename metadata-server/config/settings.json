@@ -5,5 +5,5 @@
     "cleanup_subscribers_validity_m": -1,
     "subscribers_refresh_interval_s": 30,
     "wait_replica_timeout_s": 10,
-    "async_replication": true
+    "async_replication": false
 }

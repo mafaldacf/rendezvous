@@ -242,17 +242,18 @@ std::string Server::registerBranchRegion(metadata::Request * request, const std:
 const std::string& tag, std::string bid) {
   utils::ProtoVec regions;
   regions.Add(region.c_str());
-  return registerBranch(request, service, regions, tag, true, bid);
+  return registerBranch(request, service, regions, tag, "parent_service", true, bid);
 }
 
 std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
-const utils::ProtoVec& regions, const std::string& tag, bool monitor, std::string bid) {
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
+  bool monitor, std::string bid) {
 
   // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
     bid = genBid(request);
   }
-  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions);
+  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions, parent_service);
   // unexpected error
   if (!branch) {
     return "";
@@ -308,7 +309,7 @@ int Server::waitRequest(metadata::Request * request, const std::string& service,
 }
 
 int Server::checkRequest(metadata::Request * request, const std::string& service, const std::string& region) {
-  metadata::Request::Status res;
+  utils::Status res;
 
   if (!service.empty() && !region.empty())
     res = request->getStatusServiceRegion(service, region);
@@ -323,7 +324,7 @@ int Server::checkRequest(metadata::Request * request, const std::string& service
   return res.status;
 }
 
-metadata::Request::Status Server::checkDetailedRequest(metadata::Request * request, const std::string& service, const std::string& region) {
+utils::Status Server::checkDetailedRequest(metadata::Request * request, const std::string& service, const std::string& region) {
   if (!service.empty() && !region.empty())
     return request->getStatusServiceRegion(service, region, true);
   return request->getStatusService(service, true);

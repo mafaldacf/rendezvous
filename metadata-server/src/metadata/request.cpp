@@ -22,10 +22,6 @@ std::chrono::time_point<std::chrono::system_clock> Request::getLastTs() {
     return _last_ts;
 }
 
-void Request::refreshLastTs() {
-    _last_ts = std::chrono::system_clock::now();
-}
-
 std::string Request::getRid() {
     return _rid;
 }
@@ -39,24 +35,37 @@ std::string Request::genId() {
 }
 
 metadata::Branch * Request::registerBranch(const std::string& bid, const std::string& service, 
-    const std::string& tag, const utils::ProtoVec& regions) {
+    const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service) {
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
     auto branch_it = _branches.find(bid);
+
     // branches already exist
     if (branch_it != _branches.end()) {
         return nullptr;
     }
 
-    metadata::Branch * branch = new metadata::Branch(service, tag, regions);
+    metadata::Branch * branch;
     int num = regions.size();
+
+    // branch with specified regions
+    if (num > 1) {
+        branch = new metadata::Branch(service, tag, regions);
+    }
+
+    // no region specified - global region
+    else {
+        num = 1;
+        branch = new metadata::Branch(service, tag);
+    }
+
     // error tracking branch (tag already exists!)
-    if (!trackBranch(service, regions, num, branch)) {
+    if (!trackBranch(service, regions, num, parent_service, branch)) {
         delete branch;
         return nullptr;
     }
     _branches[bid] = branch;
-    refreshLastTs();
+
     return branch;
 }
 
@@ -76,7 +85,6 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
     int r = branch->close(region);
     if (r == 1) {
         untrackBranch(service, region);
-        refreshLastTs();
         _cond_branches.notify_all();
     }
     return r;
@@ -96,6 +104,14 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
             _service_nodes[service].opened_regions[region] -= 1;
         }
 
+        // get parent node
+        ServiceNodeStruct * parent_node = &_service_nodes[service];
+        // decrease opened branches in all parents
+        while (parent_node != nullptr) {
+            parent_node->num_opened_branches--;
+            parent_node = parent_node->parent;
+        }
+
         // notify creation of new branch
         _cond_service_nodes.notify_all();
     }
@@ -113,30 +129,52 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
     return true;
 }
 
-bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, metadata::Branch * branch) {
+bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
+    const std::string& parent_name, metadata::Branch * branch) {
+        
     _num_opened_branches.fetch_add(num);
     /* --------------- */
     /* service context */
     /* --------------- */
     if (!service.empty()) {
+        // check if service does not exist yet and add node
+        if (_service_nodes.count(service) == 0) {
+            _service_nodes[service].name = service;
+        }
+
         // validate tag
         std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
         if (branch->hasTag()) {
-            // unique tag already exists: undo changes and return error
+            // ABORT - unique tag already exists
             if (_service_nodes[service].tagged_branches.count(branch->getTag()) != 0) {
                 _num_opened_branches.fetch_add(-num);
                 return false;
             }
+            // track on SERVICE TAG
             _service_nodes[service].tagged_branches[branch->getTag()] = branch;
         }
 
-        // track on <service, region> and <region> contexts
+        // add parent node and add current node to the parent's children list
+        ServiceNodeStruct * parent_node = &_service_nodes[parent_name];
+        _service_nodes[service].parent = parent_node;
+        parent_node->children.emplace_back(&_service_nodes[service]);
+        // increment opened branches in all parents
+        while (parent_node != nullptr) {
+            parent_node->num_opened_branches++;
+            parent_node = parent_node->parent;
+        }
+
+        // track on SERVICE
         _service_nodes[service].num_opened_branches += num;
-        std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
-        for (const auto& region : regions) {
-            if (!region.empty()) {
-                _service_nodes[service].opened_regions[region] += 1;
-                _opened_regions[region] += 1;
+
+        // track on REGIONS of SERVICE
+        if (regions.size() > 0) {
+            std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
+            for (const auto& region : regions) {
+                if (!region.empty()) {
+                    _service_nodes[service].opened_regions[region] += 1;
+                    _opened_regions[region] += 1;
+                }
             }
         }
         // notify upon creation (due to async waits)
@@ -353,14 +391,14 @@ const::std::string& tag, bool async, int timeout) {
     return inconsistency;
 }
 
-Request::Status Request::getStatus() {
+utils::Status Request::getStatus() {
     if (_num_opened_branches.load() == 0) {
         return {CLOSED};
     }
     return {OPENED};
 }
 
-Request::Status Request::getStatusRegion(const std::string& region) {
+utils::Status Request::getStatusRegion(const std::string& region) {
     std::unique_lock<std::mutex> lock(_mutex_opened_regions);
     if (!_opened_regions.count(region)) {
         return {UNKNOWN};
@@ -371,7 +409,7 @@ Request::Status Request::getStatusRegion(const std::string& region) {
     return {OPENED};
 }
 
-Request::Status Request::getStatusService(const std::string& service, bool detailed) {
+utils::Status Request::getStatusService(const std::string& service, bool detailed) {
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
     int status;
 
@@ -393,15 +431,25 @@ Request::Status Request::getStatusService(const std::string& service, bool detai
     }
 
     // otherwise, return detailed information
-    Request::Status res;
+    utils::Status res;
     res.status = status;
+    // get tagged branches within the same service
     for (const auto& branch_it: _service_nodes[service].tagged_branches) {
-        res.detailed[branch_it.first] = branch_it.second->getStatus();
+        res.tagged[branch_it.first] = branch_it.second->getStatus();
+    }
+    // get children nodes of current service
+    for (auto node_it = _service_nodes[service].children.begin(); node_it != _service_nodes[service].children.end(); ++node_it) {
+        int status = (*node_it)->num_opened_branches == 0 ? CLOSED : OPENED;
+        res.children[(*node_it)->name] = status;
+    }
+    // get all regions status
+    for (const auto& region_it: _service_nodes[service].opened_regions) {
+        res.regions[region_it.first] = region_it.second == 0 ? CLOSED : OPENED;
     }
     return res;
 }
 
-Request::Status Request::getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
+utils::Status Request::getStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
     int status;
 
@@ -428,10 +476,19 @@ Request::Status Request::getStatusServiceRegion(const std::string& service, cons
     }
 
     // otherwise, return detailed information
-    Request::Status res;
+    utils::Status res;
     res.status = status;
     for (const auto& branch_it: _service_nodes[service].tagged_branches) {
-        res.detailed[branch_it.first] = branch_it.second->getStatus();
+        res.tagged[branch_it.first] = branch_it.second->getStatus(region);
+    }
+    // get children nodes of current service
+    for (auto node_it = _service_nodes[service].children.begin(); node_it != _service_nodes[service].children.end(); ++node_it) {
+        // by default, if region is not found then status is set to UNKNOWN
+        int status = UNKNOWN;
+        if ((*node_it)->opened_regions.count(region) > 0) {
+            status = (*node_it)->opened_regions[region] == 0 ? CLOSED : OPENED;
+        }
+        res.children[(*node_it)->name] = status;
     }
     return res;
 }

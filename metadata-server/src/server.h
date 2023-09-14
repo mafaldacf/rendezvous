@@ -179,7 +179,8 @@ namespace rendezvous {
              * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
              */
             std::string registerBranch(metadata::Request * request, const std::string& service, 
-                const utils::ProtoVec& regions, const std::string& tag, bool monitor = false, std::string bid = "");
+                const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
+                bool monitor = false, std::string bid = "");
 
             /**
              * Close a branch according to its identifier
@@ -236,7 +237,7 @@ namespace rendezvous {
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
-            metadata::Request::Status checkDetailedRequest(metadata::Request * request, 
+            utils::Status checkDetailedRequest(metadata::Request * request, 
                 const std::string& service, const std::string& region);
             
             /**

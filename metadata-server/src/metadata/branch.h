@@ -7,14 +7,11 @@
 #include "client.grpc.pb.h"
 #include "../utils.h"
 
+using namespace utils;
+
 namespace metadata {
 
     class Branch {
-        
-        static const int OPENED = 0;
-        static const int CLOSED = 1;
-        static const int UNKNOWN = 2;
-
         private:
             const std::string _service;
             const std::string _tag;
@@ -26,6 +23,7 @@ namespace metadata {
         public:
             Branch(std::string service, std::string tag, std::string region);
             Branch(std::string service, std::string tag, const utils::ProtoVec& vector_regions);
+            Branch(std::string service, std::string tag);
 
             /**
              * Get the branche's tag
