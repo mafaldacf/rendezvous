@@ -108,8 +108,9 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   }
   std::string bid = _server->registerBranch(rdv_request, service, regions, tag, ctx.prev_service(), monitor);
   if (bid.empty()) {
-    spdlog::error("< [RB] Error: tag '{}' already exists for service '{}' in request '{}'", tag, service, rid);
-    return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, utils::ERR_MSG_TAG_ALREADY_EXISTS);
+    spdlog::error("< [RB] Error: tag '{}' already exists for service '{}' OR invalid context (field: prev_service)", 
+      tag, service, rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT);
   }
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
@@ -272,6 +273,10 @@ grpc::Status ClientServiceImpl::Wait(grpc::ServerContext* context,
   else if (result == -1) {
     response->set_timed_out(true);
   }
+  else if (result == -3) {
+    spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+  }
   spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
   return grpc::Status::OK;
 }
@@ -295,7 +300,12 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  auto result = _server->checkStatus(rdv_request, service, region, detailed);
+  auto result = _server->checkStatus(rdv_request, service, region, request->context().prev_service(), detailed);
+
+  if (result.status == INVALID_CONTEXT) {
+    spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+  }
 
   // detailed information with status of all tagged branches
   if (detailed) {

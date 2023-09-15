@@ -23,6 +23,9 @@ namespace utils {
     const int OPENED = 1;
     const int UNKNOWN = 2;
 
+    // helper for errors
+    const int INVALID_CONTEXT = -3;
+
     /* --------------------- */
     /* gRPC structure helper */
     /* --------------------- */
@@ -45,9 +48,8 @@ namespace utils {
     const std::string ERR_MSG_INVALID_TAG_USAGE = "Tag can only be specified when service is specified";
     const std::string ERR_MSG_FAILED_DETAILED_QUERY = "Cannot provide detailed information without specifying service";
     const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and must to be unique";
-
-    /* server gRPC custom error m essages */
-    const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context provided";
+    const std::string ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT = "Tag already exists OR invalid context ('prev_service' field)";
+    const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context ('prev_service' field)";
     
     /* common gRPC custom error messages */
     const std::string ERR_MSG_INVALID_REQUEST = "Invalid request identifier";

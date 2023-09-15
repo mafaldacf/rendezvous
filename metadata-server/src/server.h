@@ -221,13 +221,15 @@ namespace rendezvous {
              * @param request Request where the branch is registered
              * @param service The service context
              * @param region The region context
+             * @param prev_service Previously registered service
+             * @param detailed Enable detailed information (status for tagged branches and dependencies)
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if context was not found
              */
             utils::Status checkStatus(metadata::Request * request, const std::string& service, 
-                const std::string& region, bool detailed = false);
+                const std::string& region, std::string prev_service = "", bool detailed = false);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

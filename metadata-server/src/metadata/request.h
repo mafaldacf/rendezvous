@@ -55,22 +55,17 @@ namespace metadata {
             std::unordered_map<std::string, metadata::Branch*> _branches;
             // <service, service branching ptr>
             std::unordered_map<std::string, ServiceNode*> _service_nodes;
-            // <region, STATUS>
-            std::unordered_map<std::string, int> _opened_regions;
 
             /* ------------------- */
             /* concurrency control */
             /* ------------------- */
             std::mutex _mutex_branches;
             std::mutex _mutex_service_nodes;
-            std::mutex _mutex_opened_regions;
             std::condition_variable _cond_branches;
             std::condition_variable _cond_service_nodes;
-            std::condition_variable _cond_opened_regions;
 
             // for wait with async option
             std::condition_variable _cond_new_service_nodes;
-            std::condition_variable _cond_new_opened_regions;
 
             /**
              * Compute remaining timeout based on the original timeout value and the elapsed time
@@ -167,6 +162,7 @@ namespace metadata {
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-3) if prev_service is invalid
              */
             int wait(std::string prev_service, int timeout);
 
@@ -183,6 +179,7 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-2) if context was not found
+             * - (-3) if prev_service is invalid
              */
             int waitRegion(const std::string& region, std::string prev_service, bool async, int timeout);
 
@@ -224,24 +221,29 @@ namespace metadata {
             /**
              * Check status of request
              * @param detailed Detailed description of status for all tagged branches
+             * @param prev_service Previously registered service
+             * @param detailed Enable detailed information (status for tagged branches and dependencies)
+             * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            Status checkStatus(bool detailed = false);
+            Status checkStatus(std::string prev_service = "", bool detailed = false);
 
             /**
              * Check status of request for a given context (region)
              *
              * @param region The name of the region that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
+             * @param prev_service Previously registered service
+             * @param detailed Enable detailed information (status for tagged branches and dependencies)
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - 2 if context was not found
+             * - 2 if request is UNKNOWN
              */
-            Status checkStatusRegion(const std::string& region, bool detailed = false);
+            Status checkStatusRegion(const std::string& region, std::string prev_service = "", bool detailed = false);
 
             /**
              * Check status of request for a given context (service)
@@ -252,7 +254,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - 2 if context was not found
+             * - 2 if request is UNKNOWN
              */
             Status checkStatusService(const std::string& service, bool detailed = false);
 
@@ -266,7 +268,7 @@ namespace metadata {
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - 2 if context was not found
+             * - 2 if request is UNKNOWN
              */
             Status checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
         };

@@ -309,7 +309,7 @@ int Server::wait(metadata::Request * request, const std::string& service, const:
 }
 
 utils::Status Server::checkStatus(metadata::Request * request, const std::string& service, 
-  const std::string& region, bool detailed) {
+  const std::string& region, std::string prev_service, bool detailed) {
     
   utils::Status res;
 
@@ -318,7 +318,7 @@ utils::Status Server::checkStatus(metadata::Request * request, const std::string
   else if (!service.empty())
     return request->checkStatusService(service, detailed);
   else if (!region.empty())
-    return request->checkStatusRegion(region, detailed);
+    return request->checkStatusRegion(region, prev_service, detailed);
 
-  return request->checkStatus();
+  return request->checkStatus(prev_service, detailed);
 }

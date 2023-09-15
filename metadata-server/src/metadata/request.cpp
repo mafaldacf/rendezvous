@@ -7,7 +7,6 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     _last_ts = std::chrono::system_clock::now();
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
-    _opened_regions = std::unordered_map<std::string, int>();
     _service_nodes = std::unordered_map<std::string, ServiceNode*>();
 
     // add root node
@@ -104,48 +103,38 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
 bool Request::untrackBranch(const std::string& service, const std::string& region, bool fully_closed) {
     _num_opened_branches.fetch_add(-1);
 
-    /* --------------- */
-    /* service context */
-    /* --------------- */
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    // service and region context
-    if (!region.empty()) {
-        _service_nodes[service]->opened_regions[region] -= 1;
-    }
 
-    if (fully_closed) {
-        // decrease opened branches in all direct parents
-        ServiceNode * parent_node = _service_nodes[service];
-        do {
+    // decrease opened branches in all direct parents (start with the current one)
+    ServiceNode * parent_node = _service_nodes[service];
+    do {
+        if (fully_closed) {
             parent_node->num_opened_branches--;
-            parent_node = parent_node->parent;
-        } while (parent_node != nullptr);
-    }
+        }
+        if (!region.empty()) {
+            parent_node->opened_regions[region]--;
+        }
+        parent_node = parent_node->parent;
+    } while (parent_node != nullptr);
 
     // notify creation of new branch
     _cond_service_nodes.notify_all();
-
-    /* -------------- */
-    /* region context */
-    /* -------------- */
-    if (!region.empty()) {
-        std::unique_lock<std::mutex> lock(_mutex_opened_regions);
-        _opened_regions[region] -= 1;
-
-        // notify creation of new branch
-        _cond_opened_regions.notify_all();
-    }
 
     return true;
 }
 
 bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
     const std::string& prev_service, metadata::Branch * branch) {
-    
+
     _num_opened_branches.fetch_add(num);
-    /* --------------- */
-    /* service context */
-    /* --------------- */
+
+    std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
+    
+    // ABORT: prev service does not exist - error propagating context by client
+    if (_service_nodes.count(prev_service) == 0) {
+        _num_opened_branches.fetch_add(-num);
+        return false;
+    }
 
     // create new node if service does not exist yet
     if (_service_nodes.count(service) == 0) {
@@ -153,7 +142,6 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
     }
 
     // validate tag
-    std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
     if (branch->hasTag()) {
         // ABORT - unique tag already exists
         if (_service_nodes[service]->tagged_branches.count(branch->getTag()) != 0) {
@@ -183,19 +171,19 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
     // increment opened branches in all direct parents
     while (parent_node != nullptr) {
         parent_node->num_opened_branches++;
+        for (const auto& region: regions) {
+            parent_node->opened_regions[region]++;
+        }
         parent_node = parent_node->parent;
     }
 
     // track on REGIONS of SERVICE
     if (regions.size() > 0) {
-        std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
         for (const auto& region : regions) {
             if (!region.empty()) {
                 _service_nodes[service]->opened_regions[region] += 1;
-                _opened_regions[region] += 1;
             }
         }
-        _cond_new_opened_regions.notify_all();
     }
     // notify upon creation (due to async waits)
     _cond_new_service_nodes.notify_all();
@@ -216,7 +204,12 @@ int Request::wait(std::string prev_service, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-    std::unique_lock<std::mutex> lock(_mutex_branches);
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+
+    // prev service does not exist - error propagating context by client
+    if (_service_nodes.count(prev_service) == 0) {
+        return -3;
+    }
 
     // transverse parents algorithm:
     // - only wait for top/left neighboors
@@ -225,23 +218,19 @@ int Request::wait(std::string prev_service, int timeout) {
     ServiceNode * parent = _service_nodes[prev_service];
     do {
         for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            // break if we reach previous checkpoint
             if (*it == stop) {
-                break;
+                continue;
             }
-
-            // ----------
-            // wait logic
-            // ----------
+            // wait for branch
             while ((*it)->num_opened_branches != 0) {
-                _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
+                _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
                 inconsistency = 1;
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
                 if (remaining_timeout <= std::chrono::seconds(0)) {
                     return -1;
                 }
             }
-            // ----------
-            // ----------
         }
         stop = parent;
         parent = parent->parent;
@@ -254,7 +243,12 @@ int Request::waitRegion(const std::string& region, std::string prev_service, boo
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-    std::unique_lock<std::mutex> lock(_mutex_opened_regions);
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+
+    // prev service does not exist - error propagating context by client
+    if (_service_nodes.count(prev_service) == 0) {
+        return -3;
+    }
 
     // transverse parents algorithm (similar to the global wait):
     // - only wait for top/left neighboors
@@ -263,23 +257,22 @@ int Request::waitRegion(const std::string& region, std::string prev_service, boo
     ServiceNode * parent = _service_nodes[prev_service];
     do {
         for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            // break if we reach previous checkpoint
             if (*it == stop) {
-                break;
+                continue;
             }
-
-            // ----------
-            // wait logic
-            // ----------
-            while ((*it)->opened_regions[region] != 0) {
-                _cond_opened_regions.wait_for(lock, std::chrono::seconds(remaining_timeout));
-                inconsistency = 1;
-                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                if (remaining_timeout <= std::chrono::seconds(0)) {
-                    return -1;
+            // check if region exists
+            if ((*it)->opened_regions.count(region) != 0) {
+                // wait logic
+                while ((*it)->opened_regions[region] != 0) {
+                    _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
+                    inconsistency = 1;
+                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                    if (remaining_timeout <= std::chrono::seconds(0)) {
+                        return -1;
+                    }
                 }
             }
-            // ----------
-            // ----------
         }
         stop = parent;
         parent = parent->parent;
@@ -417,30 +410,79 @@ const::std::string& tag, bool async, int timeout) {
     return inconsistency;
 }
 
-utils::Status Request::checkStatus(bool detailed) {
+utils::Status Request::checkStatus(std::string prev_service, bool detailed) {
     utils::Status res;
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
 
-    if (_num_opened_branches.load() == 0) {
-        res.status = CLOSED;
+    // prev service does not exist - error propagating context by client
+    if (_service_nodes.count(prev_service) == 0) {
+        res.status = INVALID_CONTEXT;
+        return res;
     }
-    else {
-        res.status = OPENED;
-    }
+
+    res.status = CLOSED;
+
+    // transverse parents algorithm:
+    // - only check top/left neighboors
+    // - discard direct parents
+    ServiceNode * stop = nullptr;
+    ServiceNode * parent = _service_nodes[prev_service];
+    do {
+        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            if (*it == stop) {
+                continue;
+            }
+            // return OPENED if at least one branch is opened
+            // otherwise, we keep iterating to make sure every branch is CLOSED
+            if ((*it)->num_opened_branches != 0) {
+                res.status = OPENED;
+                return res;
+            }
+        }
+        stop = parent;
+        parent = parent->parent;
+    } while (parent != nullptr);
+
     return res;
 }
 
-utils::Status Request::checkStatusRegion(const std::string& region, bool detailed) {
+utils::Status Request::checkStatusRegion(const std::string& region, std::string prev_service, bool detailed) {
     utils::Status res;
-    std::unique_lock<std::mutex> lock(_mutex_opened_regions);
-    if (!_opened_regions.count(region)) {
-        res.status = UNKNOWN;
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+
+    // prev service does not exist - error propagating context by client
+    if (_service_nodes.count(prev_service) == 0) {
+        res.status = INVALID_CONTEXT;
+        return res;
     }
-    else if (_opened_regions[region] == 0) {
-        res.status = CLOSED;
-    }
-    else {
-        res.status = OPENED;
-    }
+
+    res.status = UNKNOWN;
+
+    // transverse parents algorithm:
+    // - only check top/left neighboors
+    // - discard direct parents
+    ServiceNode * stop = nullptr;
+    ServiceNode * parent = _service_nodes[prev_service];
+    do {
+        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            if (*it == stop) {
+                continue;
+            }
+
+            // return OPENED if at least one branch is opened
+            // otherwise, we keep iterating to make sure every branch is CLOSED
+            if ((*it)->opened_regions.count(region) != 0) {
+                if ((*it)->opened_regions[region] != 0) {
+                    res.status = OPENED;
+                    return res;
+                }
+                res.status = CLOSED;
+            }
+        }
+        stop = parent;
+        parent = parent->parent;
+    } while (parent != nullptr);
+
     return res;
 }
 
