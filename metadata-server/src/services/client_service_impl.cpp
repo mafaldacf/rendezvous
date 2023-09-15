@@ -94,6 +94,11 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   int num = request->regions().size();
 
   spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
+  
+  if (service.empty()) {
+    spdlog::error("< [RB] Error: service empty for rid '{}'", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_SERVICE_EMPTY);
+  }
 
   const auto& regions = request->regions();
   rdv_request = _getRequest(rid);

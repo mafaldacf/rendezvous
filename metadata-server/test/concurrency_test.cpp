@@ -157,16 +157,16 @@ TEST(ConcurrencyTest, WaitRequest) {
   status = server.wait(request, "", "");
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  bid =  server.registerBranchRegion(request, "", "", TAG); // bid = 0
+  bid =  server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 
-  bid =  server.registerBranchRegion(request, "service1", "", TAG); // bid = 1
+  bid =  server.registerBranchRegion(request, "service1", "", EMPTY_TAG); // bid = 1
   ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
 
-  bid =  server.registerBranchRegion(request, "", "region1", TAG); // bid = 2
+  bid =  server.registerBranchRegion(request, "", "region1", EMPTY_TAG); // bid = 2
   ASSERT_EQ(getFullBid(request->getRid(), 2), bid);
 
-  bid =  server.registerBranchRegion(request, "service2", "region2", TAG); // bid = 3
+  bid =  server.registerBranchRegion(request, "service2", "region2", EMPTY_TAG); // bid = 3
   ASSERT_EQ(getFullBid(request->getRid(), 3), bid);
 
   threads.emplace_back([&server, request] {

@@ -12,15 +12,19 @@ using namespace utils;
 namespace metadata {
 
     class Branch {
+        const std::string GLOBAL_REGION = "";
+
         private:
             const std::string _service;
             const std::string _tag;
 
             // region status with key: <region>, value: <status>
             std::unordered_map<std::string, int> _regions;
-            int _opened_regions;
 
-            const std::string GLOBAL_REGION = "";
+            int _num_opened_regions;
+
+
+
 
         public:
             Branch(std::string service, std::string tag, std::string region);

@@ -107,25 +107,23 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
     /* --------------- */
     /* service context */
     /* --------------- */
-    if (!service.empty()) {
-        std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-        // service and region context
-        if (!region.empty()) {
-            _service_nodes[service]->opened_regions[region] -= 1;
-        }
-
-        if (fully_closed) {
-            // decrease opened branches in all direct parents
-            ServiceNode * parent_node = _service_nodes[service];
-            do {
-                parent_node->num_opened_branches--;
-                parent_node = parent_node->parent;
-            } while (parent_node != nullptr);
-        }
-
-        // notify creation of new branch
-        _cond_service_nodes.notify_all();
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    // service and region context
+    if (!region.empty()) {
+        _service_nodes[service]->opened_regions[region] -= 1;
     }
+
+    if (fully_closed) {
+        // decrease opened branches in all direct parents
+        ServiceNode * parent_node = _service_nodes[service];
+        do {
+            parent_node->num_opened_branches--;
+            parent_node = parent_node->parent;
+        } while (parent_node != nullptr);
+    }
+
+    // notify creation of new branch
+    _cond_service_nodes.notify_all();
 
     /* -------------- */
     /* region context */
@@ -148,73 +146,60 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
     /* --------------- */
     /* service context */
     /* --------------- */
-    if (!service.empty()) {
-        // create new node if service does not exist yet
-        if (_service_nodes.count(service) == 0) {
-            _service_nodes[service] = new ServiceNode({service});
-        }
 
-        // validate tag
-        std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
-        if (branch->hasTag()) {
-            // ABORT - unique tag already exists
-            if (_service_nodes[service]->tagged_branches.count(branch->getTag()) != 0) {
-                _num_opened_branches.fetch_add(-num);
-                return false;
-            }
-            // track on SERVICE TAG
-            _service_nodes[service]->tagged_branches[branch->getTag()] = branch;
-        }
-
-        _service_nodes[service]->num_opened_branches++;
-
-        // ----------------------
-        // dependencies tracking
-        // ----------------------
-        ServiceNode * parent_node;
-        // we are within the same prev node -> parent node already exists
-        if (prev_service == service) {
-            parent_node = _service_nodes[service]->parent;
-        }
-        // parent node is the prev service -> this is the first child
-        else {
-            parent_node = _service_nodes[prev_service];
-            _service_nodes[service]->parent = parent_node;
-            parent_node->children.emplace_back(_service_nodes[service]);
-        }
-        // increment opened branches in all direct parents
-        while (parent_node != nullptr) {
-            parent_node->num_opened_branches++;
-            parent_node = parent_node->parent;
-        }
-
-        // track on REGIONS of SERVICE
-        if (regions.size() > 0) {
-            std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
-            for (const auto& region : regions) {
-                if (!region.empty()) {
-                    _service_nodes[service]->opened_regions[region] += 1;
-                    _opened_regions[region] += 1;
-                }
-            }
-        }
-        // notify upon creation (due to async waits)
-        _cond_new_service_nodes.notify_all();
+    // create new node if service does not exist yet
+    if (_service_nodes.count(service) == 0) {
+        _service_nodes[service] = new ServiceNode({service});
     }
 
-    /* -------------- */
-    /* region context */
-    /* -------------- */
+    // validate tag
+    std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
+    if (branch->hasTag()) {
+        // ABORT - unique tag already exists
+        if (_service_nodes[service]->tagged_branches.count(branch->getTag()) != 0) {
+            _num_opened_branches.fetch_add(-num);
+            return false;
+        }
+        // track on SERVICE TAG
+        _service_nodes[service]->tagged_branches[branch->getTag()] = branch;
+    }
+
+    _service_nodes[service]->num_opened_branches++;
+
+    // ----------------------
+    // dependencies tracking
+    // ----------------------
+    ServiceNode * parent_node;
+    // we are within the same prev node -> parent node already exists
+    if (prev_service == service) {
+        parent_node = _service_nodes[service]->parent;
+    }
+    // parent node is the prev service -> this is the first child
     else {
-        std::unique_lock<std::mutex> lock(_mutex_opened_regions);
+        parent_node = _service_nodes[prev_service];
+        _service_nodes[service]->parent = parent_node;
+        parent_node->children.emplace_back(_service_nodes[service]);
+    }
+    // increment opened branches in all direct parents
+    while (parent_node != nullptr) {
+        parent_node->num_opened_branches++;
+        parent_node = parent_node->parent;
+    }
+
+    // track on REGIONS of SERVICE
+    if (regions.size() > 0) {
+        std::unique_lock<std::mutex> lock_regions(_mutex_opened_regions);
         for (const auto& region : regions) {
             if (!region.empty()) {
+                _service_nodes[service]->opened_regions[region] += 1;
                 _opened_regions[region] += 1;
             }
         }
-        // notify upon creation (due to async waits)
         _cond_new_opened_regions.notify_all();
     }
+    // notify upon creation (due to async waits)
+    _cond_new_service_nodes.notify_all();
+
     return true;
 }
 

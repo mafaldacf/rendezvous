@@ -34,6 +34,7 @@ namespace utils {
 
     /* client gRPC custom error messages */
     const std::string ERR_MSG_SERVICE_NOT_FOUND = "Request status not found for the provided service";
+    const std::string ERR_MSG_SERVICE_EMPTY = "Service cannot be empty";
     const std::string ERR_MSG_INVALID_REGION = "Branch does not exist in the given region";
     const std::string ERR_MSG_BRANCH_NOT_FOUND = "No branch was found with the provided bid";
     const std::string ERR_MSG_INVALID_BRANCH_SERVICE = "No branch was found for the provided service";
