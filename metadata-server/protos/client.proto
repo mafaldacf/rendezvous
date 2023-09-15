@@ -26,7 +26,7 @@ message Empty {
 
 /* Metadata for server replication */
 message RequestContext {
-  string parent_service = 1;
+  string prev_service = 1;
   map<string, int32> versions = 2;
 }
 

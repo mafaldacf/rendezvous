@@ -9,7 +9,7 @@
 // CORE TEST
 // ---------
 
-TEST(ServerTest, getOrRegisterRequest_WithNoRid) { 
+TEST(CoreTest, getOrRegisterRequest_WithNoRid) { 
   rendezvous::Server server(SID);
   metadata::Request * request = server.getOrRegisterRequest(getRid(0));
   ASSERT_TRUE(request != nullptr);
@@ -20,7 +20,7 @@ TEST(ServerTest, getOrRegisterRequest_WithNoRid) {
   ASSERT_EQ(request->getRid(), request->getRid());
 }
 
-TEST(ServerTest, getOrRegisterRequest_WithRid) { 
+TEST(CoreTest, getOrRegisterRequest_WithRid) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_TRUE(request != nullptr);
@@ -31,13 +31,13 @@ TEST(ServerTest, getOrRegisterRequest_WithRid) {
   ASSERT_EQ(request->getRid(), request2->getRid());
 }
 
-TEST(ServerTest, GetRequest_InvalidRID) {
+TEST(CoreTest, GetRequest_InvalidRID) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getRequest("invalidRID");
   ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTest, GetOrRegisterAndGetRequest) {
+TEST(CoreTest, GetOrRegisterAndGetRequest) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   metadata::Request * request2 = server.getRequest(RID);
@@ -46,7 +46,7 @@ TEST(ServerTest, GetOrRegisterAndGetRequest) {
   ASSERT_EQ(request->getRid(), request->getRid());
 }
 
-TEST(ServerTest, GetOrRegisterTwiceRequest) {
+TEST(CoreTest, GetOrRegisterTwiceRequest) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   metadata::Request * request2 = server.getOrRegisterRequest(RID);
@@ -55,35 +55,35 @@ TEST(ServerTest, GetOrRegisterTwiceRequest) {
   ASSERT_EQ(request->getRid(), request->getRid());
 }
 
-TEST(ServerTest, RegisterBranch) { 
+TEST(CoreTest, RegisterBranch) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "", "", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
-TEST(ServerTest, RegisterBranch_WithService) { 
+TEST(CoreTest, RegisterBranch_WithService) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "s", "", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
-TEST(ServerTest, RegisterBranch_WithRegion) { 
+TEST(CoreTest, RegisterBranch_WithRegion) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "", "r", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
-TEST(ServerTest, RegisterBranch_WithServiceAndRegion) { 
+TEST(CoreTest, RegisterBranch_WithServiceAndRegion) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "s", "r", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
-TEST(ServerTest, RegisterBranch_DiffTags) { 
+TEST(CoreTest, RegisterBranch_DiffTags) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "service", "region", "tag_A");
@@ -92,7 +92,7 @@ TEST(ServerTest, RegisterBranch_DiffTags) {
   ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
 }
 
-TEST(ServerTest, RegisterBranch_SameTags) { 
+TEST(CoreTest, RegisterBranch_SameTags) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "service", "region", "tag_A");
@@ -102,7 +102,7 @@ TEST(ServerTest, RegisterBranch_SameTags) {
   ASSERT_EQ("", bid);
 }
 
-TEST(ServerTest, CloseBranch) { 
+TEST(CoreTest, CloseBranch) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "s", "r", EMPTY_TAG);
@@ -110,7 +110,7 @@ TEST(ServerTest, CloseBranch) {
   ASSERT_EQ(1, res);
 }
 
-TEST(ServerTest, CloseBranchInvalidRegion) {
+TEST(CoreTest, CloseBranchInvalidRegion) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", EMPTY_TAG);
@@ -118,7 +118,7 @@ TEST(ServerTest, CloseBranchInvalidRegion) {
   ASSERT_EQ(-1, res);
 }
 
-TEST(ServerTest, CloseBranchInvalidBid) {
+TEST(CoreTest, CloseBranchInvalidBid) {
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "service", "eu-central-1", EMPTY_TAG);
@@ -126,7 +126,7 @@ TEST(ServerTest, CloseBranchInvalidBid) {
   ASSERT_EQ(0, res);
 }
 
-TEST(ServerTest, CheckRequest_AllContexts) { 
+TEST(CoreTest, CheckRequest_AllContexts) { 
   rendezvous::Server server(SID); 
   utils::Status res;
   bool found_region = false;
@@ -175,7 +175,7 @@ TEST(ServerTest, CheckRequest_AllContexts) {
   ASSERT_EQ(CLOSED, res.status);
 }
 
-TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) { 
+TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) { 
   rendezvous::Server server(SID); 
     
   int status;
@@ -272,7 +272,7 @@ TEST(ServerTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(CLOSED, res.status);
 }
 
-TEST(ServerTest, CheckRequest_ContextNotFound) { 
+TEST(CoreTest, CheckRequest_ContextNotFound) { 
   rendezvous::Server server(SID); 
   int status;
   utils::Status res;
@@ -292,7 +292,7 @@ TEST(ServerTest, CheckRequest_ContextNotFound) {
 }
 
 // sanity check
-TEST(ServerTest, PreventedInconsistencies_GetZeroValue) { 
+TEST(CoreTest, PreventedInconsistencies_GetZeroValue) { 
   rendezvous::Server server(SID); 
   long value = server._prevented_inconsistencies.load();
   ASSERT_EQ(0, value);

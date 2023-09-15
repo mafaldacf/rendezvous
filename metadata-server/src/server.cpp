@@ -246,14 +246,14 @@ const std::string& tag, std::string bid) {
 //----------------------
 
 std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
   bool monitor, std::string bid) {
 
   // bid already defined when we have a replicated request from another server
   if (bid.empty()) {
     bid = genBid(request);
   }
-  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions, parent_service);
+  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions, prev_service);
   // unexpected error
   if (!branch) {
     return "";
@@ -285,7 +285,7 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
 }
 
 int Server::wait(metadata::Request * request, const std::string& service, const::std::string& region, 
-  std::string tag, bool async, int timeout) {
+  std::string tag, std::string prev_service, bool async, int timeout) {
 
   int result;
   metadata::Subscriber * subscriber;
@@ -296,9 +296,9 @@ int Server::wait(metadata::Request * request, const std::string& service, const:
   else if (!service.empty())
     result = request->waitService(service, tag, async, timeout);
   else if (!region.empty())
-    result = request->waitRegion(region, async, timeout);
+    result = request->waitRegion(region, prev_service, async, timeout);
   else
-    result = request->wait(timeout);
+    result = request->wait(prev_service, timeout);
 
   // TODO: REMOVE THIS FOR RELEASE!
   if (result == 1) {

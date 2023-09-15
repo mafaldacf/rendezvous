@@ -50,7 +50,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     }
   }
 
-  std::string res = _server->registerBranch(rdv_request, service, regions, tag, request->context().parent_service(), monitor, bid);
+  std::string res = _server->registerBranch(rdv_request, service, regions, tag, request->context().prev_service(), monitor, bid);
 
   return grpc::Status::OK;
 }

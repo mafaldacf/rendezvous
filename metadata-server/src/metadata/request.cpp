@@ -41,7 +41,7 @@ std::string Request::genId() {
 }
 
 metadata::Branch * Request::registerBranch(const std::string& bid, const std::string& service, 
-    const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service) {
+    const std::string& tag, const utils::ProtoVec& regions, const std::string& prev_service) {
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
     auto branch_it = _branches.find(bid);
@@ -66,7 +66,7 @@ metadata::Branch * Request::registerBranch(const std::string& bid, const std::st
     }
 
     // error tracking branch (tag already exists!)
-    if (!trackBranch(service, regions, num, parent_service, branch)) {
+    if (!trackBranch(service, regions, num, prev_service, branch)) {
         spdlog::error("Error creating branch for service = {} and #{} regions", service, num);
         delete branch;
         return nullptr;
@@ -142,14 +142,14 @@ bool Request::untrackBranch(const std::string& service, const std::string& regio
 }
 
 bool Request::trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, 
-    const std::string& parent_name, metadata::Branch * branch) {
+    const std::string& prev_service, metadata::Branch * branch) {
     
     _num_opened_branches.fetch_add(num);
     /* --------------- */
     /* service context */
     /* --------------- */
     if (!service.empty()) {
-        // check if service does not exist yet and add new node node
+        // create new node if service does not exist yet
         if (_service_nodes.count(service) == 0) {
             _service_nodes[service] = new ServiceNode({service});
         }
@@ -168,15 +168,25 @@ bool Request::trackBranch(const std::string& service, const utils::ProtoVec& reg
 
         _service_nodes[service]->num_opened_branches++;
 
-        // add current node to the parent's children nodes
-        ServiceNode * parent_node = _service_nodes[parent_name];
-        _service_nodes[service]->parent = parent_node;
-        parent_node->children.emplace_back(_service_nodes[service]);
+        // ----------------------
+        // dependencies tracking
+        // ----------------------
+        ServiceNode * parent_node;
+        // we are within the same prev node -> parent node already exists
+        if (prev_service == service) {
+            parent_node = _service_nodes[service]->parent;
+        }
+        // parent node is the prev service -> this is the first child
+        else {
+            parent_node = _service_nodes[prev_service];
+            _service_nodes[service]->parent = parent_node;
+            parent_node->children.emplace_back(_service_nodes[service]);
+        }
         // increment opened branches in all direct parents
-        do {
+        while (parent_node != nullptr) {
             parent_node->num_opened_branches++;
             parent_node = parent_node->parent;
-        } while (parent_node != nullptr);
+        }
 
         // track on REGIONS of SERVICE
         if (regions.size() > 0) {
@@ -217,7 +227,7 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
-int Request::wait(int timeout, std::string prev_service) {
+int Request::wait(std::string prev_service, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -252,6 +262,44 @@ int Request::wait(int timeout, std::string prev_service) {
         parent = parent->parent;
     } while (parent != nullptr);
     
+    return inconsistency;
+}
+
+int Request::waitRegion(const std::string& region, std::string prev_service, bool async, int timeout) {
+    int inconsistency = 0;
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+    std::unique_lock<std::mutex> lock(_mutex_opened_regions);
+
+    // transverse parents algorithm (similar to the global wait):
+    // - only wait for top/left neighboors
+    // - discard direct parents
+    ServiceNode * stop = nullptr;
+    ServiceNode * parent = _service_nodes[prev_service];
+    do {
+        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
+            if (*it == stop) {
+                break;
+            }
+
+            // ----------
+            // wait logic
+            // ----------
+            while ((*it)->opened_regions[region] != 0) {
+                _cond_opened_regions.wait_for(lock, std::chrono::seconds(remaining_timeout));
+                inconsistency = 1;
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
+                }
+            }
+            // ----------
+            // ----------
+        }
+        stop = parent;
+        parent = parent->parent;
+    } while (parent != nullptr);
+
     return inconsistency;
 }
 
@@ -313,46 +361,6 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
             }
         }
     }
-    return inconsistency;
-}
-
-int Request::waitRegion(const std::string& region, bool async, int timeout) {
-    int inconsistency = 0;
-    auto start_time = std::chrono::steady_clock::now();
-    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-    std::unique_lock<std::mutex> lock(_mutex_opened_regions);
-
-    // --------------
-    // CONTEXT CHECKS
-    //---------------
-    // branch is expected to be asynchronously opened so we need to wait for the branch context
-    if (async) {
-        while (_opened_regions.count(region) == 0) {
-            _cond_new_opened_regions.wait_for(lock, remaining_timeout);
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
-            }
-        }
-    }
-    // context not found
-    else if (_opened_regions.count(region) == 0) {
-        return -2;
-    }
-
-    // ----------
-    // WAIT LOGIC
-    //-----------
-    int * num_branches_ptr = &_opened_regions[region];
-    while (*num_branches_ptr != 0) {
-        inconsistency = 1;
-        _cond_opened_regions.wait_for(lock, remaining_timeout);
-        remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-        if (remaining_timeout <= std::chrono::seconds(0)) {
-            return -1;
-        }
-    }
-
     return inconsistency;
 }
 

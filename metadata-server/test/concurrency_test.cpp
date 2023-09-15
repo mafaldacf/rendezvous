@@ -9,7 +9,7 @@
 // CONCURRENCY TEST
 // ----------------
 
-TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
+TEST(ConcurrencyTest, CloseBranchBeforeRegister) {
   rendezvous::Server server(SID);
     
   std::vector<std::thread> threads;
@@ -33,7 +33,7 @@ TEST(ServerConcurrencyTest, CloseBranchBeforeRegister) {
   }
 }
 
-TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
+TEST(ConcurrencyTest, WaitRequest_ContextNotFound) {
   rendezvous::Server server(SID);
   int status;
 
@@ -44,7 +44,7 @@ TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   status = server.wait(request, "", "wrong_region");
-  ASSERT_EQ(CONTEXT_NOT_FOUND, status);
+  ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
   status = server.wait(request, "wrong_service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
@@ -59,7 +59,7 @@ TEST(ServerConcurrencyTest, WaitRequest_ContextNotFound) {
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 }
 
-TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
+TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
   rendezvous::Server server(SID);
   int status;
 
@@ -69,14 +69,14 @@ TEST(ServerConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid =  server.registerBranchRegion(request, "service", "region", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 
-  status = server.wait(request, "service", "region", EMPTY_TAG, false, 1);
+  status = server.wait(request, "service", "region", EMPTY_TAG, "", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.wait(request, "service2", "", EMPTY_TAG, true, 1);
+  status = server.wait(request, "service2", "", EMPTY_TAG, "", true, 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 
-TEST(ServerConcurrencyTest, SimpleWaitRequest) { 
+TEST(ConcurrencyTest, SimpleWaitRequest) { 
   std::vector<std::thread> threads;
   rendezvous::Server server(SID);
   std::string bid;
@@ -112,7 +112,7 @@ TEST(ServerConcurrencyTest, SimpleWaitRequest) {
   }
 }
 
-TEST(ServerConcurrencyTest, SimpleWaitRequestTwo) { 
+TEST(ConcurrencyTest, SimpleWaitRequestTwo) { 
   std::vector<std::thread> threads;
   rendezvous::Server server(SID);
   std::string bid;
@@ -144,7 +144,7 @@ TEST(ServerConcurrencyTest, SimpleWaitRequestTwo) {
   }
 }
 
-TEST(ServerConcurrencyTest, WaitRequest) { 
+TEST(ConcurrencyTest, WaitRequest) { 
   std::vector<std::thread> threads;
   rendezvous::Server server(SID);
   std::string bid;
@@ -181,9 +181,10 @@ TEST(ServerConcurrencyTest, WaitRequest) {
   });
   
 
+  // MUST NOT wait for itself
   threads.emplace_back([&server, request] {
     int status = server.wait(request, "", "region1");
-    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+    ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
   
 
@@ -257,10 +258,10 @@ TEST(ServerConcurrencyTest, WaitRequest) {
 
   // validate number of prevented inconsistencies
   long value = server._prevented_inconsistencies.load();
-  ASSERT_EQ(8, value);
+  ASSERT_EQ(7, value);
 }
 
-TEST(ServerConcurrencyTest, WaitServiceTag) {
+TEST(ConcurrencyTest, WaitServiceTag) {
   rendezvous::Server server(SID);
   std::vector<std::thread> threads;
   metadata::Request * request = server.getOrRegisterRequest(RID);
@@ -274,17 +275,17 @@ TEST(ServerConcurrencyTest, WaitServiceTag) {
   sleep(1);
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "EU", "tag", true);
+    int status = server.wait(request, "service", "EU", "tag");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "US", "tag", true);
+    int status = server.wait(request, "service", "US", "tag");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "", "tag", true);
+    int status = server.wait(request, "service", "", "tag");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -302,23 +303,23 @@ TEST(ServerConcurrencyTest, WaitServiceTag) {
   }
 }
 
-TEST(ServerConcurrencyTest, WaitServiceTagForceAsync) {
+TEST(ConcurrencyTest, WaitServiceTagForceAsync) {
   rendezvous::Server server(SID);
   std::vector<std::thread> threads;
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "EU", "tag", true);
+    int status = server.wait(request, "service", "EU", "tag", "", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "US", "tag", true);
+    int status = server.wait(request, "service", "US", "tag", "", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, "service", "", "tag", true);
+    int status = server.wait(request, "service", "", "tag", "", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 

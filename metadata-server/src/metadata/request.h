@@ -122,7 +122,7 @@ namespace metadata {
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
             metadata::Branch * registerBranch(const std::string& bid, const std::string& service, 
-                const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service);
+                const std::string& tag, const utils::ProtoVec& regions, const std::string& prev_service);
 
             /**
              * Remove a branch from the request
@@ -160,6 +160,7 @@ namespace metadata {
             /**
              * Wait until request is closed
              * 
+             * @param prev_service Previously registered service
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
@@ -167,7 +168,23 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              */
-            int wait(int timeout, std::string prev_service = "");
+            int wait(std::string prev_service, int timeout);
+
+            /**
+             * Wait until request is closed for a given context (region)
+             *
+             * @param region The name of the region that defines the waiting context
+             * @param prev_service Previously registered service
+             * @param async Force to wait for asynchronous creation of a single branch
+             * @param timeout Timeout in seconds
+             *
+             * @return Possible return values:
+             * - 0 if call did not block, 
+             * - 1 if inconsistency was prevented
+             * - (-1) if timeout was reached
+             * - (-2) if context was not found
+             */
+            int waitRegion(const std::string& region, std::string prev_service, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service)
@@ -185,20 +202,6 @@ namespace metadata {
              */
             int waitService(const std::string& service, const std::string& tag, bool async, int timeout);
 
-            /**
-             * Wait until request is closed for a given context (region)
-             *
-             * @param region The name of the region that defines the waiting context
-             * @param async Force to wait for asynchronous creation of a single branch
-             * @param timeout Timeout in seconds
-             *
-             * @return Possible return values:
-             * - 0 if call did not block, 
-             * - 1 if inconsistency was prevented
-             * - (-1) if timeout was reached
-             * - (-2) if context was not found
-             */
-            int waitRegion(const std::string& region, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service and region)

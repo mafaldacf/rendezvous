@@ -101,17 +101,17 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     spdlog::error("< [RB] Error: invalid request '{}'", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
-  std::string bid = _server->registerBranch(rdv_request, service, regions, tag, ctx.parent_service(), monitor);
+  std::string bid = _server->registerBranch(rdv_request, service, regions, tag, ctx.prev_service(), monitor);
   if (bid.empty()) {
     spdlog::error("< [RB] Error: tag '{}' already exists for service '{}' in request '{}'", tag, service, rid);
     return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, utils::ERR_MSG_TAG_ALREADY_EXISTS);
   }
   response->set_rid(rdv_request->getRid());
   response->set_bid(bid);
+  ctx.set_prev_service(service);
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
-    rendezvous::RequestContext ctx = request->context();
     if (_async_replication) {
       // update current context
       std::string sid = _server->getSid();
@@ -139,7 +139,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   // client specifies different regions for each datastores using the DatastoreBranching type
   if (request->branches().size() > 0){
     for (const auto& branches : request->branches()) {
-      std::string bid = _server->registerBranch(rdv_request, branches.datastore(), branches.regions(), branches.tag(), "parent_service");
+      std::string bid = _server->registerBranch(rdv_request, branches.datastore(), branches.regions(), branches.tag(), "prev_service");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -153,7 +153,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
     auto tags = request->tags();
     int i = 0;
     for (const auto& datastore: request->datastores()) {
-      std::string bid = _server->registerBranch(rdv_request, datastore, regions, tags[i], "parent_service");
+      std::string bid = _server->registerBranch(rdv_request, datastore, regions, tags[i], "prev_service");
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -260,7 +260,7 @@ grpc::Status ClientServiceImpl::Wait(grpc::ServerContext* context,
   }
   
   // provide in-depth info about effectiveness of wait request (prevented inconsistency, timedout, etc)
-  int result = _server->wait(rdv_request, service, region, tag, true, timeout);
+  int result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
   if (result == 1) {
     response->set_prevented_inconsistency(true);
   }
