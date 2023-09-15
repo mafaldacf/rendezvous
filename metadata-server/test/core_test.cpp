@@ -133,25 +133,26 @@ TEST(CoreTest, CheckRequest_AllContexts) {
 
   /* Register Request and Branches with Multiple Contexts */
   metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid_0 = server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
-  std::string bid_1 = server.registerBranchRegion(request, "s", "", EMPTY_TAG); // bid = 1
-  std::string bid_2 = server.registerBranchRegion(request, "", "r", EMPTY_TAG); // bid = 2
-  std::string bid_3 = server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
+  std::string bid_0 = server.registerBranchRegion(request, "s1", "", EMPTY_TAG); // bid = 0
+  std::string bid_1 = server.registerBranchRegion(request, "s2", "", EMPTY_TAG); // bid = 1
+  std::string bid_2 = server.registerBranchRegion(request, "s1", "r", EMPTY_TAG); // bid = 2
+  std::string bid_3 = server.registerBranchRegion(request, "s2", "r", EMPTY_TAG); // bid = 3
+  std::string bid_4 = server.registerBranchRegion(request, "emplastro", "region", EMPTY_TAG); // bid = 4
 
   /* Check Request for Multiple Contexts */
-  res = server.checkStatus(request, "", "");
+  res = server.checkStatus(request, "s1", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, "s", "");
+  res = server.checkStatus(request, "s2", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, "", "r");
+  res = server.checkStatus(request, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, "s", "r");
+  res = server.checkStatus(request, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
 
   /* Close branch with no context and verify request is still opened */
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), ""); // bid 0
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, "", "");
+  res = server.checkStatus(request, "s1", "");
   ASSERT_EQ(OPENED, res.status);
 
   /* Close branches with service 's' and verify request is closed for that service */
@@ -159,18 +160,24 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   ASSERT_EQ(true, found_region);
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_3, 3), "r"); // bid 3
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, "s", "");
+  res = server.checkStatus(request, "s2", "");
   ASSERT_EQ(CLOSED, res.status);
 
   /* Remaining checks */
-  res = server.checkStatus(request, "", "r");
+  res = server.checkStatus(request, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_2, 2), "r"); // bid 2
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, "s", "r");
+  res = server.checkStatus(request, "s2", "r");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, "", "r");
+  res = server.checkStatus(request, "s1", "r");
   ASSERT_EQ(CLOSED, res.status);
+  res = server.checkStatus(request, "s1", "");
+  ASSERT_EQ(CLOSED, res.status);
+  res = server.checkStatus(request, "", "");
+  ASSERT_EQ(OPENED, res.status);
+  found_region = server.closeBranch(request, parseFullBid(&server, request, bid_4, 4), "region"); // bid 4
+  ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, "", "");
   ASSERT_EQ(CLOSED, res.status);
 }

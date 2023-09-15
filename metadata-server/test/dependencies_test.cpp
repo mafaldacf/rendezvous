@@ -9,6 +9,83 @@
 // DEPENDENCIES TEST w/ POST NOTIFICATION sample
 // ---------------------------------------------
 
+TEST(DependenciesTest, CheckStatus) {
+  //          root
+  //      /           \
+  //  post_storage   notification_storage
+  //    /               \
+  //  analytics       media service
+
+  rendezvous::Server server(SID);
+  std::vector<std::thread> threads;
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+
+  utils::ProtoVec regions_0;
+  regions_0.Add("EU");
+  regions_0.Add("US");
+  std::string bid_0 = server.registerBranch(request, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid_0);
+
+  utils::ProtoVec regions_1;
+  regions_1.Add("AP");
+  std::string bid_1 = server.registerBranch(request, "analytics", regions_1, "", "post_storage");
+  ASSERT_EQ(getFullBid(request->getRid(), 1), bid_1);
+  
+  // ignore parents (analytics, post_storage)
+  utils::Status r = server.checkStatus(request, "", "", "analytics");
+  ASSERT_EQ(CLOSED, r.status);
+
+  utils::ProtoVec regions_2;
+  regions_2.Add("US");
+  std::string bid_2 = server.registerBranch(request, "notification_storage", regions_2, "", "post_storage");
+  ASSERT_EQ(getFullBid(request->getRid(), 2), bid_2);
+
+  utils::ProtoVec regions_3;
+  regions_3.Add("US");
+  std::string bid_3 = server.registerBranch(request, "media_service", regions_3, "", "notification_storage");
+  ASSERT_EQ(getFullBid(request->getRid(), 3), bid_3);
+  
+  // from the notification storage point of view
+  // we are checking the status of post-storage -> analytics
+  r = server.checkStatus(request, "", "", "notification_storage");
+  ASSERT_EQ(OPENED, r.status);
+
+  int found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "EU");
+  ASSERT_EQ(1, found);
+  found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "US");
+  ASSERT_EQ(1, found);
+
+  // analytics is still opened
+  r = server.checkStatus(request, "", "", "notification_storage");
+  ASSERT_EQ(OPENED, r.status);
+
+  // OPENED since:
+  // - media is still opened
+  found = server.closeBranch(request, parseFullBid(&server, request, bid_1, 1), "AP"); // post_storage
+  ASSERT_EQ(1, found);
+  r = server.checkStatus(request, "", "", "notification_storage");
+  ASSERT_EQ(OPENED, r.status);
+
+  // CLOSED since we ignore:
+  // - notification storage (OPENED) (direct parent)
+  // - media service (OPENED) (the current one)
+  r = server.checkStatus(request, "", "", "media_service");
+  ASSERT_EQ(CLOSED, r.status);
+
+  // OPENED since:
+  // - media storage is OPENED
+  found = server.closeBranch(request, parseFullBid(&server, request, bid_2, 2), "US"); // notification_storage
+  ASSERT_EQ(1, found);
+  r = server.checkStatus(request, "", "", "notification_storage");
+  ASSERT_EQ(OPENED, r.status);
+
+  // everything closed
+  found = server.closeBranch(request, parseFullBid(&server, request, bid_3, 3), "US"); // media_service
+  ASSERT_EQ(1, found);
+  r = server.checkStatus(request, "", "", "notification_storage");
+  ASSERT_EQ(CLOSED, r.status);
+}
+
 TEST(DependenciesTest, Wait) {
   // total wait waits for all of its dependencies
   // - dependencies are root -> {post_storage -> {analytics}}
