@@ -223,13 +223,28 @@ namespace rendezvous {
              * @param region The region context
              * @param prev_service Previously registered service
              * @param detailed Enable detailed information (status for tagged branches and dependencies)
-             * @return Possible return values:
+             * @return Possible return values of Status.status:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - 2 if context was not found
+             * - 2 if request is UNKNOWN
+             * - (-3) if context was not found
              */
             utils::Status checkStatus(metadata::Request * request, const std::string& service, 
                 const std::string& region, std::string prev_service = "", bool detailed = false);
+
+            /**
+             * Fetch dependencies in the call graph
+             * 
+             * @param request Request where the branch is registered
+             * @param service The service context
+             * @param prev_service Previously registered service
+             * @return Possible return values of Dependencies.res:
+             * - 0 if OK
+             * - (-2) if service was not found
+             * - (-3) if context was not found
+             */
+            utils::Dependencies fetchDependencies(metadata::Request * request, const std::string& service, 
+                std::string prev_service = "");
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

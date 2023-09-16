@@ -3,18 +3,26 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 namespace utils {
 
-    /* ------------------------------------------- */
-    /* status info for CheckRequest remote request */
-    /* ------------------------------------------- */
+    /* ------------------------------ */
+    /* helper for CheckStatus request */
+    /* ------------------------------- */
     typedef struct StatusStruct {
         int status;
         std::map<std::string, int> tagged;
-        std::map<std::string, int> children;
         std::map<std::string, int> regions;
     } Status;
+
+    /* ------------------------------------ */
+    /* helper for FetchDependencies request */
+    /* ------------------------------------ */
+    typedef struct DependenciesStruct {
+        int res;
+        std::vector<std::string> deps;
+    } Dependencies;
     
     /* --------------*/
     /* status values */
@@ -24,6 +32,7 @@ namespace utils {
     const int UNKNOWN = 2;
 
     // helper for errors
+    const int INVALID_SERVICE = -2;
     const int INVALID_CONTEXT = -3;
 
     /* --------------------- */
@@ -52,6 +61,7 @@ namespace utils {
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context ('prev_service' field)";
     const std::string ERR_MSG_INVALID_SERVICES_NONE = "Must provide 'service' or 'services' parameter";
     const std::string ERR_MSG_INVALID_SERVICES_BOTH = "Cannot provide 'service' and 'services' parameter simultaneously";
+    const std::string ERR_MSG_INVALID_SERVICE = "Invalid service";
     
     /* common gRPC custom error messages */
     const std::string ERR_MSG_INVALID_REQUEST = "Invalid request identifier";

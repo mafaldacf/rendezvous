@@ -12,6 +12,7 @@ service ClientService {
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
   rpc CheckStatus(CheckStatusMessage) returns (CheckStatusResponse);
+  rpc FetchDependencies(FetchDependenciesMessage) returns (FetchDependenciesResponse);
 }
 
 /* Helpers */
@@ -120,6 +121,16 @@ message CheckStatusMessage {
 message CheckStatusResponse {
   RequestStatus status = 1;
   map<string, RequestStatus> tagged = 2;
-  map<string, RequestStatus> direct_dependencies = 3;
-  map<string, RequestStatus> regions = 4;
+  map<string, RequestStatus> regions = 3;
+}
+
+/* Check Dependencies */
+message FetchDependenciesMessage {
+  string rid = 1;
+  string service = 2;
+  RequestContext context = 4;
+}
+
+message FetchDependenciesResponse {
+  repeated string dependencies = 1;
 }

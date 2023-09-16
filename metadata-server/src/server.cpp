@@ -300,7 +300,7 @@ int Server::wait(metadata::Request * request, const std::string& service, const:
   else
     result = request->wait(prev_service, timeout);
 
-  // TODO: REMOVE THIS FOR RELEASE!
+  // TODO: REMOVE THIS FOR FINAL RELEASE!
   if (result == 1) {
     _prevented_inconsistencies.fetch_add(1);
   }
@@ -318,7 +318,14 @@ utils::Status Server::checkStatus(metadata::Request * request, const std::string
   else if (!service.empty())
     return request->checkStatusService(service, detailed);
   else if (!region.empty())
-    return request->checkStatusRegion(region, prev_service, detailed);
+    return request->checkStatusRegion(region, prev_service);
 
-  return request->checkStatus(prev_service, detailed);
+  return request->checkStatus(prev_service);
+}
+
+utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, std::string prev_service) {
+  if (service.empty()) {
+    return request->fetchDependencies(prev_service);
+  }
+  return request->fetchDependenciesService(service);
 }

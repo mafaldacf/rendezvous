@@ -410,7 +410,7 @@ const::std::string& tag, bool async, int timeout) {
     return inconsistency;
 }
 
-utils::Status Request::checkStatus(std::string prev_service, bool detailed) {
+utils::Status Request::checkStatus(const std::string& prev_service) {
     utils::Status res;
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
 
@@ -446,7 +446,7 @@ utils::Status Request::checkStatus(std::string prev_service, bool detailed) {
     return res;
 }
 
-utils::Status Request::checkStatusRegion(const std::string& region, std::string prev_service, bool detailed) {
+utils::Status Request::checkStatusRegion(const std::string& region, const std::string& prev_service) {
     utils::Status res;
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
 
@@ -491,7 +491,7 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
     std::unique_lock<std::mutex> lock(_mutex_service_nodes);
 
     // find out if service context exists
-    if (!_service_nodes.count(service)) {
+    if (_service_nodes.count(service) == 0) {
         res.status = UNKNOWN;
         return res;
     }
@@ -512,11 +512,6 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
     // get tagged branches within the same service
     for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus();
-    }
-    // get children nodes of current service
-    for (auto node_it = _service_nodes[service]->children.begin(); node_it != _service_nodes[service]->children.end(); ++node_it) {
-        int status = (*node_it)->num_opened_branches == 0 ? CLOSED : OPENED;
-        res.children[(*node_it)->name] = status;
     }
     // get all regions status
     for (const auto& region_it: _service_nodes[service]->opened_regions) {
@@ -557,14 +552,36 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
     for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
         res.tagged[branch_it.first] = branch_it.second->getStatus(region);
     }
-    // get children nodes of current service
-    for (auto node_it = _service_nodes[service]->children.begin(); node_it != _service_nodes[service]->children.end(); ++node_it) {
-        // by default, if region is not found then status is set to UNKNOWN
-        int status = UNKNOWN;
-        if ((*node_it)->opened_regions.count(region) > 0) {
-            status = (*node_it)->opened_regions[region] == 0 ? CLOSED : OPENED;
-        }
-        res.children[(*node_it)->name] = status;
-    }
     return res;
+}
+
+utils::Dependencies Request::fetchDependencies(const std::string& prev_service) {
+    utils::Dependencies result {0};
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    // find out if context is valid
+    if (_service_nodes.count(prev_service) == 0) {
+        result.res = INVALID_CONTEXT;
+        return result;
+    }
+    // get children nodes of current service
+    for (auto it = _service_nodes[prev_service]->children.begin(); it != _service_nodes[prev_service]->children.end(); ++it) {
+        result.deps.emplace_back((*it)->name);
+    }
+    return result;
+}
+
+utils::Dependencies Request::fetchDependenciesService(const std::string& service) {
+    utils::Dependencies result {0};
+    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+
+    if (_service_nodes.count(service) == 0) {
+        result.res = INVALID_SERVICE;
+        return result;
+    }
+
+    // get children nodes of current service
+    for (auto it = _service_nodes[service]->children.begin(); it != _service_nodes[service]->children.end(); ++it) {
+        result.deps.emplace_back((*it)->name);
+    }
+    return result;
 }

@@ -222,13 +222,12 @@ namespace metadata {
              * Check status of request
              * @param detailed Detailed description of status for all tagged branches
              * @param prev_service Previously registered service
-             * @param detailed Enable detailed information (status for tagged branches and dependencies)
              * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            Status checkStatus(std::string prev_service = "", bool detailed = false);
+            Status checkStatus(const std::string& prev_service);
 
             /**
              * Check status of request for a given context (region)
@@ -236,14 +235,13 @@ namespace metadata {
              * @param region The name of the region that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
              * @param prev_service Previously registered service
-             * @param detailed Enable detailed information (status for tagged branches and dependencies)
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusRegion(const std::string& region, std::string prev_service = "", bool detailed = false);
+            Status checkStatusRegion(const std::string& region, const std::string& prev_service);
 
             /**
              * Check status of request for a given context (service)
@@ -271,6 +269,30 @@ namespace metadata {
              * - 2 if request is UNKNOWN
              */
             Status checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
+
+            /**
+             * Fetch dependencies in the call graph
+             * 
+             * @param request Request where the branch is registered
+             * @param prev_service Previously registered service
+             * @return Possible return values of Dependencies.res:
+             * - 0 if OK
+             * - (-2) if service was not found
+             * - (-3) if context was not found
+             */
+            utils::Dependencies fetchDependencies(const std::string& prev_service);
+
+            /**
+             * Fetch dependencies in the call graph
+             * 
+             * @param request Request where the branch is registered
+             * @param service The service context
+             * @return Possible return values of Dependencies.res:
+             * - 0 if OK
+             * - (-2) if service was not found
+             * - (-3) if context was not found
+             */
+            utils::Dependencies fetchDependenciesService(const std::string& service);
         };
     
 }

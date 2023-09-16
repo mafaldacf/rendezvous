@@ -24,7 +24,7 @@ ClientServiceImpl::ClientServiceImpl(
 metadata::Request * ClientServiceImpl::_getRequest(const std::string& rid) {
   metadata::Request * request;
   // one metadata server
-  if (_num_replicas == 1) {
+  if (_num_replicas == 1 || !_async_replication) {
     request = _server->getRequest(rid);
   }
   // replicated servers
@@ -324,10 +324,10 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  auto result = _server->checkStatus(rdv_request, service, region, request->context().prev_service(), detailed);
+  const auto& result = _server->checkStatus(rdv_request, service, region, request->context().prev_service(), detailed);
 
   if (result.status == INVALID_CONTEXT) {
-    spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+    spdlog::error("< [CS] Error: invalid context (field: prev_service)", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
   }
 
@@ -342,12 +342,12 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
     }
 
     // get info for children/dependencies branches
-    auto * children = response->mutable_direct_dependencies();
+    /* auto * children = response->mutable_direct_dependencies();
     response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
     for (auto pair = result.children.begin(); pair != result.children.end(); pair++) {
       // <child service name, status>
       (*children)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
-    }
+    } */
 
     // get info for regions
     auto * regions = response->mutable_regions();
@@ -359,5 +359,40 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
   }
 
   response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
+  return grpc::Status::OK;
+}
+
+grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context, 
+  const rendezvous::FetchDependenciesMessage* request, 
+  rendezvous::FetchDependenciesResponse* response) {
+  if (!_consistency_checks) return grpc::Status::OK;
+
+  const std::string& rid = request->rid();
+  const std::string& service = request->service();
+
+  spdlog::trace("> [FD] query for request '{}' on service '{}'", rid, service);
+  
+  // check if request exists
+  metadata::Request * rdv_request = _getRequest(rid);
+  if (rdv_request == nullptr) {
+    spdlog::error("< [FD] Error: invalid request '{}'", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
+  }
+
+  const auto& result = _server->fetchDependencies(rdv_request, service, request->context().prev_service());
+
+  if (result.res == INVALID_CONTEXT) {
+    spdlog::error("< [FD] Error: invalid context (field: prev_service)", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+  }
+  else if (result.res == INVALID_SERVICE) {
+    spdlog::error("< [FD] Error: invalid service", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICE);
+  }
+
+  for (const auto& dep: result.deps) {
+    response->add_dependencies(dep);
+  }
+
   return grpc::Status::OK;
 }

@@ -86,6 +86,84 @@ TEST(DependenciesTest, CheckStatus) {
   ASSERT_EQ(CLOSED, r.status);
 }
 
+TEST(DependenciesTest, FetchDependencies_Root) {
+  rendezvous::Server server(SID);
+  std::vector<std::thread> threads;
+  std::string bid;
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+
+  utils::ProtoVec regions_0;
+  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+
+  utils::ProtoVec regions_1;
+  bid = server.registerBranch(request, "notification_storage", regions_1, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+
+  // fetch dependencies from root
+  auto result = server.fetchDependencies(request, "", "");
+
+  ASSERT_EQ(OK, result.res);
+  ASSERT_EQ(2, result.deps.size());
+  auto found = std::find(std::begin(result.deps), std::end(result.deps), "post_storage");
+  ASSERT_EQ(true, found != std::end(result.deps));
+  found = std::find(std::begin(result.deps), std::end(result.deps), "notification_storage");
+  ASSERT_EQ(true, found != std::end(result.deps));
+}
+
+TEST(DependenciesTest, FetchDependencies_PostStorage) {
+  rendezvous::Server server(SID);
+  std::vector<std::thread> threads;
+  std::string bid;
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+
+  utils::ProtoVec regions_0;
+  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+
+  utils::ProtoVec regions_1;
+  bid = server.registerBranch(request, "analytics", regions_1, "", "post_storage");
+  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+
+  // fetch dependencies from root
+  auto result = server.fetchDependencies(request, "post_storage", "");
+
+  ASSERT_EQ(OK, result.res);
+  ASSERT_EQ(1, result.deps.size());
+  auto found = std::find(std::begin(result.deps), std::end(result.deps), "analytics");
+  ASSERT_EQ(true, found != std::end(result.deps));
+}
+
+TEST(DependenciesTest, FetchDependencies_InvalidContext) {
+  rendezvous::Server server(SID);
+  std::vector<std::thread> threads;
+  std::string bid;
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+
+  utils::ProtoVec regions_0;
+  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+
+  // fetch dependencies from root
+  auto result = server.fetchDependencies(request, "", "invalid context service");
+  ASSERT_EQ(INVALID_CONTEXT, result.res);
+}
+
+TEST(DependenciesTest, FetchDependencies_InvalidService) {
+  rendezvous::Server server(SID);
+  std::vector<std::thread> threads;
+  std::string bid;
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+
+  utils::ProtoVec regions_0;
+  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+
+  // fetch dependencies from root
+  auto result = server.fetchDependencies(request, "invalid service", "");
+  ASSERT_EQ(INVALID_SERVICE, result.res);
+}
+
 TEST(DependenciesTest, Wait) {
   // total wait waits for all of its dependencies
   // - dependencies are root -> {post_storage -> {analytics}}

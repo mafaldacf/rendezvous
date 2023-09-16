@@ -65,6 +65,10 @@ namespace service {
             grpc::Status CheckStatus(grpc::ServerContext * context, 
                 const rendezvous::CheckStatusMessage * request, 
                 rendezvous::CheckStatusResponse * response) override;
+
+            grpc::Status FetchDependencies(grpc::ServerContext * context, 
+                const rendezvous::FetchDependenciesMessage * request, 
+                rendezvous::FetchDependenciesResponse * response) override;
         
     };
 }
