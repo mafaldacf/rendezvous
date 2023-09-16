@@ -236,6 +236,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   
   const std::string& rid = request->rid();
   const std::string& service = request->service();
+  const auto& services = request->services();
   const std::string& tag = request->tag();
   const std::string& region = request->region();
   //bool async = request->async();
@@ -247,6 +248,14 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   if (timeout < 0) {
     spdlog::error("< [WR] Error: invalid timeout ({})", timeout);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
+  }
+  if (service.empty() && services.size() == 0) {
+    spdlog::error("< [WR] Error: must provide 'service' or 'services' parameter", tag);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICES_NONE);
+  }
+  if (!service.empty() && services.size() > 0) {
+    spdlog::error("< [WR] Error: cannot provide 'service' and 'services' parameter simultaneously", tag);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICES_BOTH);
   }
   if (!tag.empty() && service.empty()) {
     spdlog::error("< [WR] Error: service not specified for tag '{}'", tag);
@@ -264,18 +273,33 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   if (_async_replication && _num_replicas > 1) {
     rdv_request->getVersionsRegistry()->waitRemoteVersions(request->context());
   }
-  
-  // provide in-depth info about effectiveness of wait request (prevented inconsistency, timedout, etc)
-  int result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
-  if (result == 1) {
-    response->set_prevented_inconsistency(true);
+
+  int result;
+
+  // wait logic for multiple services
+  if (services.size() > 0) {
+    for (const auto& service: services) {
+      result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
+      if (result == -1) {
+        response->set_timed_out(true);
+        break;
+      }
+      else if (result == -3) {
+        spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+      }
+    }
   }
-  else if (result == -1) {
-    response->set_timed_out(true);
-  }
-  else if (result == -3) {
-    spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+  else {
+    int result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
+    if (result == 1) {
+      response->set_prevented_inconsistency(true);
+    } else if (result == -1) {
+      response->set_timed_out(true);
+    } else if (result == -3) {
+      spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+    }
   }
   spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
   return grpc::Status::OK;

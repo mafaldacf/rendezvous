@@ -96,9 +96,10 @@ message CloseBranchMessage {
 message WaitRequestMessage {
   string rid = 1;
   string service = 2;
-  string region = 3;
-  string tag = 4;
-  int32 timeout = 5;
+  repeated string services = 3;
+  string region = 4;
+  string tag = 5;
+  int32 timeout = 6;
   //bool async = 6;
   RequestContext context = 7;
 }
