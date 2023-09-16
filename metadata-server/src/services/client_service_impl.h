@@ -58,9 +58,9 @@ namespace service {
                 const rendezvous::CloseBranchMessage * request, 
                 rendezvous::Empty * response) override;
 
-            grpc::Status Wait(grpc::ServerContext * context, 
-                const rendezvous::WaitMessage * request, 
-                rendezvous::WaitResponse * response) override;
+            grpc::Status WaitRequest(grpc::ServerContext * context, 
+                const rendezvous::WaitRequestMessage * request, 
+                rendezvous::WaitRequestResponse * response) override;
 
             grpc::Status CheckStatus(grpc::ServerContext * context, 
                 const rendezvous::CheckStatusMessage * request, 

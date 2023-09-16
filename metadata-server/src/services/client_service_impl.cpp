@@ -229,9 +229,9 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
-grpc::Status ClientServiceImpl::Wait(grpc::ServerContext* context, 
-  const rendezvous::WaitMessage* request, 
-  rendezvous::WaitResponse* response) {
+grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context, 
+  const rendezvous::WaitRequestMessage* request, 
+  rendezvous::WaitRequestResponse* response) {
   if (!_consistency_checks) return grpc::Status::OK;
   
   const std::string& rid = request->rid();

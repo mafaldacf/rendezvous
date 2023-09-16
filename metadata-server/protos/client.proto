@@ -10,7 +10,7 @@ service ClientService {
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
   rpc RegisterBranchesDatastores(RegisterBranchesDatastoresMessage) returns (RegisterBranchesDatastoresResponse);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
-  rpc Wait(WaitMessage) returns (WaitResponse);
+  rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
   rpc CheckStatus(CheckStatusMessage) returns (CheckStatusResponse);
 }
 
@@ -93,7 +93,7 @@ message CloseBranchMessage {
 }
 
 /* Wait */
-message WaitMessage {
+message WaitRequestMessage {
   string rid = 1;
   string service = 2;
   string region = 3;
@@ -102,7 +102,7 @@ message WaitMessage {
   //bool async = 6;
   RequestContext context = 7;
 }
-message WaitResponse {
+message WaitRequestResponse {
   bool prevented_inconsistency = 1;
   bool timed_out = 2;
 }
