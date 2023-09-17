@@ -59,8 +59,9 @@ namespace utils {
     const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and must to be unique";
     const std::string ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT = "Tag already exists OR invalid context ('prev_service' field)";
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid context ('prev_service' field)";
-    const std::string ERR_MSG_INVALID_SERVICES_NONE = "Must provide 'service' or 'services' parameter";
-    const std::string ERR_MSG_INVALID_SERVICES_BOTH = "Cannot provide 'service' and 'services' parameter simultaneously";
+    const std::string ERR_MSG_INVALID_SERVICE_REGION = "Invalid service or region provided";
+    const std::string ERR_MSG_INVALID_TAG = "Invalid service tag";
+    const std::string ERR_MSG_INVALID_SERVICES_EXCLUSIVE = "Cannot provide either 'service' or 'services' simultaneously";
     const std::string ERR_MSG_INVALID_SERVICE = "Invalid service";
     
     /* common gRPC custom error messages */

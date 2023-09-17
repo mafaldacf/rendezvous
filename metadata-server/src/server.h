@@ -210,7 +210,9 @@ namespace rendezvous {
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
-             * - (-2) if context was not found
+             * - (-2) if context (service/region) was not found
+             * - (-3) if context (prev service) was not found
+             * - (-4) if tag was not found
              */
             int wait(metadata::Request * request, const std::string& service, const::std::string& region, 
                 std::string tag = "", std::string prev_service = "", bool async = false, int timeout = 0);

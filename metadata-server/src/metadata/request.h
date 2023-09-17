@@ -30,6 +30,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
+                int global_region;
                 int num_opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
@@ -134,10 +135,11 @@ namespace metadata {
              *
              * @param service The service context
              * @param region The region context
+             * @param globally_closed Indicates if all regions are closed
              * 
              * @return true if successful and false otherwise
              */
-            bool untrackBranch(const std::string& service, const std::string& region, bool fully_closed);
+            bool untrackBranch(const std::string& service, const std::string& region, bool globally_closed);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
@@ -213,7 +215,9 @@ namespace metadata {
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
-             * - (-2) if context was not found
+             * - (-2) if context (service/region) was not found
+             * - (-3) if context (prev service) was not found
+             * - (-4) if tag was not found
              */
             int waitServiceRegion(const std::string& service, const std::string& region, 
                 const std::string& tag, bool async, int timeout);

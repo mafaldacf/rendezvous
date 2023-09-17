@@ -24,7 +24,7 @@ ClientServiceImpl::ClientServiceImpl(
 metadata::Request * ClientServiceImpl::_getRequest(const std::string& rid) {
   metadata::Request * request;
   // one metadata server
-  if (_num_replicas == 1 || !_async_replication) {
+  if (_num_replicas == 1) {
     request = _server->getRequest(rid);
   }
   // replicated servers
@@ -123,8 +123,8 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
       std::string sid = _server->getSid();
       int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
       ctx.mutable_versions()->insert({sid, version});
-      response->mutable_context()->CopyFrom(ctx);
     }
+    response->mutable_context()->CopyFrom(ctx);
     _replica_client.registerBranch(rdv_request->getRid(), bid, service, tag, regions, monitor, ctx);
   }
   return grpc::Status::OK;
@@ -215,8 +215,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (res == 0) {
     spdlog::error("< [CB] Error: branch with full bid '{}' not found", request->bid());
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
-  }
-  else if (res == -1) {
+  } else if (res == -1) {
     spdlog::error("< [CB] Error: region '{}' for branch with full bid '{}' not found", region, request->bid());
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
@@ -248,16 +247,10 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   if (timeout < 0) {
     spdlog::error("< [WR] Error: invalid timeout ({})", timeout);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TIMEOUT);
-  }
-  if (service.empty() && services.size() == 0) {
-    spdlog::error("< [WR] Error: must provide 'service' or 'services' parameter", tag);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICES_NONE);
-  }
-  if (!service.empty() && services.size() > 0) {
-    spdlog::error("< [WR] Error: cannot provide 'service' and 'services' parameter simultaneously", tag);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICES_BOTH);
-  }
-  if (!tag.empty() && service.empty()) {
+  } if (!service.empty() && services.size() > 0) {
+    spdlog::error("< [WR] Error: cannot provide 'service' and 'services' parameters simultaneously", tag);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICES_EXCLUSIVE);
+  } if (!tag.empty() && service.empty()) {
     spdlog::error("< [WR] Error: service not specified for tag '{}'", tag);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TAG_USAGE);
   }
@@ -279,27 +272,31 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   // wait logic for multiple services
   if (services.size() > 0) {
     for (const auto& service: services) {
-      result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
-      if (result == -1) {
-        response->set_timed_out(true);
+      result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), _async_replication, timeout);
+      if (result < 0) {
         break;
-      }
-      else if (result == -3) {
-        spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
-        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
       }
     }
   }
   else {
-    int result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), true, timeout);
+    int result = _server->wait(rdv_request, service, region, tag, request->context().prev_service(), _async_replication, timeout);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
-    } else if (result == -1) {
-      response->set_timed_out(true);
-    } else if (result == -3) {
-      spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
     }
+  }
+  // parse errors
+  if (result == -1) {
+    response->set_timed_out(true);
+  }
+  else if (result == -2) {
+    spdlog::error("< [WR] Error: invalid context (service/region)", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICE_REGION);
+  } else if (result == -3) {
+    spdlog::error("< [WR] Error: invalid context (field: prev_service)", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_CONTEXT);
+  } else if (result == -4) {
+    spdlog::error("< [WR] Error: invalid tag", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TAG);
   }
   spdlog::trace("< [WR] returning call for request '{}' on service '{}' and region '{}' (r={})", rid, service, region, result);
   return grpc::Status::OK;
@@ -340,14 +337,6 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
       // <service, status>
       (*tagged)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
     }
-
-    // get info for children/dependencies branches
-    /* auto * children = response->mutable_direct_dependencies();
-    response->set_status(static_cast<rendezvous::RequestStatus>(result.status));
-    for (auto pair = result.children.begin(); pair != result.children.end(); pair++) {
-      // <child service name, status>
-      (*children)[pair->first] = static_cast<rendezvous::RequestStatus>(pair->second);
-    } */
 
     // get info for regions
     auto * regions = response->mutable_regions();

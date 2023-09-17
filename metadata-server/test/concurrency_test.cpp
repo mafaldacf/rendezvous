@@ -125,7 +125,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   status = server.wait(request, "", "");
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  bid =  server.registerBranchRegion(request, "", "region1", TAG); // bid = 0
+  bid =  server.registerBranchRegion(request, "service", "region1", TAG); // bid = 0
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 
   threads.emplace_back([&server, request] {
@@ -157,13 +157,13 @@ TEST(ConcurrencyTest, WaitRequest) {
   status = server.wait(request, "", "");
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  bid =  server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
+  bid =  server.registerBranchRegion(request, "service0", "", EMPTY_TAG); // bid = 0
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 
   bid =  server.registerBranchRegion(request, "service1", "", EMPTY_TAG); // bid = 1
   ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
 
-  bid =  server.registerBranchRegion(request, "", "region1", EMPTY_TAG); // bid = 2
+  bid =  server.registerBranchRegion(request, "service0", "region1", EMPTY_TAG); // bid = 2
   ASSERT_EQ(getFullBid(request->getRid(), 2), bid);
 
   bid =  server.registerBranchRegion(request, "service2", "region2", EMPTY_TAG); // bid = 3
@@ -179,11 +179,15 @@ TEST(ConcurrencyTest, WaitRequest) {
     int status = server.wait(request, "service1", "");
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
-  
 
-  // MUST NOT wait for itself
   threads.emplace_back([&server, request] {
     int status = server.wait(request, "", "region1");
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+
+  // must not wait for itself
+  threads.emplace_back([&server, request] {
+    int status = server.wait(request, "", "", "", "service0");
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
   
@@ -194,9 +198,18 @@ TEST(ConcurrencyTest, WaitRequest) {
   });
   
 
-  sleep(1.5);
+  sleep(1);
   found_region = server.closeBranch(request, getBid(0), ""); // bid 0
   ASSERT_EQ(1, found_region);
+
+  // must only check previous service (service0) which is closed
+  // must ignore it current service (service1) which is opened
+  threads.emplace_back([&server, request] {
+    int status = server.wait(request, "", "region1", "", "service1");
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+  sleep(1);
+
   found_region = server.closeBranch(request, getBid(1), ""); // bid 1
   ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, getBid(2), "region1"); // bid 2
@@ -258,7 +271,7 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   // validate number of prevented inconsistencies
   long value = server._prevented_inconsistencies.load();
-  ASSERT_EQ(7, value);
+  ASSERT_EQ(9, value);
 }
 
 TEST(ConcurrencyTest, WaitServiceTag) {
@@ -332,7 +345,7 @@ TEST(ConcurrencyTest, WaitServiceTagForceAsync) {
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid_0);
 
   sleep(1);
-
+  
   int r = server.closeBranch(request, getBid(0), "EU");
   ASSERT_EQ(1, r);
   r = server.closeBranch(request, getBid(0), "US");

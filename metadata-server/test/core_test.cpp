@@ -55,24 +55,10 @@ TEST(CoreTest, GetOrRegisterTwiceRequest) {
   ASSERT_EQ(request->getRid(), request->getRid());
 }
 
-TEST(CoreTest, RegisterBranch) { 
-  rendezvous::Server server(SID); 
-  metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "", "", EMPTY_TAG);
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
-}
-
 TEST(CoreTest, RegisterBranch_WithService) { 
   rendezvous::Server server(SID); 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   std::string bid = server.registerBranchRegion(request, "s", "", EMPTY_TAG);
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
-}
-
-TEST(CoreTest, RegisterBranch_WithRegion) { 
-  rendezvous::Server server(SID); 
-  metadata::Request * request = server.getOrRegisterRequest(RID);
-  std::string bid = server.registerBranchRegion(request, "", "r", EMPTY_TAG);
   ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
 }
 
@@ -285,16 +271,27 @@ TEST(CoreTest, CheckRequest_ContextNotFound) {
   utils::Status res;
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
-  server.registerBranchRegion(request, "", "", EMPTY_TAG); // bid = 0
-  server.registerBranchRegion(request, "s", "", EMPTY_TAG); // bid = 1
-  server.registerBranchRegion(request, "", "r", EMPTY_TAG); // bid = 2
-  server.registerBranchRegion(request, "s", "r", EMPTY_TAG); // bid = 3
+  google::protobuf::RepeatedPtrField<std::string> regions;
+  std::string bid_0 = server.registerBranch(request, "s1", regions, EMPTY_TAG, ""); // bid = 0
+  std::string bid_1 = server.registerBranch(request, "s1", regions, EMPTY_TAG, ""); // bid = 1
+  server.registerBranchRegion(request, "s1", "r", EMPTY_TAG); // bid = 2
+  server.registerBranchRegion(request, "s2", "r", EMPTY_TAG); // bid = 3
 
-  res = server.checkStatus(request, "s1", "");
+  res = server.checkStatus(request, "invalid service", "");
   ASSERT_EQ(UNKNOWN, res.status);
-  res = server.checkStatus(request, "", "r1");
+  // EXCEPTION: although r1 does not exist, global branches are still opened!
+  res = server.checkStatus(request, "", "invalid region");
+  ASSERT_EQ(OPENED, res.status);
+  res = server.checkStatus(request, "invalid service", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
-  res = server.checkStatus(request, "s1", "r1");
+
+  bool found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "");
+  ASSERT_EQ(true, found);
+  found = server.closeBranch(request, parseFullBid(&server, request, bid_1, 1), "");
+  ASSERT_EQ(true, found);
+
+  // now we can ensure it is unknown since all global branches are closed!
+  res = server.checkStatus(request, "", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
 }
 

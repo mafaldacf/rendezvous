@@ -237,7 +237,9 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 std::string Server::registerBranchRegion(metadata::Request * request, const std::string& service, const std::string& region, 
 const std::string& tag, std::string bid) {
   utils::ProtoVec regions;
-  regions.Add(region.c_str());
+  if (!region.empty()) {
+    regions.Add(region.c_str());
+  }
   return registerBranch(request, service, regions, tag, "", true, bid);
 }
 
