@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from __future__ import print_function
 import argparse
 import time
@@ -59,7 +61,7 @@ class EvalClient():
     def annotate_datastores(self, plt, datapoints):
         # hard coded :(
         if len(datapoints) == 5:
-            shift = [(1, 5), (0, 5), (0, 5), (0, 5), (0, 5)]
+            shift = [(3, 5), (0, 5), (0, 5), (0, 5), (0, 5)]
             num_datastores = [20, 15, 10, 5, 1]
 
         elif len(datapoints) == 7:
@@ -110,7 +112,7 @@ class EvalClient():
         ax_datastores.set_ylabel(None)
         ax_datastores.legend_.set_title(None)
         # use same y limits for both subplots
-        #ax_datastores.set_xlim(right=5100)
+        ax_datastores.set_xlim(right=4410)
         ax_datastores.set_ylim(top=138, bottom=35)
         self.annotate_datastores(ax_datastores, dps_datastores)
 
@@ -120,7 +122,7 @@ class EvalClient():
         ax_clients.set_ylabel(None)
         ax_clients.legend_.set_title(None)
         # use same y limits for both subplots
-        #ax_clients.set_xlim(right=10000)
+        ax_clients.set_xlim(left=3800, right=10200)
         ax_clients.set_ylim(top=138, bottom=35) # use same y limits for both subplots
         self.annotate_clients(ax_clients, dps_clients)
         # remove y numeration since it is already present in the first subplot on the left side
@@ -396,11 +398,10 @@ if __name__ == '__main__':
     remote_run_parser.add_argument('-t', '--threads', type=int, default=1, help="Number of threads")
     remote_run_parser.add_argument('-s', '--sleep', type=float, default=0.0, help="Sleep between requests")
     remote_run_parser.add_argument('-c', '--clients', type=int, default=len(CLIENTS_IP), help="Number of clients")
-    remote_run_parser.add_argument('-d', '--datastores', type=int, default=1, help="Number of datastores")
+    remote_run_parser.add_argument('-ds', '--datastores', type=int, default=1, help="Number of datastores")
 
     plot_parser = command_parser.add_parser('plot', help="Plot")
     plot_parser.add_argument('-d', '--directory', type=str, default=RESULTS_DIR, help="Base directory of results")
-    plot_parser.add_argument('-a', '--annotate', type=bool, default=False, help="Annotate datapoints")
 
 
     args = vars(main_parser.parse_args())
