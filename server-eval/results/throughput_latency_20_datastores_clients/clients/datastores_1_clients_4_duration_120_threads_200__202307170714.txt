@@ -1,0 +1,12 @@
+Client 18.192.63.137: {'requests': 247450, 'responses': 247450, 'throughput': 2062.0833333333335, 'avg_latency': 96}
+Client 18.196.239.101: {'requests': 272710, 'responses': 272710, 'throughput': 2272.5833333333335, 'avg_latency': 87}
+Client 3.122.56.149: {'requests': 245943, 'responses': 245943, 'throughput': 2049.525, 'avg_latency': 97}
+Client 18.195.203.9: {'requests': 254393, 'responses': 254393, 'throughput': 2119.9416666666666, 'avg_latency': 93}
+----------------------------
+Duration: 120
+Clients: 4
+Threads per Client: 200
+Requests: 1020496
+Responses: 1020496 (100.0%)
+Throughput (req/s): 8504
+Latency (ms): 93

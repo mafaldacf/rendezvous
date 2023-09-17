@@ -1,0 +1,10 @@
+Client 3.70.70.228: {'requests': 105069, 'responses': 105069, 'throughput': 3502.3, 'avg_latency': 56}
+Client 3.66.235.64: {'requests': 100014, 'responses': 100014, 'throughput': 3333.8, 'avg_latency': 59}
+----------------------------
+Duration: 30
+Clients: 2
+Threads per Client: 200
+Requests: 205083
+Responses: 205083 (100.0%)
+Throughput (req/s): 6836
+Latency (ms): 57
