@@ -1,0 +1,13 @@
+Client 0 @ 18.184.7.85: {'requests': 49100, 'responses': 49100, 'throughput': 1636.6666666666667, 'avg_latency': 122.44}
+Client 1 @ 35.159.7.100: {'requests': 49781, 'responses': 49781, 'throughput': 1659.3666666666666, 'avg_latency': 120.76}
+Client 2 @ 35.157.37.20: {'requests': 50997, 'responses': 50997, 'throughput': 1699.9, 'avg_latency': 118.43}
+Client 3 @ 18.196.151.93: {'requests': 46376, 'responses': 46376, 'throughput': 1545.8666666666666, 'avg_latency': 129.63}
+Client 4 @ 3.122.242.146: {'requests': 49199, 'responses': 49199, 'throughput': 1639.9666666666667, 'avg_latency': 121.63}
+----------------------------
+Duration: 30
+Clients: 5
+Threads per Client: 200
+Requests: 245453
+Responses: 245453 (100.0%)
+Throughput (req/s): 8181.77
+Latency (ms): 122.58

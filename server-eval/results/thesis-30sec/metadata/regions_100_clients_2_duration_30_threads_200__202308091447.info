@@ -1,0 +1,10 @@
+Client 0 @ 18.184.7.85: {'requests': 74378, 'responses': 74378, 'throughput': 2479.266666666667, 'avg_latency': 80.76}
+Client 1 @ 35.159.7.100: {'requests': 74282, 'responses': 74282, 'throughput': 2476.0666666666666, 'avg_latency': 80.93}
+----------------------------
+Duration: 30
+Clients: 2
+Threads per Client: 200
+Requests: 148660
+Responses: 148660 (100.0%)
+Throughput (req/s): 4955.33
+Latency (ms): 80.84
