@@ -313,7 +313,7 @@ elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "config" ]
   local_build_config
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "tests" ]; then
   local_build_tests
-elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "py" ]; then
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "py" ]; then
   local_build_py
 elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
   local_run_server $4 $5

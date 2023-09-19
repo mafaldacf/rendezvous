@@ -13,4 +13,5 @@ server-eval/results/**
 server-eval/remote-csv-results/**
 metadata-server/examples/python/rendezvous/protos/__pycache__/**
 metadata-server/examples/python/rendezvous/protos/**
+!metadata-server/examples/python/rendezvous/protos/.keep
 datastore-monitor/proto/**
