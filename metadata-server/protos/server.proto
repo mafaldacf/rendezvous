@@ -26,18 +26,21 @@ message RegisterRequestMessage {
 
 /* Registers Branches */
 message RegisterBranchMessage {
-  string rid = 1;
-  string bid = 2;
-  string service = 3;
-  string tag = 4;
-  repeated string regions = 5;
-  bool monitor = 6;
-  RequestContext context = 7;
+  string root_rid = 1;
+  string sub_rid = 2;
+  string core_bid = 3;
+  string service = 4;
+  string tag = 5;
+  repeated string regions = 6;
+  bool monitor = 7;
+  RequestContext context = 8;
 }
 
 /* Close Branch */
 message CloseBranchMessage {
-  string bid = 1;
-  string region = 2;
-  RequestContext context = 3;
+  string root_rid = 1;
+  string sub_rid = 2;
+  string core_bid = 3;
+  string region = 4;
+  RequestContext context = 5;
 }

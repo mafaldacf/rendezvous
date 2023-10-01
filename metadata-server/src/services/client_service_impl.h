@@ -6,7 +6,8 @@
 #include "../metadata/subscriber.h"
 #include "../server.h"
 #include "../replicas/replica_client.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <atomic>
 #include <unordered_set>
 #include <vector>

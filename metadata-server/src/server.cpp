@@ -175,27 +175,33 @@ std::string Server::genBid(metadata::Request * request) {
   return _sid + '_' + request->genId();
 }
 
-std::string Server::getFullBid(metadata::Request * request, const std::string& bid) {
-  return bid + ':' + request->getRid();
-}
+std::pair<std::string, std::string> Server::parseFullId(const std::string& full_id) {
+  size_t delimiter_pos = full_id.find(utils::FULL_ID_DELIMITER);
+  std::string primary_id = full_id;
+  std::string secondary_id = "";
 
-std::pair<std::string, std::string> Server::parseFullBid(const std::string& full_bid) {
-  size_t delimiter_pos = full_bid.find(':');
-  std::string rid = "";
-  std::string bid = "";
-
-  // FORMAT of full bid: <bid>:<rid>
+  // FORMAT: <primary_id>:<secondary_id>
   if (delimiter_pos != std::string::npos) {
-    rid = full_bid.substr(delimiter_pos+1);
-    bid = full_bid.substr(0, delimiter_pos);
+    primary_id = full_id.substr(delimiter_pos+1);
+    secondary_id = full_id.substr(0, delimiter_pos);
   }
-  return std::make_pair(bid, rid);
+  return std::make_pair(primary_id, secondary_id);
 }
 
+std::string Server::composeFullId(const std::string& primary_id, const std::string& secondary_id) {
+  if (secondary_id.empty()) {
+    return primary_id;
+  }
+  return primary_id + utils::FULL_ID_DELIMITER + secondary_id;
+}
 
 // -----------
 // Helpers
 //------------
+
+std::string Server::addSubRequest(metadata::Request * request, const std::string& sub_rid) {
+  return request->addSubRequest(sub_rid);
+}
 
 metadata::Request * Server::getRequest(const std::string& rid) {
   std::shared_lock<std::shared_mutex> lock(_mutex_requests); 
@@ -240,14 +246,15 @@ const std::string& tag, std::string bid) {
   if (!region.empty()) {
     regions.Add(region.c_str());
   }
-  return registerBranch(request, service, regions, tag, "", true, bid);
+  return registerBranch(request, "", service, regions, tag, "", true, bid);
 }
 
 // ---------------------
-// Main Rendezvous Logic
+// Core Rendezvous Logic
 //----------------------
 
-std::string Server::registerBranch(metadata::Request * request, const std::string& service, 
+std::string Server::registerBranch(metadata::Request * request, 
+  const std::string& sub_rid, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
   bool monitor, std::string bid) {
 
@@ -255,28 +262,33 @@ std::string Server::registerBranch(metadata::Request * request, const std::strin
   if (bid.empty()) {
     bid = genBid(request);
   }
-  metadata::Branch * branch = request->registerBranch(bid, service, tag, regions, prev_service);
+
+  metadata::Branch * branch = request->registerBranch(sub_rid, bid, service, tag, regions, prev_service);
   // unexpected error
   if (!branch) {
     return "";
   }
-  const std::string& full_bid = getFullBid(request, bid);
+
+  const std::string& composed_rid = composeFullId(request->getRid(), sub_rid);
+  const std::string& composed_bid = composeFullId(bid, composed_rid);
   if (monitor) {
-    publishBranches(service, tag, full_bid);
+    publishBranches(service, tag, composed_bid);
   }
-  return full_bid;
+  return bid;
 }
 
-int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force) {
-  int r = request->closeBranch(bid, region);
+int Server::closeBranch(metadata::Request * request, const std::string& sub_rid, 
+  const std::string& bid, const std::string& region, bool force) {
+    
+  int r = request->closeBranch(sub_rid, bid, region);
   
   // close branch in the background
   if (r != 1 && force) {
-    std::thread([this, request, bid, region]() {
+    std::thread([this, request, sub_rid, bid, region]() {
       int retries = 0;
       while (retries++ <= _wait_replica_timeout_s) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        if (request->closeBranch(bid, region) == 1) {
+        if (request->closeBranch(sub_rid, bid, region) == 1) {
           break;
         }
       }
@@ -286,7 +298,8 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return r;
 }
 
-int Server::wait(metadata::Request * request, const std::string& service, const::std::string& region, 
+int Server::wait(metadata::Request * request, const std::string& sub_rid, 
+  const std::string& service, const::std::string& region, 
   std::string tag, std::string prev_service, bool async, int timeout) {
 
   int result;
@@ -298,9 +311,9 @@ int Server::wait(metadata::Request * request, const std::string& service, const:
   else if (!service.empty())
     result = request->waitService(service, tag, async, timeout);
   else if (!region.empty())
-    result = request->waitRegion(region, prev_service, async, timeout);
+    result = request->waitRegion(sub_rid, region, prev_service, async, timeout);
   else
-    result = request->wait(prev_service, timeout);
+    result = request->wait(sub_rid, prev_service, timeout);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
   if (result == 1) {
@@ -310,19 +323,17 @@ int Server::wait(metadata::Request * request, const std::string& service, const:
   return result;
 }
 
-utils::Status Server::checkStatus(metadata::Request * request, const std::string& service, 
-  const std::string& region, std::string prev_service, bool detailed) {
-    
-  utils::Status res;
+utils::Status Server::checkStatus(metadata::Request * request, const std::string& sub_rid, 
+  const std::string& service, const std::string& region, std::string prev_service, bool detailed) {
 
   if (!service.empty() && !region.empty())
     return request->checkStatusServiceRegion(service, region, detailed);
   else if (!service.empty())
     return request->checkStatusService(service, detailed);
   else if (!region.empty())
-    return request->checkStatusRegion(region, prev_service);
+    return request->checkStatusRegion(sub_rid, region, prev_service);
 
-  return request->checkStatus(prev_service);
+  return request->checkStatus(sub_rid, prev_service);
 }
 
 utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, std::string prev_service) {

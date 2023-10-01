@@ -41,8 +41,8 @@ static std::string parseFullBid(rendezvous::Server * server, metadata::Request *
   // just a workaround for a quick sanity check!
   // getBid() computes the id which should match the one parsed by the server
   // we return "ERR" to force the test to fail if the following condition is not true (which should never happen if everything is ok)
-  if (bid_idx != -1 && getBid(bid_idx) == server->parseFullBid(bid).first) {
-    return server->parseFullBid(bid).first;
+  if (bid_idx != -1 && getBid(bid_idx) == server->parseFullId(bid).first) {
+    return server->parseFullId(bid).first;
   }
   return "ERROR_PARSING_FULL_BID";
 }

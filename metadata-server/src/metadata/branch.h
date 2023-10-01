@@ -5,7 +5,8 @@
 #include <unordered_map>
 #include <vector>
 #include "client.grpc.pb.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 
 using namespace utils;
 

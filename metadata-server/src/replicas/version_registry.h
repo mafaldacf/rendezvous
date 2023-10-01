@@ -9,7 +9,8 @@
 #include <condition_variable>
 #include "client.grpc.pb.h"
 #include <grpcpp/grpcpp.h>
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <chrono>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"

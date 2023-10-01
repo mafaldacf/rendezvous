@@ -3,7 +3,8 @@
 
 #include "client.grpc.pb.h"
 #include "server.grpc.pb.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <grpcpp/grpcpp.h>
 #include <string>
 #include <thread>
@@ -40,11 +41,12 @@ namespace replicas {
 
             /* Helpers */
             void _doRegisterRequest(const std::string& rid);
-            void _doRegisterBranch(const std::string& rid, const std::string& bid, const std::string& service, 
-                const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
+            void _doRegisterBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+                const std::string& service, const std::string& tag, 
+                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous::RequestContext& ctx);
-            void _doCloseBranch(const std::string& bid, const std::string& region, 
-                const rendezvous::RequestContext& ctx);
+            void _doCloseBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+                const std::string& region, const rendezvous::RequestContext& ctx);
 
         public:
             ReplicaClient(std::vector<std::string> addrs, bool async_replication);
@@ -58,27 +60,31 @@ namespace replicas {
             /**
              * Send register branches call to all replicas
              * 
-             * @param rid The identifier of the request associated with the branch
-             * @param bid The identifier of the set of branches
+             * @param root_rid The identifier of the root request
+             * @param sub_rid The identifier of the sub request
+             * @param core_bid The identifier of the set of branches (without rid)
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void registerBranch(const std::string& rid, const std::string& bid, const std::string& service, 
-                const std::string& tag, const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
+            void registerBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+                const std::string& service, const std::string& tag, 
+                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous::RequestContext& ctx);
 
             /**
              * Send close branch call to all replicas
              * 
-             * @param bid The identifier of the set of branches generated when the branch was registered
+             * @param root_rid The identifier of the root request
+             * @param sub_rid The subrequest identifier
+             * @param core_bid bid The identifier of the set of branches generated when the branch was registered (without rid)
              * @param region The region where the branch was registered
              * @param id The id of the current replica
              * @param version The request version of the current replica
              */
-            void closeBranch(const std::string& bid, const std::string& region, 
-                const rendezvous::RequestContext& ctx);
+            void closeBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+                const std::string& region, const rendezvous::RequestContext& ctx);
 
         };
     

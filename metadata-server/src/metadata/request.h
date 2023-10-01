@@ -3,7 +3,8 @@
 
 #include "branch.h"
 #include "../replicas/version_registry.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <iostream>
 #include <map>
 #include <memory>
@@ -21,6 +22,8 @@
 #include <sstream>
 #include <thread>
 
+#include "oneapi/tbb/concurrent_hash_map.h"
+
 using namespace utils;
 
 namespace metadata {
@@ -30,7 +33,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
-                int global_region;
+                int opened_global_region;
                 int num_opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
@@ -38,8 +41,18 @@ namespace metadata {
                 std::list<struct ServiceNodeStruct*> children;
             } ServiceNode;
 
+            typedef struct SubRequestStruct {
+                std::atomic<int> next_sub_rid_index;
+                std::atomic<int> opened_branches;
+                std::atomic<int> opened_global_region;
+                oneapi::tbb::concurrent_hash_map<std::string, int> opened_regions;
+            } SubRequest;
+
+            oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _subrequests;
+
             const std::string _rid;
             std::atomic<long> _next_id;
+            std::atomic<int> _next_sub_rid_index;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
             
             /* ------------------- */
@@ -50,8 +63,11 @@ namespace metadata {
             /* -------------------- */
             /* branching management */
             /* -------------------- */
-            // number of opened branches globally
+            // number of opened branches
             std::atomic<int> _num_opened_branches;
+            std::atomic<int> _opened_global_region;
+            std::unordered_map<std::string, int> _opened_regions;
+            // FIXME: TRANSFORM TO TBB UNORDERED MAP BECAUSE WE DON'T USE NOTIFY HERE
             // <bid, branch ptr>
             std::unordered_map<std::string, metadata::Branch*> _branches;
             // <service, service branching ptr>
@@ -62,8 +78,10 @@ namespace metadata {
             /* ------------------- */
             std::mutex _mutex_branches;
             std::mutex _mutex_service_nodes;
+            std::mutex _mutex_regions;
             std::condition_variable _cond_branches;
             std::condition_variable _cond_service_nodes;
+            std::condition_variable _cond_regions;
 
             // for wait with async option
             std::condition_variable _cond_new_service_nodes;
@@ -108,8 +126,17 @@ namespace metadata {
             std::string genId();
 
             /**
+             * Register a new sub request originating from an async branch within the current subrequest
+             * 
+             * @param sub_rid Current subrequest
+             * @return new subrequest
+            */
+            std::string addSubRequest(const std::string& sub_rid);
+
+            /**
              * Register a set of branches in the request
              * 
+             * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches
              * @param service The service where the branches are being registered
              * @param tag The service tag
@@ -117,33 +144,37 @@ namespace metadata {
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            metadata::Branch * registerBranch(const std::string& bid, const std::string& service, 
+            metadata::Branch * registerBranch(const std::string& sub_rid, const std::string& bid, const std::string& service, 
                 const std::string& tag, const utils::ProtoVec& regions, const std::string& prev_service);
 
             /**
              * Remove a branch from the request
              * 
+             * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region The region where the branch was registered
              * 
              * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            int closeBranch(const std::string& bid, const std::string& region);
+            int closeBranch(const std::string& sub_rid, const std::string& bid, const std::string& region);
 
             /**
              * Untrack (remove) branch according to its context (service, region or none) in the corresponding maps
              *
+             * @param sub_rid Current subrequest
              * @param service The service context
              * @param region The region context
              * @param globally_closed Indicates if all regions are closed
              * 
              * @return true if successful and false otherwise
              */
-            bool untrackBranch(const std::string& service, const std::string& region, bool globally_closed);
+            bool untrackBranch(const std::string& sub_rid, const std::string& service, 
+                const std::string& region, bool globally_closed);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
              *
+             * @param sub_rid Current subrequest
              * @param service The service context
              * @param regions The regions for each branch
              * @param num The number of new branches
@@ -151,12 +182,13 @@ namespace metadata {
              * 
              * @return true if successful and false otherwise
              */
-            bool trackBranch(const std::string& service, const utils::ProtoVec& regions, int num, const std::string& parent,
-                metadata::Branch * branch = nullptr);
+            bool trackBranch(const std::string& sub_rid, const std::string& service, const utils::ProtoVec& regions, 
+                int num, const std::string& parent, metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed
              * 
+             * @param sub_rid Current sub request
              * @param prev_service Previously registered service
              * @param timeout Timeout in seconds
              *
@@ -165,12 +197,14 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-3) if prev_service is invalid
+             * - (-4) if sub_rid does not exist
              */
-            int wait(std::string prev_service, int timeout);
+            int wait(const std::string& sub_rid, std::string prev_service, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
              *
+             * @param sub_rid Current subrequest
              * @param region The name of the region that defines the waiting context
              * @param prev_service Previously registered service
              * @param async Force to wait for asynchronous creation of a single branch
@@ -182,8 +216,9 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              * - (-3) if prev_service is invalid
+             * - (-4) if sub_rid does not exist
              */
-            int waitRegion(const std::string& region, std::string prev_service, bool async, int timeout);
+            int waitRegion(const std::string& sub_rid, const std::string& region, std::string prev_service, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service)
@@ -224,20 +259,20 @@ namespace metadata {
 
             /**
              * Check status of request
-             * @param detailed Detailed description of status for all tagged branches
+             * @param sub_rid Current sub request
              * @param prev_service Previously registered service
              * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            Status checkStatus(const std::string& prev_service);
+            Status checkStatus(const std::string& sub_rid, const std::string& prev_service);
 
             /**
              * Check status of request for a given context (region)
              *
+             * @param sub_rid Current sub request
              * @param region The name of the region that defines the waiting context
-             * @param detailed Detailed description of status for all tagged branches
              * @param prev_service Previously registered service
              *
              * @return Possible return values:
@@ -245,7 +280,7 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusRegion(const std::string& region, const std::string& prev_service);
+            Status checkStatusRegion(const std::string& sub_rid, const std::string& region, const std::string& prev_service);
 
             /**
              * Check status of request for a given context (service)

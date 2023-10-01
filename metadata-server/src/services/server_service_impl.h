@@ -4,7 +4,8 @@
 #include "server.grpc.pb.h"
 #include "../metadata/request.h"
 #include "../server.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <atomic>
 #include <mutex>
 #include <iostream>

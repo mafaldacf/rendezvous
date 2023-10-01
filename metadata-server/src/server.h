@@ -6,7 +6,8 @@
 #include "metadata/subscriber.h"
 #include "replicas/version_registry.h"
 #include "replicas/replica_client.h"
-#include "utils.h"
+#include "utils/grpc_service.h"
+#include "utils/metadata.h"
 #include <atomic>
 #include <vector>
 #include <mutex>
@@ -31,10 +32,10 @@ namespace rendezvous {
 
     class Server {
 
-        private:
-            static const int REGISTER = 1;
-            static const int REMOVE = -1;
+        static const int REGISTER = 1;
+        static const int REMOVE = -1;
 
+        private:
             /* ------------- */
             /* config values */
             /* --------------*/
@@ -116,25 +117,37 @@ namespace rendezvous {
             std::string genBid(metadata::Request * request);
 
             /**
-             * Generate an full identifier from rid and bid
-             * 
-             * @param request
-             * @param bid
-             * @return the new identifier 
-             */
-            std::string getFullBid(metadata::Request * request, const std::string& bid);
-
-            /**
-             * Parse rid and bid from full bid
+             * Helper for parsing full id
+             * - (GENERIC)      full_rid       ->   <rid, sub_rid>
+             * - (CLOSE BRANCH) composed_rid   ->   <full_rid, bid>
              * 
              * @param full_bid 
              * @return rid and bid
              */
-            std::pair<std::string, std::string> parseFullBid(const std::string& full_bid);
+            std::pair<std::string, std::string> parseFullId(const std::string& full_bid);
+
+            /**
+             * Helper for composing full id
+             * - (GENERIC)      full_rid       ->   <rid, sub_rid>
+             * - (CLOSE BRANCH) composed_rid   ->   <full_rid, bid>
+             * 
+             * @param primary_id The first identifier
+             * @param secondary_id The second identifier
+             * @return new composed id in the format <primary_id:secondary_id>
+             */
+            std::string composeFullId(const std::string& primary_id, const std::string& secondary_id);
+
+            /**
+             * Register a new sub request originating from an async branch within the current subrequest
+             * 
+             * @param request Current request ptr
+             * @param sub_rid Current subrequest
+             * @return new subrequest
+            */
+            std::string addSubRequest(metadata::Request * request, const std::string& sub_rid);
 
             /**
              * Returns the number of inconsistencies prevented so far
-             * 
              * @return The number of prevented inconsistencies
              */
             long getNumInconsistencies();
@@ -171,15 +184,18 @@ namespace rendezvous {
              * Register new branch for a given request
              * 
              * @param request Request where the branch is registered
+             * @param sub_rid The current sub request
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
              * @param prev_service The parent service in the dependency graph
              * @param monitor Monitor branch by publishing identifier to subscribers
              * @param bid The set of branches identifier: empty if request is from client
-             * @return The new identifier of the set of branches or empty if an error ocurred (branches already exist with bid)
+             * @return 
+             * - The new identifier (core_bid) of the set of branches 
+             * - Or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranch(metadata::Request * request, const std::string& service, 
+            std::string registerBranch(metadata::Request * request, const std::string& sub_rid, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
                 bool monitor = false, std::string bid = "");
 
@@ -187,19 +203,21 @@ namespace rendezvous {
              * Close a branch according to its identifier
              * 
              * @param request Request where the branch is registered
+             * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
              * @param service Service where branch was registered
              * @param force Force waiting until branch is registered
              * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
              */
-            int closeBranch(metadata::Request * request, const std::string& bid, 
-                const std::string& region, bool force = false);
+            int closeBranch(metadata::Request * request, const std::string& sub_rid, 
+                const std::string& bid, const std::string& region, bool force = false);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)
              * 
              * @param request Request where the branch is registered
+             * @param sub_rid Current subrequest
              * @param service The service context
              * @param region The region we are waiting for the service on
              * @param tag The specified operation tag for this service
@@ -214,13 +232,15 @@ namespace rendezvous {
              * - (-3) if context (prev service) was not found
              * - (-4) if tag was not found
              */
-            int wait(metadata::Request * request, const std::string& service, const::std::string& region, 
-                std::string tag = "", std::string prev_service = "", bool async = false, int timeout = 0);
+            int wait(metadata::Request * request, const std::string& sub_rid, const std::string& service, 
+                const::std::string& region, std::string tag = "", std::string prev_service = "", 
+                bool async = false, int timeout = 0);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)
              * 
              * @param request Request where the branch is registered
+             * @param sub_rid Current subrequest
              * @param service The service context
              * @param region The region context
              * @param prev_service Previously registered service
@@ -231,8 +251,9 @@ namespace rendezvous {
              * - 2 if request is UNKNOWN
              * - (-3) if context was not found
              */
-            utils::Status checkStatus(metadata::Request * request, const std::string& service, 
-                const std::string& region, std::string prev_service = "", bool detailed = false);
+            utils::Status checkStatus(metadata::Request * request, const std::string &sub_rid,
+                const std::string& service, const std::string& region, 
+                std::string prev_service = "", bool detailed = false);
 
             /**
              * Fetch dependencies in the call graph

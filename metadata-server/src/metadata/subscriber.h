@@ -8,7 +8,8 @@
 #include <chrono>
 #include <queue>
 #include "branch.h"
-#include "../utils.h"
+#include "../utils/grpc_service.h"
+#include "../utils/metadata.h"
 #include <chrono>
 #include "spdlog/fmt/ostr.h"
 
