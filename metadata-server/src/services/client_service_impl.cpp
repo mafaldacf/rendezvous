@@ -124,7 +124,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   // if branch is async, we register a new "sub" request id
   if (async) {
-    sub_rid = _server->addSubRequest(rdv_request, sub_rid);
+    sub_rid = _server->addNextSubRequest(rdv_request, sub_rid);
     if (sub_rid.empty()) {
       spdlog::error("< [RB] Error: invalid request '{}' (sub_rid does not exist)", composed_rid);
       return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST_SUB_RID);

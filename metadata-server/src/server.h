@@ -121,10 +121,10 @@ namespace rendezvous {
              * - (GENERIC)      full_rid       ->   <rid, sub_rid>
              * - (CLOSE BRANCH) composed_rid   ->   <full_rid, bid>
              * 
-             * @param full_bid 
+             * @param full_id The full id to be parsed 
              * @return rid and bid
              */
-            std::pair<std::string, std::string> parseFullId(const std::string& full_bid);
+            std::pair<std::string, std::string> parseFullId(const std::string& full_id);
 
             /**
              * Helper for composing full id
@@ -144,7 +144,7 @@ namespace rendezvous {
              * @param sub_rid Current subrequest
              * @return new subrequest
             */
-            std::string addSubRequest(metadata::Request * request, const std::string& sub_rid);
+            std::string addNextSubRequest(metadata::Request * request, const std::string& sub_rid);
 
             /**
              * Returns the number of inconsistencies prevented so far

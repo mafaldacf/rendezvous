@@ -178,7 +178,7 @@ std::string Server::genBid(metadata::Request * request) {
 std::pair<std::string, std::string> Server::parseFullId(const std::string& full_id) {
   size_t delimiter_pos = full_id.find(utils::FULL_ID_DELIMITER);
   std::string primary_id = full_id;
-  std::string secondary_id = "";
+  std::string secondary_id = "0";
 
   // FORMAT: <primary_id>:<secondary_id>
   if (delimiter_pos != std::string::npos) {
@@ -199,8 +199,8 @@ std::string Server::composeFullId(const std::string& primary_id, const std::stri
 // Helpers
 //------------
 
-std::string Server::addSubRequest(metadata::Request * request, const std::string& sub_rid) {
-  return request->addSubRequest(sub_rid);
+std::string Server::addNextSubRequest(metadata::Request * request, const std::string& sub_rid) {
+  return request->addNextSubRequest(sub_rid);
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {

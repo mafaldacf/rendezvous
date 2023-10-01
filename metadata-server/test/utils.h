@@ -20,6 +20,9 @@ static const std::string RID = "myrequestid";
 static const std::string TAG = "mytag";
 static const std::string EMPTY_TAG = "";
 
+static const std::string ROOT_SUB_RID = "0";
+static const std::string SUB_RID = "0:0";
+
 // force test failure
 static const std::string ERROR_PARSING_FULL_BID = "ERROR_PARSING_FULL_BID";
 
@@ -34,7 +37,7 @@ static std::string getBid(int bid) {
 
 // for register branches
 static std::string getFullBid(std::string rid, int id) {
-  return SID + '_' + std::to_string(id) + ":" + rid;
+  return SID + '_' + std::to_string(id+1) + ":" + rid;
 }
 
 static std::string parseFullBid(rendezvous::Server * server, metadata::Request * request, std::string bid, int bid_idx=-1) {

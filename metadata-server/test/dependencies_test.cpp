@@ -23,66 +23,66 @@ TEST(DependenciesTest, CheckStatus) {
   utils::ProtoVec regions_0;
   regions_0.Add("EU");
   regions_0.Add("US");
-  std::string bid_0 = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid_0);
+  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid_0);
 
   utils::ProtoVec regions_1;
   regions_1.Add("AP");
-  std::string bid_1 = server.registerBranch(request, "analytics", regions_1, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid_1);
+  std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  ASSERT_EQ(getBid(1), bid_1);
   
   // ignore parents (analytics, post_storage)
-  utils::Status r = server.checkStatus(request, "", "", "analytics");
+  utils::Status r = server.checkStatus(request, ROOT_SUB_RID, "", "", "analytics");
   ASSERT_EQ(CLOSED, r.status);
 
   utils::ProtoVec regions_2;
   regions_2.Add("US");
-  std::string bid_2 = server.registerBranch(request, "notification_storage", regions_2, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 2), bid_2);
+  std::string bid_2 = server.registerBranch(request, ROOT_SUB_RID, "notification_storage", regions_2, "", "post_storage");
+  ASSERT_EQ(getBid(2), bid_2);
 
   utils::ProtoVec regions_3;
   regions_3.Add("US");
-  std::string bid_3 = server.registerBranch(request, "media_service", regions_3, "", "notification_storage");
+  std::string bid_3 = server.registerBranch(request, ROOT_SUB_RID, "media_service", regions_3, "", "notification_storage");
   ASSERT_EQ(getFullBid(request->getRid(), 3), bid_3);
   
   // from the notification storage point of view
   // we are checking the status of post-storage -> analytics
-  r = server.checkStatus(request, "", "", "notification_storage");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
-  int found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "EU");
+  int found = server.closeBranch(request, ROOT_SUB_RID, bid_0, "EU");
   ASSERT_EQ(1, found);
-  found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "US");
+  found = server.closeBranch(request, ROOT_SUB_RID, bid_0, "US");
   ASSERT_EQ(1, found);
 
   // analytics is still opened
-  r = server.checkStatus(request, "", "", "notification_storage");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
   // OPENED since:
   // - media is still opened
-  found = server.closeBranch(request, parseFullBid(&server, request, bid_1, 1), "AP"); // post_storage
+  found = server.closeBranch(request, ROOT_SUB_RID, bid_1, "AP"); // post_storage
   ASSERT_EQ(1, found);
-  r = server.checkStatus(request, "", "", "notification_storage");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
   // CLOSED since we ignore:
   // - notification storage (OPENED) (direct parent)
   // - media service (OPENED) (the current one)
-  r = server.checkStatus(request, "", "", "media_service");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "media_service");
   ASSERT_EQ(CLOSED, r.status);
 
   // OPENED since:
   // - media storage is OPENED
-  found = server.closeBranch(request, parseFullBid(&server, request, bid_2, 2), "US"); // notification_storage
+  found = server.closeBranch(request, ROOT_SUB_RID, bid_2, "US"); // notification_storage
   ASSERT_EQ(1, found);
-  r = server.checkStatus(request, "", "", "notification_storage");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
   // everything closed
-  found = server.closeBranch(request, parseFullBid(&server, request, bid_3, 3), "US"); // media_service
+  found = server.closeBranch(request, ROOT_SUB_RID, bid_3, "US"); // media_service
   ASSERT_EQ(1, found);
-  r = server.checkStatus(request, "", "", "notification_storage");
+  r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(CLOSED, r.status);
 }
 
@@ -93,12 +93,12 @@ TEST(DependenciesTest, FetchDependencies_Root) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, "notification_storage", regions_1, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "notification_storage", regions_1, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
   auto result = server.fetchDependencies(request, "", "");
@@ -118,12 +118,12 @@ TEST(DependenciesTest, FetchDependencies_PostStorage) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, "analytics", regions_1, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
   auto result = server.fetchDependencies(request, "post_storage", "");
@@ -141,8 +141,8 @@ TEST(DependenciesTest, FetchDependencies_InvalidContext) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
   auto result = server.fetchDependencies(request, "", "invalid context service");
@@ -156,8 +156,8 @@ TEST(DependenciesTest, FetchDependencies_InvalidService) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
   auto result = server.fetchDependencies(request, "invalid service", "");
@@ -176,14 +176,14 @@ TEST(DependenciesTest, Wait) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, "analytics", regions_1, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  ASSERT_EQ(getBid(0), bid);
 
-  int r = server.closeBranch(request, getBid(0), ""); // post_storage
+  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), ""); // post_storage
   ASSERT_EQ(1, r);
 
   sleep(1);
@@ -196,7 +196,7 @@ TEST(DependenciesTest, Wait) {
 
   sleep(1);
 
-  r = server.closeBranch(request, getBid(1), ""); // post_storage (write post)
+  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), ""); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -215,25 +215,25 @@ TEST(DependenciesTest, WaitService_PostStorage) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("US");
-  bid = server.registerBranch(request, "post_storage", regions_1, "write_post", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("AP");
-  bid = server.registerBranch(request, "analytics", regions_2, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 2), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  ASSERT_EQ(getBid(0), bid);
 
-  int r = server.closeBranch(request, getBid(0), ""); // post_storage
+  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), ""); // post_storage
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, getBid(1), "EU"); // post_storage (write post)
+  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "EU"); // post_storage (write post)
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, getBid(1), "US"); // post_storage (write post)
+  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "US"); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   sleep(1);
@@ -246,7 +246,7 @@ TEST(DependenciesTest, WaitService_PostStorage) {
 
   sleep(1);
 
-  r = server.closeBranch(request, getBid(2), "AP"); // analytics
+  r = server.closeBranch(request, ROOT_SUB_RID, getBid(2), "AP"); // analytics
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -266,19 +266,19 @@ TEST(DependenciesTest, WaitServiceTag_PostStorage_WritePost) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("US");
-  bid = server.registerBranch(request, "post_storage", regions_1, "write_post", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("AP");
-  bid = server.registerBranch(request, "analytics", regions_2, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 2), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  ASSERT_EQ(getBid(0), bid);
 
   sleep(1);
 
@@ -289,9 +289,9 @@ TEST(DependenciesTest, WaitServiceTag_PostStorage_WritePost) {
 
   sleep(1);
 
-  int r = server.closeBranch(request, getBid(1), "EU"); // post_storage (write post)
+  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "EU"); // post_storage (write post)
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, getBid(1), "US"); // post_storage (write post)
+  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "US"); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -311,13 +311,13 @@ TEST(DependenciesTest, WaitRegion_EU_OnAnalyticsNode) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, "post_storage", regions_0, "", "");
-  ASSERT_EQ(getFullBid(request->getRid(), 0), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("EU");
-  bid = server.registerBranch(request, "analytics", regions_2, "", "post_storage");
-  ASSERT_EQ(getFullBid(request->getRid(), 1), bid);
+  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  ASSERT_EQ(getBid(0), bid);
 
   sleep(1);
 

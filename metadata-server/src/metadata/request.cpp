@@ -3,7 +3,9 @@
 using namespace metadata;
 
 Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
-    : _rid(rid), _next_id(0), _num_opened_branches(0), _versions_registry(versions_registry) {
+    : _rid(rid), _next_bid_index(0), _num_opened_branches(0), _opened_global_region(0), 
+    _next_sub_rid_index(1), _versions_registry(versions_registry) {
+
     _last_ts = std::chrono::system_clock::now();
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
@@ -12,6 +14,11 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
 
     // add root node
     _service_nodes[""] = new ServiceNode({""});
+
+    // insert the subrequest of the root
+    tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
+    _subrequests.insert(write_accessor, "0");
+    write_accessor->second = new SubRequest{};
 }
 
 Request::~Request() {
@@ -36,7 +43,7 @@ std::string Request::getRid() {
 }
 
 std::string Request::genId() {
-  return std::to_string(_next_id.fetch_add(1));
+  return std::to_string(_next_bid_index.fetch_add(1));
 }
 
 // -----------
@@ -51,8 +58,9 @@ replicas::VersionRegistry * Request::getVersionsRegistry() {
     return _versions_registry;
 }
 
-std::string Request::addSubRequest(const std::string& sub_rid) {
+std::string Request::addNextSubRequest(const std::string& sub_rid) {
     int next_sub_rid_index;
+    std::string next_sub_rid;
 
     // if we are currently in a sub_rid we fetch its next sub_rid
     if (!sub_rid.empty()) {
@@ -65,14 +73,15 @@ std::string Request::addSubRequest(const std::string& sub_rid) {
 
         // get next sub_rid
         next_sub_rid_index = write_accessor->second->next_sub_rid_index++;
+        // parse the index to full string of sub_rid
+        next_sub_rid = sub_rid + utils::FULL_ID_DELIMITER + std::to_string(next_sub_rid_index);
     }
     // otherwise we obtain the next sub_rid from current request
     else {
         next_sub_rid_index = _next_sub_rid_index.fetch_add(1);
+        // parse the index to full string of sub_rid
+        next_sub_rid = std::to_string(next_sub_rid_index);
     }
-
-    // parse the index to full string of sub_rid
-    std::string next_sub_rid = sub_rid + utils::FULL_ID_DELIMITER + std::to_string(next_sub_rid_index);
 
     // insert the next subrequest and return its id
     tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
@@ -139,6 +148,7 @@ int Request::closeBranch(const std::string& sub_rid, const std::string& bid, con
 
     int r = branch->close(region);
     bool globally_closed = branch->isClosed();
+    lock.unlock();
     if (r == 1) {
         if (!untrackBranch(sub_rid, service, region, globally_closed)) {
             r = -1;
@@ -186,15 +196,15 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
         tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
         bool found = _subrequests.find(read_accessor, sub_rid);
 
-        // sanity check >> should never happen
-        if (!found) {
-            _num_opened_branches.fetch_add(-1);
-            return false;
-        }
+        // sanity check, should never happen
+        if (!found) return false;
 
         SubRequest * subrequest = read_accessor->second;
         read_accessor.release();
-        subrequest->opened_branches.fetch_add(-1);
+
+        if (globally_closed) {
+            subrequest->opened_branches.fetch_add(-1);
+        }
 
         if (region.empty()) {
             subrequest->opened_global_region.fetch_add(-1);
@@ -301,7 +311,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
 
         SubRequest * subrequest = read_accessor->second;
         read_accessor.release();
-        subrequest->opened_branches.fetch_add(num);
+        subrequest->opened_branches.fetch_add(1);
 
         tbb::concurrent_hash_map<std::string, int>::accessor write_accessor;
         for (const auto& region: regions) {
@@ -331,7 +341,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     if (regions.size() == 0) {
         _opened_global_region.fetch_add(1);
     }
-    _num_opened_branches.fetch_add(num);
+    _num_opened_branches.fetch_add(1);
     lock.unlock();
     lock_regions.unlock();
 
@@ -357,39 +367,23 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
         return -3;
     }
 
-    // ignore number of opened branches for current request
-    if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-        bool found = _subrequests.find(read_accessor, sub_rid);
-        // subrequest does not exist - error propagating rid by client
-        if (!found) {
-            return -4;
-        }
-
-        SubRequest * subrequest = read_accessor->second;
-        read_accessor.release();
-
-        std::unique_lock<std::mutex> lock(_mutex_branches);
-        while (_num_opened_branches.load() > subrequest->opened_branches.load()) {
-            _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
-            inconsistency = 1;
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
-            }
-        }
+    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
+    bool found = _subrequests.find(read_accessor, sub_rid);
+    // subrequest does not exist - error propagating rid by client
+    if (!found) {
+        return -4;
     }
-    // consider all opened branches
-    else {
-        std::unique_lock<std::mutex> lock(_mutex_branches);
-        // we need to consider the current branch if we are in the root request
-        while (_num_opened_branches.load() > 1) {
-            _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
-            inconsistency = 1;
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
-            }
+
+    SubRequest * subrequest = read_accessor->second;
+    read_accessor.release();
+
+    std::unique_lock<std::mutex> lock(_mutex_branches);
+    while (_num_opened_branches.load() != subrequest->opened_branches.load()) {
+        _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
+        inconsistency = 1;
+        remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+        if (remaining_timeout <= std::chrono::seconds(0)) {
+            return -1;
         }
     }
 
@@ -434,52 +428,52 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region, s
         return -3;
     }
 
-    if (_opened_regions.count(region) == 0) {
-        return inconsistency;
-    }
-
-    // ignore number of opened branches for current request
-    if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
-        bool found = _subrequests.find(read_accessor_sr, sub_rid);
-        // subrequest does not exist - error propagating rid by client
-        if (!found) {
-            return -4;
-        }
-
-        SubRequest * subrequest = read_accessor_sr->second;
-        read_accessor_sr.release();
-
-        tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
-        std::unique_lock<std::mutex> lock(_mutex_regions);
-        while(true) {
-            // get counters (region and globally) for current sub request
-            int sr_global_region = subrequest->opened_global_region.load();
-            bool found = subrequest->opened_regions.find(read_accessor_num, region);
-            int sr_region = found ? read_accessor_num->second : 0;
-
-            if (_opened_regions[region] > sr_region || _opened_global_region.load() > sr_global_region) {
-                read_accessor_num.release();
-                _cond_regions.wait_for(lock, std::chrono::seconds(remaining_timeout));
-                inconsistency = 1;
-                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                if (remaining_timeout <= std::chrono::seconds(0)) {
-                    return -1;
-                }
-            }
-        }
-    }
-    // consider all opened branches
-    else {
-        std::unique_lock<std::mutex> lock(_mutex_regions);
-        // we need to consider the current branch if we are in the root request
-        while (_opened_regions[region] > 1 || _opened_global_region.load() > 1) {
-            _cond_branches.wait_for(lock, std::chrono::seconds(remaining_timeout));
+    std::unique_lock<std::mutex> lock(_mutex_regions);
+    // wait for creation
+    if (async) {
+        while (_opened_regions.count(region) == 0) {
+            _cond_regions.wait_for(lock, std::chrono::seconds(remaining_timeout));
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
                 return -1;
             }
+        }
+    }
+    else {
+        if (_opened_regions.count(region) == 0) {
+            return 0;
+        }
+    }
+
+    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
+    bool found = _subrequests.find(read_accessor_sr, sub_rid);
+    // subrequest does not exist - error propagating rid by client
+    if (!found) {
+        return -4;
+    }
+
+    SubRequest * subrequest = read_accessor_sr->second;
+    read_accessor_sr.release();
+
+    tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
+    while(true) {
+        // get counters (region and globally) for current sub request
+        int sr_global_region = subrequest->opened_global_region.load();
+        bool found = subrequest->opened_regions.find(read_accessor_num, region);
+        int sr_region = found ? read_accessor_num->second : 0;
+
+        if (_opened_regions[region] != sr_region || _opened_global_region.load() != sr_global_region) {
+            read_accessor_num.release();
+            _cond_regions.wait_for(lock, std::chrono::seconds(remaining_timeout));
+            inconsistency = 1;
+            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+            if (remaining_timeout <= std::chrono::seconds(0)) {
+                return -1;
+            }
+        }
+        else {
+            break;
         }
     }
 
@@ -672,36 +666,23 @@ utils::Status Request::checkStatus(const std::string& sub_rid, const std::string
         return res;
     }
 
-    // ignore number of opened branches for current request
-    if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-        bool found = _subrequests.find(read_accessor, sub_rid);
-        // subrequest does not exist - error propagating rid by client
-        if (!found) {
-            res.status = INVALID_CONTEXT;
-            return res;
-        }
-
-        SubRequest * subrequest = read_accessor->second;
-        read_accessor.release();
-
-        std::unique_lock<std::mutex> lock(_mutex_branches);
-        if (_num_opened_branches.load() > subrequest->opened_branches.load()) {
-            res.status = OPENED;
-        }
-        else {
-            res.status = CLOSED;
-        }
+    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
+    bool found = _subrequests.find(read_accessor, sub_rid);
+    // subrequest does not exist - error propagating rid by client
+    if (!found) {
+        res.status = INVALID_CONTEXT;
+        return res;
     }
-    // consider all opened branches
+
+    SubRequest * subrequest = read_accessor->second;
+    read_accessor.release();
+
+    std::unique_lock<std::mutex> lock(_mutex_branches);
+    if (_num_opened_branches.load() > subrequest->opened_branches.load()) {
+        res.status = OPENED;
+    }
     else {
-        // we need to consider the current branch if we are in the root request
-        if (_num_opened_branches.load() > 1) {
-            res.status = OPENED;
-        }
-        else {
-            res.status = CLOSED;
-        }
+        res.status = CLOSED;
     }
 
     // -----------------------------------
@@ -747,44 +728,30 @@ utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::
         return res;
     }
 
-    // ignore number of opened branches for current request
-    if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
-        bool found = _subrequests.find(read_accessor_sr, sub_rid);
-        // subrequest does not exist - error propagating rid by client
-        if (!found) {
-            res.status = INVALID_CONTEXT;
-            return res;
-        }
-
-        SubRequest * subrequest = read_accessor_sr->second;
-        read_accessor_sr.release();
-
-        tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
-        std::unique_lock<std::mutex> lock(_mutex_regions);
-
-        // get counters (region and globally) for current sub request
-        int sr_global_region = subrequest->opened_global_region.load();
-        found = subrequest->opened_regions.find(read_accessor_num, region);
-        int sr_region = found ? read_accessor_num->second : 0;
-
-        if (_opened_regions[region] > sr_region || _opened_global_region.load() > sr_global_region) {
-            res.status = OPENED;
-        }
-        else {
-            res.status = CLOSED;
-        }
+    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
+    bool found = _subrequests.find(read_accessor_sr, sub_rid);
+    // subrequest does not exist - error propagating rid by client
+    if (!found) {
+        res.status = INVALID_CONTEXT;
+        return res;
     }
-    // consider all opened branches
+
+    SubRequest * subrequest = read_accessor_sr->second;
+    read_accessor_sr.release();
+
+    tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
+    std::unique_lock<std::mutex> lock(_mutex_regions);
+
+    // get counters (region and globally) for current sub request
+    int sr_global_region = subrequest->opened_global_region.load();
+    found = subrequest->opened_regions.find(read_accessor_num, region);
+    int sr_region = found ? read_accessor_num->second : 0;
+
+    if (_opened_regions[region] != sr_region || _opened_global_region.load() != sr_global_region) {
+        res.status = OPENED;
+    }
     else {
-        std::unique_lock<std::mutex> lock(_mutex_regions);
-        // we need to consider the current branch if we are in the root request
-        if (_opened_regions[region] > 1 || _opened_global_region.load() > 1) {
-            res.status = OPENED;
-        }
-        else {
-            res.status = CLOSED;
-        }
+        res.status = CLOSED;
     }
 
     // -----------------------------------

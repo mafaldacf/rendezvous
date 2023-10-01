@@ -51,7 +51,7 @@ namespace metadata {
             oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _subrequests;
 
             const std::string _rid;
-            std::atomic<long> _next_id;
+            std::atomic<long> _next_bid_index;
             std::atomic<int> _next_sub_rid_index;
             std::chrono::time_point<std::chrono::system_clock> _last_ts;
             
@@ -131,7 +131,7 @@ namespace metadata {
              * @param sub_rid Current subrequest
              * @return new subrequest
             */
-            std::string addSubRequest(const std::string& sub_rid);
+            std::string addNextSubRequest(const std::string& sub_rid);
 
             /**
              * Register a set of branches in the request
