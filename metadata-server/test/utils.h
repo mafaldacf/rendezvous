@@ -22,6 +22,8 @@ static const std::string EMPTY_TAG = "";
 
 static const std::string ROOT_SUB_RID = "0";
 static const std::string SUB_RID = "0:0";
+static const std::string SUB_RID_0 = "0:0";
+static const std::string SUB_RID_1 = "0:1";
 
 // force test failure
 static const std::string ERROR_PARSING_FULL_BID = "ERROR_PARSING_FULL_BID";

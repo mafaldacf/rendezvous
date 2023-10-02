@@ -21,7 +21,7 @@ AWS_ACCOUNT_ID=851889773113
 
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build [{config, tests, py}], run {server <replica id> <config>, tests, client, monitor}"
+    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, monitor}"
     echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
@@ -53,6 +53,15 @@ local_build() {
   mkdir -p cmake/build
   cd cmake/build
   cmake ../..
+  make
+  echo done!
+}
+
+local_build_debug() {
+  cd metadata-server
+  mkdir -p cmake/build
+  cd cmake/build 
+  cmake -DCMAKE_BUILD_TYPE=Debug ../..
   make
   echo done!
 }
@@ -309,11 +318,13 @@ elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "clean" ]; then
   local_clean
 elif [ "$#" -eq 2 ] && [ $1 = "local" ] && [ $2 = "build" ]; then
   local_build
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "config" ]; then
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--debug" ]; then
+  local_build_debug
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--config" ]; then
   local_build_config
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "tests" ]; then
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--tests" ]; then
   local_build_tests
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "py" ]; then
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--py" ]; then
   local_build_py
 elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
   local_run_server $4 $5

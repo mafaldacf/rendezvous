@@ -100,7 +100,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.7);
+  sleep(0.2);
   found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU"); // bid 0
   ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "US"); // bid 0
@@ -127,7 +127,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   std::string bid_2 = server.registerBranch(request, SUB_RID, "new-service", regions2, "tag", "");
   ASSERT_EQ(getBid(2), bid_2);
 
-  sleep(0.7);
+  sleep(0.2);
   
   threads.emplace_back([&server, request] {
     int status = server.wait(request, ROOT_SUB_RID, "", "AP", "", "", false, 5);
@@ -140,7 +140,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.7);
+  sleep(0.2);
 
   found_region = server.closeBranch(request, SUB_RID, getBid(2), "AP");
   ASSERT_EQ(1, found_region);
@@ -150,7 +150,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   std::string bid_3 = server.registerBranch(request, SUB_RID, "new-service", regions_empty2, "tag2", "");
   ASSERT_EQ(getBid(3), bid_3);
 
-  sleep(0.7);
+  sleep(0.2);
 
   // we try for global region
   threads.emplace_back([&server, request] {
@@ -165,7 +165,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.7);
+  sleep(0.2);
 
   found_region = server.closeBranch(request, SUB_RID, getBid(3), "");
   ASSERT_EQ(1, found_region);
@@ -191,7 +191,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   status = server.wait(request, ROOT_SUB_RID, "", "", "", "", false, 5);
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  google::protobuf::RepeatedPtrField<std::string> region;
+  utils::ProtoVec region;
   region.Add("region1");
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
@@ -202,7 +202,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.7);
+  sleep(0.2);
 
   // -----------------------------------------------------
   // ASYNC ZONE
@@ -210,15 +210,17 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   // but we can wait if we are in an async zone
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID, next_sub_rid);
-  google::protobuf::RepeatedPtrField<std::string> empty_region;
+  utils::ProtoVec empty_region;
   // this branch is ignored 
   std::string bid_1 = server.registerBranch(request, SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
+  sleep(0.4);
   // we do a global wait (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
     int status = server.wait(request, SUB_RID, "", "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
+  sleep(0.2);
   // we do a wait on region1 (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
     int status = server.wait(request, SUB_RID, "", "region1", "", "", false, 5);
@@ -226,7 +228,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   });
   // -----------------------------------------------------
   
-  sleep(0.7);
+  sleep(1);
   found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "region1"); // bid 0
   ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, SUB_RID, getBid(1), ""); // bid 0
@@ -253,7 +255,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   // ASYNC ZONES:
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID, next_sub_rid);
-  google::protobuf::RepeatedPtrField<std::string> empty_region;
+  utils::ProtoVec empty_region;
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
   // -------------
@@ -266,19 +268,19 @@ TEST(ConcurrencyTest, WaitRequest) {
   status = server.wait(request, SUB_RID, "", "", "", "", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  google::protobuf::RepeatedPtrField<std::string> emptyRegion;
+  utils::ProtoVec emptyRegion;
   std::string bid_1 = server.registerBranch(request, SUB_RID, "service0", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
 
   std::string bid_2 = server.registerBranch(request, SUB_RID, "service1", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(2), bid_2);
 
-  google::protobuf::RepeatedPtrField<std::string> region1;
+  utils::ProtoVec region1;
   region1.Add("region1");
   std::string bid_3 = server.registerBranch(request, SUB_RID, "service0", region1, EMPTY_TAG, "");
   ASSERT_EQ(getBid(3), bid_3);
 
-  google::protobuf::RepeatedPtrField<std::string> region2;
+  utils::ProtoVec region2;
   region2.Add("region2");
   std::string bid_4 = server.registerBranch(request, SUB_RID, "service2", region2, EMPTY_TAG, "");
   ASSERT_EQ(getBid(4), bid_4);
@@ -339,17 +341,17 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(0, found);
 
   // Sanity Check - ensure that locks still work
-  google::protobuf::RepeatedPtrField<std::string> region_EU;
+  utils::ProtoVec region_EU;
   region_EU.Add("EU");
   std::string bid_5 = server.registerBranch(request, SUB_RID, "storage", region_EU, EMPTY_TAG, "");
   ASSERT_EQ(getBid(5), bid_5);
 
-  google::protobuf::RepeatedPtrField<std::string> region_US;
+  utils::ProtoVec region_US;
   region_US.Add("US");
   std::string bid_6 = server.registerBranch(request, SUB_RID, "storage", region_US, EMPTY_TAG, "");
   ASSERT_EQ(getBid(6), bid_6);
 
-  google::protobuf::RepeatedPtrField<std::string> region_GLOBAL;
+  utils::ProtoVec region_GLOBAL;
   region_GLOBAL.Add("GLOBAL");
   std::string bid_7 = server.registerBranch(request, SUB_RID, "notification", region_GLOBAL, "tagC", "");
   ASSERT_EQ(getBid(7), bid_7);

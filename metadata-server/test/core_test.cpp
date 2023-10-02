@@ -184,13 +184,13 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   /* Register Request and Branches with Multiple Contexts */
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
-  google::protobuf::RepeatedPtrField<std::string> regionsNoService;
+  utils::ProtoVec regionsNoService;
   regionsNoService.Add("EU");
   regionsNoService.Add("US");
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "notifications", regionsNoService, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  google::protobuf::RepeatedPtrField<std::string> regionsService;
+  utils::ProtoVec regionsService;
   regionsService.Add("EU");
   regionsService.Add("US");
   std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "post-storage", regionsService, EMPTY_TAG, "");
@@ -219,7 +219,7 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(OPENED, res.status);
 
   /* more branches for 'post-storage' service */
-  google::protobuf::RepeatedPtrField<std::string> regionsService2;
+  utils::ProtoVec regionsService2;
   regionsService2.Add("CH");
   regionsService2.Add("EU");
   std::string bid_2 = server.registerBranch(request, ROOT_SUB_RID, "post-storage", regionsService2, EMPTY_TAG, "");
@@ -275,7 +275,7 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   /* remaining global verifications (FURTHER CHECK) */
   // ASYNC ZONE CORNER CASE: here, it only returns CLOSED if we have a branch that
   // encompasses the checkStatus, since it always considers num opened branches > 1
-  google::protobuf::RepeatedPtrField<std::string> emptyRegion;
+  utils::ProtoVec emptyRegion;
   std::string current_bid = server.registerBranch(request, ROOT_SUB_RID, "dummy-current-service", emptyRegion, EMPTY_TAG, "");
   res = server.checkStatus(request, ROOT_SUB_RID, "", "EU");
   ASSERT_EQ(CLOSED, res.status);
@@ -291,7 +291,7 @@ TEST(CoreTest, CheckRequest_ContextNotFound) {
   utils::Status res;
   metadata::Request * request = server.getOrRegisterRequest(RID);
   
-  google::protobuf::RepeatedPtrField<std::string> regions;
+  utils::ProtoVec regions;
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "s1", regions, EMPTY_TAG, ""); // bid = 0
   std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "s1", regions, EMPTY_TAG, ""); // bid = 1
   server.registerBranchRegion(request, "s1", "r", EMPTY_TAG); // bid = 2

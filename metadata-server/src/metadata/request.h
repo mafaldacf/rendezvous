@@ -48,8 +48,17 @@ namespace metadata {
                 oneapi::tbb::concurrent_hash_map<std::string, int> opened_regions;
             } SubRequest;
 
-            oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _subrequests;
+            /* ----------- */
+            /* async zones */
+            /* ----------- */
+            // <sub_rid, sub_request_ptr>
+            oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _sub_requests;
+            // <sub_rid, num_current_waits>
+            std::map<std::string, int> _wait_logs;
 
+            /* ------- */
+            /* helpers */
+            /* ------- */
             const std::string _rid;
             std::atomic<long> _next_bid_index;
             std::atomic<int> _next_sub_rid_index;
@@ -63,28 +72,32 @@ namespace metadata {
             /* -------------------- */
             /* branching management */
             /* -------------------- */
-            // number of opened branches
             std::atomic<int> _num_opened_branches;
             std::atomic<int> _opened_global_region;
-            std::unordered_map<std::string, int> _opened_regions;
-            // FIXME: TRANSFORM TO TBB UNORDERED MAP BECAUSE WE DON'T USE NOTIFY HERE
-            // <bid, branch ptr>
-            std::unordered_map<std::string, metadata::Branch*> _branches;
-            // <service, service branching ptr>
+            // <region, num opened branches>
+            std::unordered_map<std::string, int> _opened_regions; // FIXME: use tbb
+            // <bid, branch_ptr>
+            std::unordered_map<std::string, metadata::Branch*> _branches; //FIXME: use tbb
+            // <service name, service_node_ptr>
             std::unordered_map<std::string, ServiceNode*> _service_nodes;
 
             /* ------------------- */
             /* concurrency control */
             /* ------------------- */
             std::mutex _mutex_branches;
-            std::mutex _mutex_service_nodes;
             std::mutex _mutex_regions;
-            std::condition_variable _cond_branches;
+            // service nodes
+            std::mutex _mutex_service_nodes;
             std::condition_variable _cond_service_nodes;
-            std::condition_variable _cond_regions;
-
-            // for wait with async option
+            // service nodes -- wait with async option
             std::condition_variable _cond_new_service_nodes;
+            // sub requests
+            std::shared_mutex _mutex_subrequests;
+            std::condition_variable_any _cond_subrequests;
+            // log wait requests
+            std::shared_mutex _mutex_wait_logs;
+            std::condition_variable _cond_wait_logs;
+
 
             /**
              * Compute remaining timeout based on the original timeout value and the elapsed time
@@ -93,6 +106,47 @@ namespace metadata {
              * @param start_time
             */
             std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
+
+            /**
+             * Add current sub request to wait logs
+             * 
+             * @param sub_rid The current sub request identifier
+            */
+            void _addToWaitLogs(const std::string& sub_rid);
+
+            /**
+             * Remove current sub request from wait logs
+             * 
+             * @param sub_rid The current sub request identifier
+            */
+            void _removeFromWaitLogs(const std::string& sub_rid);
+
+            /**
+             * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
+             * (used to be ignored in the wait call)
+             * 
+             * @param sub_rid The current sub request identifier
+             * @return vector of all preceding sub rids
+            */
+            std::vector<std::string> _getPrecedingWaitLogsEntries(const std::string& sub_rid);
+
+            /**
+             * Get number of opened branches for all preceding sub requests
+             * 
+             * @param sub_rids Vector of all preceding sub requests identifiers
+             * @return number of opened branches
+            */
+            int _openedBranchesPrecedingSubRids(const std::vector<std::string>& sub_rids);
+
+            /**
+             * Get number of opened branches for all preceding sub requests in current region and global region
+             * 
+             * @param sub_rids Vector of all preceding sub requests identifiers
+             * @param region Targeted region
+             * @return pair for number of opened branches with format: <global region, targeted region>
+            */
+            std::pair<int, int> _openedBranchesRegionPrecedingSubRids(
+                const std::vector<std::string>& sub_rids, const std::string& region);
 
         public:
 
