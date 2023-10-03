@@ -142,9 +142,10 @@ namespace rendezvous {
              * 
              * @param request Current request ptr
              * @param sub_rid Current subrequest
+             * @param gen_id If disabled, the next sub_rid is not generated
              * @return new subrequest
             */
-            std::string addNextSubRequest(metadata::Request * request, const std::string& sub_rid);
+            std::string addNextSubRequest(metadata::Request * request, const std::string& sub_rid, bool gen_id = true);
 
             /**
              * Returns the number of inconsistencies prevented so far
@@ -172,7 +173,6 @@ namespace rendezvous {
              * Register new branch for a given request
              * 
              * @param request Request where the branch is registered
-             * @param sub_rid The current sub request
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
@@ -191,7 +191,6 @@ namespace rendezvous {
              * Close a branch according to its identifier
              * 
              * @param request Request where the branch is registered
-             * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
              * @param service Service where branch was registered
@@ -201,8 +200,7 @@ namespace rendezvous {
              * - 0 if branch was already closed before
              * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
              */
-            int closeBranch(metadata::Request * request, const std::string& sub_rid, 
-                const std::string& bid, const std::string& region, bool force = false);
+            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force = false);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)

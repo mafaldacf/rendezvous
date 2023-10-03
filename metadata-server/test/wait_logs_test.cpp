@@ -86,7 +86,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   sleep(1);
 
   // close all branches for compose-post
-  found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "");
+  found_region = server.closeBranch(request, getBid(0), "");
   ASSERT_EQ(1, found_region);
 
   sleep(0.5);
@@ -101,17 +101,17 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   sleep(0.2);
 
   // close all branches for post-storage
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), "");
+  found_region = server.closeBranch(request, getBid(1), "");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), "EU");
+  found_region = server.closeBranch(request, getBid(2), "EU");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), "US");
+  found_region = server.closeBranch(request, getBid(2), "US");
   ASSERT_EQ(1, found_region);
 
   // close all branches for notifier
-  found_region = server.closeBranch(request, SUB_RID_1, getBid(3), "");
+  found_region = server.closeBranch(request, getBid(3), "");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_1, getBid(4), "US");
+  found_region = server.closeBranch(request, getBid(4), "US");
   ASSERT_EQ(1, found_region);
 
   // wait for all threads

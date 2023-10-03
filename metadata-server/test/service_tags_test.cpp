@@ -31,7 +31,7 @@ TEST(ServiceTagsTest, CheckStatusDetailed_Tags) {
   ASSERT_EQ(1, r.tagged.count("write_post"));
   ASSERT_EQ(OPENED, r.tagged["write_post"]);
 
-  int found = server.closeBranch(request, ROOT_SUB_RID, bid_1, "EU");
+  int found = server.closeBranch(request, bid_1, "EU");
   ASSERT_EQ(1, found);
 
   r = server.checkStatus(request, ROOT_SUB_RID, "post_storage", "EU", "", true);

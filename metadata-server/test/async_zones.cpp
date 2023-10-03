@@ -32,7 +32,7 @@ TEST(AsyncZonesTest, RidParsing) {
 
   parsed_id = server.parseFullId("1st:");
   ASSERT_EQ(parsed_id.first, "1st");
-  ASSERT_EQ(parsed_id.second, "0");
+  ASSERT_EQ(parsed_id.second, "");
 
   parsed_id = server.parseFullId(":2nd");
   ASSERT_EQ(parsed_id.first, "");
@@ -40,11 +40,11 @@ TEST(AsyncZonesTest, RidParsing) {
 
   parsed_id = server.parseFullId(":");
   ASSERT_EQ(parsed_id.first, "");
-  ASSERT_EQ(parsed_id.second, "0");
+  ASSERT_EQ(parsed_id.second, "");
 
-  parsed_id = server.parseFullId("root_rid");
-  ASSERT_EQ(parsed_id.first, "root_rid");
-  ASSERT_EQ(parsed_id.second, "0");
+  parsed_id = server.parseFullId("original_rid");
+  ASSERT_EQ(parsed_id.first, "original_rid");
+  ASSERT_EQ(parsed_id.second, "r");
 }
 
 TEST(AsyncZonesTest, RegisterWrongBranchId) { 
@@ -62,33 +62,21 @@ TEST(AsyncZonesTest, RegisterWrongBranchId) {
   ASSERT_EQ(getBid(0), bid_0);
 
   // attempt to close but bid does not exist
-  closed = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "EU");
+  closed = server.closeBranch(request, getBid(1), "EU");
   ASSERT_EQ(-1, closed);
 
   // attempt to close but region does not exist
-  closed = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "wrong-region");
-  ASSERT_EQ(-1, closed);
-
-  // attempt to close with invalid subrid
-  closed = server.closeBranch(request, SUB_RID_1, getBid(0), "EU");
+  closed = server.closeBranch(request, getBid(0), "wrong-region");
   ASSERT_EQ(-1, closed);
 
   // close branch
-  closed = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU");
+  closed = server.closeBranch(request, getBid(0), "EU");
   ASSERT_EQ(1, closed);
 
   // attempt to close branch again
-  closed = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU");
+  closed = server.closeBranch(request, getBid(0), "EU");
   ASSERT_EQ(0, closed);
 }
-
-/* static const std::string ROOT_SUB_RID = "0";
-static const std::string SUB_RID_0 = "0:0";
-static const std::string SUB_RID_1 = "0:1";
-static const std::string SUB_RID_2 = "0:2";
-static const std::string SUB_RID_0_0 = "0:0:0";
-static const std::string SUB_RID_0_1 = "0:0:1";
-static const std::string SUB_RID_0_0_0 = "0:0:0:0"; */
 
 TEST(AsyncZonesTest, AddNextSubRids) { 
   rendezvous::Server server(SID);
@@ -168,11 +156,11 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   sleep(0.5);
 
   // close all branches for compose-post
-  found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "");
+  found_region = server.closeBranch(request, getBid(0), "");
   ASSERT_EQ(1, found_region);
 
   // close all branches for post-storage
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), "");
+  found_region = server.closeBranch(request, getBid(1), "");
   ASSERT_EQ(1, found_region);
 
   // at this point, no global branch is opened so 
@@ -184,9 +172,9 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   sleep(0.5);
 
   // close all branches for write-post operation in post-storage
-  found_region = server.closeBranch(request, SUB_RID_0_0, getBid(2), "EU");
+  found_region = server.closeBranch(request, getBid(2), "EU");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0_0, getBid(2), "US");
+  found_region = server.closeBranch(request, getBid(2), "US");
   ASSERT_EQ(1, found_region);
 
   // wait for all threads

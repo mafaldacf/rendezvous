@@ -109,7 +109,7 @@ TEST(CoreTest, CloseBranch) {
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "s", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  int res = server.closeBranch(request, ROOT_SUB_RID, bid_0, "");
+  int res = server.closeBranch(request, bid_0, "");
   ASSERT_EQ(1, res);
 }
 
@@ -122,7 +122,7 @@ TEST(CoreTest, CloseBranchInvalidRegion) {
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  int res = server.closeBranch(request, ROOT_SUB_RID, bid_0, "us-east-1");
+  int res = server.closeBranch(request, bid_0, "us-east-1");
   ASSERT_EQ(-1, res);
 }
 
@@ -135,7 +135,7 @@ TEST(CoreTest, CloseBranchInvalidBid) {
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  int res = server.closeBranch(request, ROOT_SUB_RID, "invalid bid", "us-east-1");
+  int res = server.closeBranch(request, "invalid bid", "us-east-1");
   ASSERT_EQ(-1, res);
 }
 
@@ -177,15 +177,15 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   ASSERT_EQ(OPENED, res.status);
 
   /* Close branch with no context and verify request is still opened */
-  found_region = server.closeBranch(request, ROOT_SUB_RID, parseFullBid(&server, request, bid_0, 0), ""); // bid 0
+  found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), ""); // bid 0
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "s1", "");
   ASSERT_EQ(OPENED, res.status);
 
   /* Close branches with service 's' and verify request is closed for that service */
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_1, ""); // bid 1
+  found_region = server.closeBranch(request, bid_1, ""); // bid 1
   ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_3, "r"); // bid 3
+  found_region = server.closeBranch(request, bid_3, "r"); // bid 3
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "s2", "");
   ASSERT_EQ(CLOSED, res.status);
@@ -193,7 +193,7 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   /* Remaining checks */
   res = server.checkStatus(request, ROOT_SUB_RID, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_2, "r"); // bid 2
+  found_region = server.closeBranch(request, bid_2, "r"); // bid 2
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "s2", "r");
   ASSERT_EQ(CLOSED, res.status);
@@ -207,7 +207,7 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   res = server.checkStatus(request, ROOT_SUB_RID, "", "");
   ASSERT_EQ(CLOSED, res.status);
 
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_4, "region"); // bid 4
+  found_region = server.closeBranch(request, bid_4, "region"); // bid 4
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "", "");
   ASSERT_EQ(CLOSED, res.status);
@@ -251,7 +251,7 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(OPENED, res.status);
 
   /* 'notifications' service verifications */
-  found_region = server.closeBranch(request, ROOT_SUB_RID, parseFullBid(&server, request, bid_0, 0), "EU"); // post-storage
+  found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "EU"); // post-storage
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "notifications", "EU");
   ASSERT_EQ(CLOSED, res.status);
@@ -266,9 +266,9 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(getBid(2), bid_2);
 
   /* 'post-storage' service verifications */
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_1, "EU"); // notifications
+  found_region = server.closeBranch(request, bid_1, "EU"); // notifications
   ASSERT_EQ(true, found_region);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_1, "US"); // notifications
+  found_region = server.closeBranch(request, bid_1, "US"); // notifications
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "post-storage", "");
   ASSERT_EQ(OPENED, res.status);
@@ -278,11 +278,11 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(OPENED, res.status);
   res = server.checkStatus(request, ROOT_SUB_RID, "post-storage", "US");
   ASSERT_EQ(CLOSED, res.status);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_2, "CH"); // notifications
+  found_region = server.closeBranch(request, bid_2, "CH"); // notifications
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "post-storage", "CH");
   ASSERT_EQ(CLOSED, res.status);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, bid_2, "EU"); // notifications
+  found_region = server.closeBranch(request, bid_2, "EU"); // notifications
   ASSERT_EQ(true, found_region);
   res = server.checkStatus(request, ROOT_SUB_RID, "post-storage", "EU");
   ASSERT_EQ(CLOSED, res.status);
@@ -301,7 +301,7 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   /* remaining 'notifications' service verifications */
   res = server.checkStatus(request, ROOT_SUB_RID, "notifications", "US");
   ASSERT_EQ(OPENED, res.status);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, parseFullBid(&server, request, bid_0, 0), "US"); // post-storage
+  found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "US"); // post-storage
   ASSERT_EQ(true, found_region);
 
   /* remaining global verifications */
@@ -346,9 +346,9 @@ TEST(CoreTest, CheckRequest_ContextNotFound) {
   res = server.checkStatus(request, ROOT_SUB_RID, "invalid service", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
 
-  bool found = server.closeBranch(request, ROOT_SUB_RID, parseFullBid(&server, request, bid_0, 0), "");
+  bool found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "");
   ASSERT_EQ(true, found);
-  found = server.closeBranch(request, ROOT_SUB_RID, bid_1, "");
+  found = server.closeBranch(request, bid_1, "");
   ASSERT_EQ(true, found);
 
   // now we can ensure it is unknown since all global branches are closed!

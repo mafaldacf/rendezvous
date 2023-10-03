@@ -50,9 +50,9 @@ TEST(DependenciesTest, CheckStatus) {
   r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
-  int found = server.closeBranch(request, ROOT_SUB_RID, bid_0, "EU");
+  int found = server.closeBranch(request, bid_0, "EU");
   ASSERT_EQ(1, found);
-  found = server.closeBranch(request, ROOT_SUB_RID, bid_0, "US");
+  found = server.closeBranch(request, bid_0, "US");
   ASSERT_EQ(1, found);
 
   // analytics is still opened
@@ -61,7 +61,7 @@ TEST(DependenciesTest, CheckStatus) {
 
   // OPENED since:
   // - media is still opened
-  found = server.closeBranch(request, ROOT_SUB_RID, bid_1, "AP"); // post_storage
+  found = server.closeBranch(request, bid_1, "AP"); // post_storage
   ASSERT_EQ(1, found);
   r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
@@ -74,13 +74,13 @@ TEST(DependenciesTest, CheckStatus) {
 
   // OPENED since:
   // - media storage is OPENED
-  found = server.closeBranch(request, ROOT_SUB_RID, bid_2, "US"); // notification_storage
+  found = server.closeBranch(request, bid_2, "US"); // notification_storage
   ASSERT_EQ(1, found);
   r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(OPENED, r.status);
 
   // everything closed
-  found = server.closeBranch(request, ROOT_SUB_RID, bid_3, "US"); // media_service
+  found = server.closeBranch(request, bid_3, "US"); // media_service
   ASSERT_EQ(1, found);
   r = server.checkStatus(request, ROOT_SUB_RID, "", "", "notification_storage");
   ASSERT_EQ(CLOSED, r.status);
@@ -183,7 +183,7 @@ TEST(DependenciesTest, Wait) {
   bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
-  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), ""); // post_storage
+  int r = server.closeBranch(request, getBid(0), ""); // post_storage
   ASSERT_EQ(1, r);
 
   sleep(1);
@@ -196,7 +196,7 @@ TEST(DependenciesTest, Wait) {
 
   sleep(1);
 
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), ""); // post_storage (write post)
+  r = server.closeBranch(request, getBid(1), ""); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -229,11 +229,11 @@ TEST(DependenciesTest, WaitService_PostStorage) {
   bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
-  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), ""); // post_storage
+  int r = server.closeBranch(request, getBid(0), ""); // post_storage
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "EU"); // post_storage (write post)
+  r = server.closeBranch(request, getBid(1), "EU"); // post_storage (write post)
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "US"); // post_storage (write post)
+  r = server.closeBranch(request, getBid(1), "US"); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   sleep(1);
@@ -246,7 +246,7 @@ TEST(DependenciesTest, WaitService_PostStorage) {
 
   sleep(1);
 
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(2), "AP"); // analytics
+  r = server.closeBranch(request, getBid(2), "AP"); // analytics
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -289,9 +289,9 @@ TEST(DependenciesTest, WaitServiceTag_PostStorage_WritePost) {
 
   sleep(1);
 
-  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "EU"); // post_storage (write post)
+  int r = server.closeBranch(request, getBid(1), "EU"); // post_storage (write post)
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(1), "US"); // post_storage (write post)
+  r = server.closeBranch(request, getBid(1), "US"); // post_storage (write post)
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {

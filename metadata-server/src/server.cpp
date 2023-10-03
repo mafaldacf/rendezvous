@@ -177,17 +177,19 @@ std::string Server::genBid(metadata::Request * request) {
 
 std::pair<std::string, std::string> Server::parseFullId(const std::string& full_id) {
   size_t delimiter_pos = full_id.find(utils::FULL_ID_DELIMITER);
-  std::string primary_id = full_id;
-  std::string secondary_id = "0";
+  std::string primary_id, secondary_id;
 
   // FORMAT: <primary_id>:<secondary_id>
   if (delimiter_pos != std::string::npos) {
     primary_id = full_id.substr(0, delimiter_pos);
     secondary_id = full_id.substr(delimiter_pos+1);
   }
-
-  // force to be zero if empty
-  if (secondary_id.empty()) secondary_id = "0";
+  // this may happen if the full_id corresponds to the original root_rid
+  // cannot happen when parsing branch identifiers
+  else {
+    primary_id = full_id;
+    secondary_id = "r";
+  }
 
   return std::make_pair(primary_id, secondary_id);
 }
@@ -203,8 +205,8 @@ std::string Server::composeFullId(const std::string& primary_id, const std::stri
 // Helpers
 //------------
 
-std::string Server::addNextSubRequest(metadata::Request * request, const std::string& sub_rid) {
-  return request->addNextSubRequest(sub_rid);
+std::string Server::addNextSubRequest(metadata::Request * request, const std::string& sub_rid, bool gen_id) {
+  return request->addNextSubRequest(_sid, sub_rid, gen_id);
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {
@@ -263,26 +265,24 @@ std::string Server::registerBranch(metadata::Request * request,
     return "";
   }
 
-  const std::string& composed_rid = composeFullId(request->getRid(), sub_rid);
-  const std::string& composed_bid = composeFullId(bid, composed_rid);
+  const std::string& composed_bid = composeFullId(bid, request->getRid());
   if (monitor) {
     publishBranches(service, tag, composed_bid);
   }
   return bid;
 }
 
-int Server::closeBranch(metadata::Request * request, const std::string& sub_rid, 
-  const std::string& bid, const std::string& region, bool force) {
+int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force) {
     
-  int r = request->closeBranch(sub_rid, bid, region);
+  int r = request->closeBranch(bid, region);
   
   // close branch in the background
   if (r != 1 && force) {
-    std::thread([this, request, sub_rid, bid, region]() {
+    std::thread([this, request, bid, region]() {
       int retries = 0;
       while (retries++ <= _wait_replica_timeout_s) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        if (request->closeBranch(sub_rid, bid, region) == 1) {
+        if (request->closeBranch(bid, region) == 1) {
           break;
         }
       }

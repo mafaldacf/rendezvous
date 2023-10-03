@@ -18,7 +18,7 @@ TEST(ConcurrencyTest, CloseBranchBeforeRegister) {
 
   threads.emplace_back([&server, request] {
     sleep(0.1);
-    bool found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "region");
+    bool found_region = server.closeBranch(request, getBid(0), "region");
     ASSERT_EQ(true, found_region);
   });
 
@@ -107,9 +107,9 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   });
 
   sleep(0.2);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU"); // bid 0
+  found_region = server.closeBranch(request, getBid(0), "EU"); // bid 0
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "US"); // bid 0
+  found_region = server.closeBranch(request, getBid(0), "US"); // bid 0
   ASSERT_EQ(1, found_region);
 
   // wait for all threads
@@ -148,7 +148,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   sleep(0.2);
 
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), "AP");
+  found_region = server.closeBranch(request, getBid(2), "AP");
   ASSERT_EQ(1, found_region);
 
   // try for GLOBAL branch
@@ -173,7 +173,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   sleep(0.2);
 
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(3), "");
+  found_region = server.closeBranch(request, getBid(3), "");
   ASSERT_EQ(1, found_region);
 
   // wait for all threads
@@ -235,9 +235,9 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   // -----------------------------------------------------
   
   sleep(1);
-  found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "region1"); // bid 0
+  found_region = server.closeBranch(request, getBid(0), "region1"); // bid 0
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), ""); // bid 0
+  found_region = server.closeBranch(request, getBid(1), ""); // bid 0
   ASSERT_EQ(1, found_region);
 
   // wait for all threads
@@ -320,7 +320,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   
 
   sleep(1);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), ""); // bid 0
+  found_region = server.closeBranch(request, getBid(1), ""); // bid 0
   ASSERT_EQ(1, found_region);
 
   // must only check previous service (service0) which is closed
@@ -338,13 +338,10 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   sleep(1);
 
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), ""); // bid 1
+  found_region = server.closeBranch(request, getBid(2), ""); // bid 1
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(3), "region1"); // bid 2
+  found_region = server.closeBranch(request, getBid(3), "region1"); // bid 2
   ASSERT_EQ(1, found_region);
-
-  int found = server.closeBranch(request, "invalid sub rid", getBid(3), "region1"); // bid 2
-  ASSERT_EQ(-1, found);
 
   // Sanity Check - ensure that locks still work
   utils::ProtoVec region_EU;
@@ -388,13 +385,13 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   sleep(1);
 
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(4), "region2");
+  found_region = server.closeBranch(request, getBid(4), "region2");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(5), "EU");
+  found_region = server.closeBranch(request, getBid(5), "EU");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(6), "US");
+  found_region = server.closeBranch(request, getBid(6), "US");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID_0, getBid(7), "GLOBAL");
+  found_region = server.closeBranch(request, getBid(7), "GLOBAL");
   ASSERT_EQ(1, found_region);
   
   // wait for all threads
@@ -441,9 +438,9 @@ TEST(ConcurrencyTest, WaitServiceTag) {
 
   sleep(1);
 
-  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU");
+  int r = server.closeBranch(request, getBid(0), "EU");
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "US");
+  r = server.closeBranch(request, getBid(0), "US");
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {
@@ -483,9 +480,9 @@ TEST(ConcurrencyTest, WaitServiceTagForceAsync) {
 
   sleep(1);
   
-  int r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "EU");
+  int r = server.closeBranch(request, getBid(0), "EU");
   ASSERT_EQ(1, r);
-  r = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "US");
+  r = server.closeBranch(request, getBid(0), "US");
   ASSERT_EQ(1, r);
 
   for(auto& thread : threads) {

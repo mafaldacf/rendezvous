@@ -154,7 +154,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
       ctx.mutable_versions()->insert({sid, version});
     }
     response->mutable_context()->CopyFrom(ctx);
-    _replica_client.registerBranch(root_rid, sub_rid, core_bid, service, tag, regions, monitor, ctx);
+    _replica_client.registerBranch(root_rid, sub_rid, core_bid, service, tag, regions, monitor, async, ctx);
   }
   return grpc::Status::OK;
 }
@@ -228,32 +228,22 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
 
   spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", composed_bid, region, force);
 
-  // parse composed id into <bid, full_rid>
+  // parse composed id into <bid, root_rid>
   auto ids = _server->parseFullId(composed_bid);
   const std::string& bid = ids.first;
-  const std::string& full_rid = ids.second;
-  if (bid.empty() || full_rid.empty()) {
-    spdlog::error("< [CB] Error parsing full bid '{}'", full_rid);
+  const std::string& root_rid = ids.second;
+  if (bid.empty() || root_rid.empty()) {
+    spdlog::error("< [CB] Error parsing full bid '{}'", root_rid);
     return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_BID);
   }
 
-  // parse full rid into <rid, sub_rid>
-  ids = _server->parseFullId(full_rid);
-  const std::string& rid = ids.first;
-  const std::string& sub_rid = ids.second;
-  // sub_rid can be empty
-  if (rid.empty()) {
-    spdlog::error("< [CB] Error parsing full rid '{}'", full_rid);
-    return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
-  }
-
-  metadata::Request * rdv_request = _getRequest(rid);
+  metadata::Request * rdv_request = _getRequest(root_rid);
   if (rdv_request == nullptr) {
-    spdlog::error("< [CB] Error: invalid request '{}'", rid);
+    spdlog::error("< [CB] Error: invalid request '{}'", root_rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  int res = _server->closeBranch(rdv_request, sub_rid, bid, region, force);
+  int res = _server->closeBranch(rdv_request, bid, region, force);
   if (res == 0) {
     spdlog::error("< [CB] Error: branch not found for provided bid (composed_bid): {}", composed_bid);
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
@@ -265,7 +255,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
     rendezvous::RequestContext ctx = request->context();
-    _replica_client.closeBranch(rid, sub_rid, bid, region, ctx);
+    _replica_client.closeBranch(root_rid, bid, region, ctx);
   }
   return grpc::Status::OK;
 }

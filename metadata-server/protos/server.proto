@@ -33,14 +33,14 @@ message RegisterBranchMessage {
   string tag = 5;
   repeated string regions = 6;
   bool monitor = 7;
-  RequestContext context = 8;
+  bool async = 8;
+  RequestContext context = 9;
 }
 
 /* Close Branch */
 message CloseBranchMessage {
   string root_rid = 1;
-  string sub_rid = 2;
-  string core_bid = 3;
-  string region = 4;
-  RequestContext context = 5;
+  string core_bid = 2;
+  string region = 3;
+  RequestContext context = 4;
 }

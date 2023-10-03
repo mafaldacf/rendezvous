@@ -15,19 +15,19 @@ static const int CONTEXT_NOT_FOUND = -2;
 static const int INVALID_BRANCH_SERVICE = -2;
 static const int INVALID_BRANCH_REGION = -3;
 
-static const std::string SID = "eu-central-1";
+static const std::string SID = "eu";
 static const std::string RID = "myrequestid";
 static const std::string TAG = "mytag";
 static const std::string EMPTY_TAG = "";
 
-static const std::string ROOT_SUB_RID = "0";
-static const std::string SUB_RID_0 = "0:0";
-static const std::string SUB_RID_1 = "0:1";
-static const std::string SUB_RID_2 = "0:2";
-static const std::string SUB_RID_0_0 = "0:0:0";
-static const std::string SUB_RID_0_1 = "0:0:1";
-static const std::string SUB_RID_1_0 = "0:1:0";
-static const std::string SUB_RID_0_0_0 = "0:0:0:0";
+static const std::string ROOT_SUB_RID = "r";
+static const std::string SUB_RID_0 = "r:eu0";
+static const std::string SUB_RID_1 = "r:eu1";
+static const std::string SUB_RID_2 = "r:eu2";
+static const std::string SUB_RID_0_0 = "r:eu0:eu0";
+static const std::string SUB_RID_0_1 = "r:eu0:eu1";
+static const std::string SUB_RID_1_0 = "r:eu1:eu0";
+static const std::string SUB_RID_0_0_0 = "r:eu0:eu0:eu0";
 
 // force test failure
 static const std::string ERROR_PARSING_FULL_BID = "ERROR_PARSING_FULL_BID";

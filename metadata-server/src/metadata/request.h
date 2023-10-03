@@ -23,6 +23,7 @@
 #include <thread>
 
 #include "oneapi/tbb/concurrent_hash_map.h"
+#include "oneapi/tbb/concurrent_vector.h"
 
 using namespace utils;
 
@@ -42,15 +43,21 @@ namespace metadata {
             } ServiceNode;
 
             typedef struct SubRequestStruct {
+                int i;
+                std::atomic<int> num_current_waits;
+
                 std::atomic<int> next_sub_rid_index;
                 std::atomic<int> opened_branches;
                 std::atomic<int> opened_global_region;
                 oneapi::tbb::concurrent_hash_map<std::string, int> opened_regions;
+
             } SubRequest;
 
             /* ----------- */
             /* async zones */
             /* ----------- */
+            // index for sub_requests
+            std::atomic<int> sub_requests_i;
             // <sub_rid, sub_request_ptr>
             oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _sub_requests;
             // <sub_rid, num_current_waits>
@@ -111,24 +118,27 @@ namespace metadata {
              * Add current sub request to wait logs
              * 
              * @param sub_rid The current sub request identifier
+             * @param subrequest The current sub request
             */
-            void _addToWaitLogs(const std::string& sub_rid);
+            void _addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest);
 
             /**
              * Remove current sub request from wait logs
              * 
              * @param sub_rid The current sub request identifier
+             * @param subrequest The current sub request
             */
-            void _removeFromWaitLogs(const std::string& sub_rid);
+            void _removeFromWaitLogs(const std::string& sub_rid, SubRequest* subrequest);
 
             /**
              * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
              * (used to be ignored in the wait call)
              * 
              * @param sub_rid The current sub request identifier
+             * @param subrequest The current sub request
              * @return vector of all preceding sub rids
             */
-            std::vector<std::string> _getPrecedingWaitLogsEntries(const std::string& sub_rid);
+            std::vector<std::string> _getPrecedingWaitLogsEntries(const std::string& sub_rid, SubRequest* subrequest);
 
             /**
              * Get number of opened branches for all preceding sub requests
@@ -180,12 +190,15 @@ namespace metadata {
             std::string genId();
 
             /**
-             * Register a new sub request originating from an async branch within the current subrequest
+             * Register a new sub request originating from an async branch within the current subrequest with
+             * the folllowing format: <sub_rid>:<sid>-<new_sub_rid>
              * 
+             * @param sid The current server (replica) id
              * @param sub_rid Current subrequest
+             * @param gen_id If disabled, the next sub_rid is not generated
              * @return new subrequest
             */
-            std::string addNextSubRequest(const std::string& sub_rid);
+            std::string addNextSubRequest(const std::string& sid, const std::string& sub_rid, bool gen_id);
 
             /**
              * Register a set of branches in the request
@@ -204,7 +217,6 @@ namespace metadata {
             /**
              * Remove a branch from the request
              * 
-             * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region The region where the branch was registered
 
@@ -213,7 +225,7 @@ namespace metadata {
              * - 0 if branch was already closed before
              * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
              */
-            int closeBranch(const std::string& sub_rid, const std::string& bid, const std::string& region);
+            int closeBranch(const std::string& bid, const std::string& region);
 
             /**
              * Untrack (remove) branch according to its context (service, region or none) in the corresponding maps

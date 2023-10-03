@@ -34,6 +34,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& core_bid = request->core_bid();
   const auto& regions = request->regions();
   bool monitor = request->monitor();
+  bool async = request->async();
   int num = request->regions().size();
 
   spdlog::trace("> [REPLICATED RB] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", num, service, monitor, core_bid, root_rid, sub_rid);
@@ -53,6 +54,10 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     }
   }
 
+  if (async) {
+    _server->addNextSubRequest(rdv_request, sub_rid, false);
+  }
+
   std::string res = _server->registerBranch(rdv_request, sub_rid, service, regions, tag, request->context().prev_service(), monitor, core_bid);
 
   return grpc::Status::OK;
@@ -65,15 +70,14 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& root_rid = request->root_rid();
-  const std::string& sub_rid = request->sub_rid();
   const std::string& core_bid = request->core_bid();
   const std::string& region = request->region();
   
-  spdlog::trace("> [REPLICATED CB] closing branch on region '{}' for ids {}:{}:{}", region, core_bid, root_rid, sub_rid);
+  spdlog::trace("> [REPLICATED CB] closing branch on region '{}' for ids {}:{}", region, core_bid, root_rid);
 
   metadata::Request * rdv_request = _server->getOrRegisterRequest(root_rid);
   if (rdv_request == nullptr) {
-    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}:{}", core_bid, root_rid, sub_rid);
+    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}", core_bid, root_rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
@@ -87,13 +91,13 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   }
 
   // always force close branch when dealing with replicated requests
-  int res = _server->closeBranch(rdv_request, sub_rid, core_bid, region, true);
+  int res = _server->closeBranch(rdv_request, core_bid, region, true);
 
   if (res == 0) {
-    spdlog::critical("< [REPLICATED CB] Error: branch not found for ids {}:{}:{}", core_bid, root_rid, sub_rid);
+    spdlog::critical("< [REPLICATED CB] Error: branch not found for ids {}:{}", core_bid, root_rid);
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
   } else if (res == -1) {
-    spdlog::critical("< [REPLICATED CB] Error: region '{}' not found for branch for ids {}:{}:{}", region, core_bid, root_rid, sub_rid);
+    spdlog::critical("< [REPLICATED CB] Error: region '{}' not found for branch for ids {}:{}", region, core_bid, root_rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
   
