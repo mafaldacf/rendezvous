@@ -61,6 +61,8 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(getBid(4), bid_4);
 
   // do wait call on notifier
+  // this is an edge case where the it is notified again 
+  // and then disregards the post-storage wait call
   sleep(0.2);
   threads.emplace_back([&server, request] {
     int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);

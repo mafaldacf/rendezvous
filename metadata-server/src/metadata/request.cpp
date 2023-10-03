@@ -6,14 +6,14 @@ using namespace metadata;
 
 Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     : _rid(rid), _next_bid_index(0), _num_opened_branches(0), _opened_global_region(0), 
-    _next_sub_rid_index(1), _versions_registry(versions_registry) {
+    _next_sub_rid_index(1), sub_requests_i(1), _versions_registry(versions_registry) {
 
     _last_ts = std::chrono::system_clock::now();
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
     _service_nodes = std::unordered_map<std::string, ServiceNode*>();
     _sub_requests = oneapi::tbb::concurrent_hash_map<std::string, SubRequest*>();
-    _wait_logs = std::map<std::string, int>();
+    _wait_logs = std::unordered_set<SubRequest*>();
 
     // add root node
     _service_nodes[""] = new ServiceNode({""});
@@ -21,7 +21,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     // insert the subrequest of the root
     tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
     _sub_requests.insert(write_accessor, "r");
-    write_accessor->second = new SubRequest{};
+    write_accessor->second = new SubRequest{0, "r"};
 }
 
 Request::~Request() {
@@ -96,7 +96,7 @@ std::string Request::addNextSubRequest(const std::string& sid, const std::string
     // insert the next subrequest and return its id
     tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
     _sub_requests.insert(write_accessor, next_sub_rid);
-    write_accessor->second = new SubRequest{};
+    write_accessor->second = new SubRequest{sub_requests_i.fetch_add(1), next_sub_rid};
 
     return next_sub_rid;
 }
@@ -381,10 +381,11 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
 void Request::_addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
-    std::unique_lock<std::shared_mutex> lock(_mutex_wait_logs);
-    _wait_logs[sub_rid]++;
+    // try to insert if not yet done
+    _wait_logs.insert(subrequest);
+    subrequest->num_current_waits++;
 
-    // notify regarding new wait logs to cover an edge case:
+    // notify regarding new wait logs to cover an >>> EDGE CASE <<<:
     // subrid (a) registered before subrid (b), but (b) does wait call before (a) and both with branches opened
     // (b) needs to be signaled and update its preceeding list to discard (a) from the wait call
     _cond_subrequests.notify_all();
@@ -393,13 +394,9 @@ void Request::_addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest)
 void Request::_removeFromWaitLogs(const std::string& sub_rid, SubRequest* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
-    std::unique_lock<std::shared_mutex> lock(_mutex_wait_logs);
-    // remove key from map since this is the last wait entry
-    if (_wait_logs[sub_rid] == 1) {
-        _wait_logs.erase(sub_rid);
-    }
-    else {
-        _wait_logs[sub_rid]--;
+    int n = --subrequest->num_current_waits;
+    if (n == 0) {
+        _wait_logs.erase(subrequest);
     }
 }
 
@@ -407,13 +404,10 @@ std::vector<std::string> Request::_getPrecedingWaitLogsEntries(const std::string
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     std::vector<std::string> entries;
-    std::shared_lock<std::shared_mutex> lock(_mutex_wait_logs);
-    for (auto it = _wait_logs.begin(); it != _wait_logs.end(); it++) {
-        // stop since we are dealing with an ordered map
-        if (it->first >= sub_rid) {
-            break;
+    for (const auto& entry: _wait_logs) {
+        if (entry->i < subrequest->i) {
+            entries.emplace_back(entry->sub_rid);
         }
-        entries.emplace_back(it->first);
     }
     return entries;
 }

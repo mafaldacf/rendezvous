@@ -21,6 +21,7 @@
 #include <chrono>
 #include <sstream>
 #include <thread>
+#include <unordered_set>
 
 #include "oneapi/tbb/concurrent_hash_map.h"
 #include "oneapi/tbb/concurrent_vector.h"
@@ -44,7 +45,9 @@ namespace metadata {
 
             typedef struct SubRequestStruct {
                 int i;
-                std::atomic<int> num_current_waits;
+                std::string sub_rid;
+                // does not need to be atomic since it is always acquired the subrequests lock
+                int num_current_waits;
 
                 std::atomic<int> next_sub_rid_index;
                 std::atomic<int> opened_branches;
@@ -61,7 +64,7 @@ namespace metadata {
             // <sub_rid, sub_request_ptr>
             oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _sub_requests;
             // <sub_rid, num_current_waits>
-            std::map<std::string, int> _wait_logs;
+            std::unordered_set<SubRequest*> _wait_logs;
 
             /* ------- */
             /* helpers */
@@ -101,9 +104,6 @@ namespace metadata {
             // sub requests
             std::shared_mutex _mutex_subrequests;
             std::condition_variable_any _cond_subrequests;
-            // log wait requests
-            std::shared_mutex _mutex_wait_logs;
-            std::condition_variable _cond_wait_logs;
 
 
             /**
