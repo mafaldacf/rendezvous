@@ -182,9 +182,13 @@ std::pair<std::string, std::string> Server::parseFullId(const std::string& full_
 
   // FORMAT: <primary_id>:<secondary_id>
   if (delimiter_pos != std::string::npos) {
-    primary_id = full_id.substr(delimiter_pos+1);
-    secondary_id = full_id.substr(0, delimiter_pos);
+    primary_id = full_id.substr(0, delimiter_pos);
+    secondary_id = full_id.substr(delimiter_pos+1);
   }
+
+  // force to be zero if empty
+  if (secondary_id.empty()) secondary_id = "0";
+
   return std::make_pair(primary_id, secondary_id);
 }
 
@@ -237,16 +241,6 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
   _requests.insert({rid, request});
   return request;
-}
-
-// testing purposes
-std::string Server::registerBranchRegion(metadata::Request * request, const std::string& service, const std::string& region, 
-const std::string& tag, std::string bid) {
-  utils::ProtoVec regions;
-  if (!region.empty()) {
-    regions.Add(region.c_str());
-  }
-  return registerBranch(request, "", service, regions, tag, "", true, bid);
 }
 
 // ---------------------

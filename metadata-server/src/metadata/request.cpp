@@ -113,13 +113,13 @@ metadata::Branch * Request::registerBranch(const std::string& sub_rid, const std
 
     // branch with specified regions
     if (num > 0) {
-        branch = new metadata::Branch(service, tag, regions);
+        branch = new metadata::Branch(service, tag, sub_rid, regions);
     }
 
     // no region specified - global region
     else {
         num = 1;
-        branch = new metadata::Branch(service, tag);
+        branch = new metadata::Branch(service, tag, sub_rid);
     }
     _branches[bid] = branch;
     lock.unlock();
@@ -140,19 +140,26 @@ int Request::closeBranch(const std::string& sub_rid, const std::string& bid, con
     std::unique_lock<std::mutex> lock(_mutex_branches);
     bool region_found = true;
     auto branch_it = _branches.find(bid);
-    // not found
-    if (branch_it == _branches.end()) {
-        return 0;
-    }
 
+    // branch not found
+    if (branch_it == _branches.end()) {
+        return -1;
+    }
     metadata::Branch * branch = branch_it->second;
-    const std::string& service = branch->getService();
-    const std::string& tag = branch->getTag();
+
+    // error propagating/parsing ids
+    if (branch->getSubRid() != sub_rid) {
+        return -1;
+    }
 
     int r = branch->close(region);
     bool globally_closed = branch->isClosed();
     lock.unlock();
     if (r == 1) {
+        const std::string& service = branch->getService();
+        const std::string& tag = branch->getTag();
+
+        // error in sub_requests tbb map
         if (!untrackBranch(sub_rid, service, region, globally_closed)) {
             r = -1;
         }
@@ -258,7 +265,9 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     if (_service_nodes.count(prev_service) == 0) {
         return false;
     }
+
     // create new node if service does not exist yet
+    // SERVICES CANNOT HAVE EMPTY NAME otherwise we create a loop when adding parent
     if (_service_nodes.count(service) == 0) {
         _service_nodes[service] = new ServiceNode({service});
     }

@@ -18,6 +18,7 @@ namespace metadata {
         private:
             const std::string _service;
             const std::string _tag;
+            const std::string _sub_rid;
 
             // region status with key: <region>, value: <status>
             std::unordered_map<std::string, int> _regions;
@@ -28,12 +29,18 @@ namespace metadata {
 
 
         public:
-            Branch(std::string service, std::string tag, std::string region);
-            Branch(std::string service, std::string tag, const utils::ProtoVec& vector_regions);
-            Branch(std::string service, std::string tag);
+            Branch(std::string service, std::string tag, std::string sub_rid, const utils::ProtoVec& vector_regions);
+            Branch(std::string service, std::string tag, std::string sub_rid);
 
             /**
-             * Get the branche's tag
+             * Get the branch's sub_rid
+             * 
+             * @return sub_rid
+             */
+            std::string getSubRid();
+
+            /**
+             * Get the branch's tag
              * 
              * @return bid
              */

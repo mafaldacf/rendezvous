@@ -2,15 +2,8 @@
 
 using namespace metadata;
 
-Branch::Branch(std::string service, std::string tag, std::string region)
-    : _service(service), _tag(tag) {
-        _regions = std::unordered_map<std::string, int>();
-        _regions[region] = OPENED;
-        _num_opened_regions = 1;
-    }
-
-Branch::Branch(std::string service, std::string tag, const utils::ProtoVec& vector_regions)
-    : _service(service), _tag(tag) {
+Branch::Branch(std::string service, std::string tag, std::string sub_rid, const utils::ProtoVec& vector_regions)
+    : _service(service), _tag(tag), _sub_rid(sub_rid) {
         _regions = std::unordered_map<std::string, int>();
         for (const auto& region : vector_regions) {
             _regions[region] = OPENED;
@@ -18,13 +11,17 @@ Branch::Branch(std::string service, std::string tag, const utils::ProtoVec& vect
         _num_opened_regions = vector_regions.size();
     }
 
-Branch::Branch(std::string service, std::string tag)
-    : _service(service), _tag(tag) {
+Branch::Branch(std::string service, std::string tag, std::string sub_rid)
+    : _service(service), _tag(tag), _sub_rid(sub_rid) {
         _regions = std::unordered_map<std::string, int>();
 
         _regions[GLOBAL_REGION] = OPENED;
         _num_opened_regions = 1;
     }
+
+std::string Branch::getSubRid() {
+    return _sub_rid;
+}
 
 std::string Branch::getTag() {
     return _tag;

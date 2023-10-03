@@ -207,8 +207,11 @@ namespace metadata {
              * @param sub_rid Current subrequest
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region The region where the branch was registered
-             * 
-             * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
+
+             * @return one of three values:
+             * - 1 if branch was closed
+             * - 0 if branch was already closed before
+             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
              */
             int closeBranch(const std::string& sub_rid, const std::string& bid, const std::string& region);
 

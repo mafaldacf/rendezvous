@@ -169,18 +169,6 @@ namespace rendezvous {
             metadata::Request * getOrRegisterRequest(std::string rid);
 
             /**
-             * Register a new branch for a region
-             * 
-             * @param request Request where the branch is registered
-             * @param service The service context
-             * @param region The region context
-             * @param tag The service tag
-             * @param bid The set of branches identifier: empty if request is from client
-             * @return The new branch identifiers or empty if an error ocurred (branches already exist with bid)
-             */
-            std::string registerBranchRegion(metadata::Request * request, const std::string& service, 
-                const std::string& region, const std::string& tag, std::string bid = "");
-            /**
              * Register new branch for a given request
              * 
              * @param request Request where the branch is registered
@@ -208,7 +196,10 @@ namespace rendezvous {
              * @param region Region where branch was registered
              * @param service Service where branch was registered
              * @param force Force waiting until branch is registered
-             * @return 1 if branch was closed, 0 if branch was not found and -1 if regions does not exist
+             * @return one of three values:
+             * - 1 if branch was closed
+             * - 0 if branch was already closed before
+             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
              */
             int closeBranch(metadata::Request * request, const std::string& sub_rid, 
                 const std::string& bid, const std::string& region, bool force = false);
