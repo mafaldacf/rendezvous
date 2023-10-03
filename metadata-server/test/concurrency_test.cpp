@@ -22,8 +22,10 @@ TEST(ConcurrencyTest, CloseBranchBeforeRegister) {
     ASSERT_EQ(true, found_region);
   });
 
-  std::string bid = server.registerBranchRegion(request, "service", "region", TAG);
-  ASSERT_EQ(getBid(0), bid);
+  utils::ProtoVec regions;
+  regions.Add("region");
+  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, TAG, "");
+  ASSERT_EQ(getBid(0), bid_0);
 
   // sanity check - wait threads
   for(auto& thread : threads) {
@@ -49,8 +51,10 @@ TEST(ConcurrencyTest, WaitRequest_ContextNotFound) {
   status = server.wait(request, ROOT_SUB_RID, "wrong_service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  std::string bid = server.registerBranchRegion(request, "service", "region", TAG); // bid = 0
-  ASSERT_EQ(getBid(0), bid);
+  utils::ProtoVec regions;
+  regions.Add("region");
+  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, TAG, "");
+  ASSERT_EQ(getBid(0), bid_0);
 
   status = server.wait(request, ROOT_SUB_RID, "service", "wrong_region");
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
@@ -66,8 +70,10 @@ TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_EQ(RID, request->getRid());
 
-  std::string bid =  server.registerBranchRegion(request, "service", "region", EMPTY_TAG);
-  ASSERT_EQ(getBid(0), bid);
+  utils::ProtoVec regions;
+  regions.Add("region");
+  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
+  ASSERT_EQ(getBid(0), bid_0);
 
   status = server.wait(request, ROOT_SUB_RID, "service", "region", EMPTY_TAG, "", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
@@ -115,7 +121,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   // now we do the same for for an async branch
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
-  ASSERT_EQ(SUB_RID, next_sub_rid);
+  ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec regions_empty;
   std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "dummy-service", regions_empty, "", "");
   ASSERT_EQ(getBid(1), bid_1);
@@ -124,7 +130,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   utils::ProtoVec regions2;
   regions2.Add("AP");
-  std::string bid_2 = server.registerBranch(request, SUB_RID, "new-service", regions2, "tag", "");
+  std::string bid_2 = server.registerBranch(request, SUB_RID_0, "new-service", regions2, "tag", "");
   ASSERT_EQ(getBid(2), bid_2);
 
   sleep(0.2);
@@ -142,12 +148,12 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   sleep(0.2);
 
-  found_region = server.closeBranch(request, SUB_RID, getBid(2), "AP");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), "AP");
   ASSERT_EQ(1, found_region);
 
   // try for GLOBAL branch
   utils::ProtoVec regions_empty2;
-  std::string bid_3 = server.registerBranch(request, SUB_RID, "new-service", regions_empty2, "tag2", "");
+  std::string bid_3 = server.registerBranch(request, SUB_RID_0, "new-service", regions_empty2, "tag2", "");
   ASSERT_EQ(getBid(3), bid_3);
 
   sleep(0.2);
@@ -167,7 +173,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   sleep(0.2);
 
-  found_region = server.closeBranch(request, SUB_RID, getBid(3), "");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(3), "");
   ASSERT_EQ(1, found_region);
 
   // wait for all threads
@@ -209,21 +215,21 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   // -----------------------------------------------------
   // but we can wait if we are in an async zone
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
-  ASSERT_EQ(SUB_RID, next_sub_rid);
+  ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   // this branch is ignored 
-  std::string bid_1 = server.registerBranch(request, SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
+  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
   sleep(0.4);
   // we do a global wait (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   sleep(0.2);
   // we do a wait on region1 (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID, "", "region1", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "region1", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   // -----------------------------------------------------
@@ -231,7 +237,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   sleep(1);
   found_region = server.closeBranch(request, ROOT_SUB_RID, getBid(0), "region1"); // bid 0
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID, getBid(1), ""); // bid 0
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), ""); // bid 0
   ASSERT_EQ(1, found_region);
 
   // wait for all threads
@@ -254,7 +260,7 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   // ASYNC ZONES:
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
-  ASSERT_EQ(SUB_RID, next_sub_rid);
+  ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
@@ -265,24 +271,24 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
   // we timeout
-  status = server.wait(request, SUB_RID, "", "", "", "", false, 1);
+  status = server.wait(request, SUB_RID_0, "", "", "", "", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
   utils::ProtoVec emptyRegion;
-  std::string bid_1 = server.registerBranch(request, SUB_RID, "service0", emptyRegion, EMPTY_TAG, "");
+  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "service0", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
 
-  std::string bid_2 = server.registerBranch(request, SUB_RID, "service1", emptyRegion, EMPTY_TAG, "");
+  std::string bid_2 = server.registerBranch(request, SUB_RID_0, "service1", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(2), bid_2);
 
   utils::ProtoVec region1;
   region1.Add("region1");
-  std::string bid_3 = server.registerBranch(request, SUB_RID, "service0", region1, EMPTY_TAG, "");
+  std::string bid_3 = server.registerBranch(request, SUB_RID_0, "service0", region1, EMPTY_TAG, "");
   ASSERT_EQ(getBid(3), bid_3);
 
   utils::ProtoVec region2;
   region2.Add("region2");
-  std::string bid_4 = server.registerBranch(request, SUB_RID, "service2", region2, EMPTY_TAG, "");
+  std::string bid_4 = server.registerBranch(request, SUB_RID_0, "service2", region2, EMPTY_TAG, "");
   ASSERT_EQ(getBid(4), bid_4);
 
   threads.emplace_back([&server, request] {
@@ -314,7 +320,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   
 
   sleep(1);
-  found_region = server.closeBranch(request, SUB_RID, getBid(1), ""); // bid 0
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(1), ""); // bid 0
   ASSERT_EQ(1, found_region);
 
   // must only check previous service (service0) which is closed
@@ -332,28 +338,28 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   sleep(1);
 
-  found_region = server.closeBranch(request, SUB_RID, getBid(2), ""); // bid 1
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(2), ""); // bid 1
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID, getBid(3), "region1"); // bid 2
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(3), "region1"); // bid 2
   ASSERT_EQ(1, found_region);
 
   int found = server.closeBranch(request, "invalid sub rid", getBid(3), "region1"); // bid 2
-  ASSERT_EQ(0, found);
+  ASSERT_EQ(-1, found);
 
   // Sanity Check - ensure that locks still work
   utils::ProtoVec region_EU;
   region_EU.Add("EU");
-  std::string bid_5 = server.registerBranch(request, SUB_RID, "storage", region_EU, EMPTY_TAG, "");
+  std::string bid_5 = server.registerBranch(request, SUB_RID_0, "storage", region_EU, EMPTY_TAG, "");
   ASSERT_EQ(getBid(5), bid_5);
 
   utils::ProtoVec region_US;
   region_US.Add("US");
-  std::string bid_6 = server.registerBranch(request, SUB_RID, "storage", region_US, EMPTY_TAG, "");
+  std::string bid_6 = server.registerBranch(request, SUB_RID_0, "storage", region_US, EMPTY_TAG, "");
   ASSERT_EQ(getBid(6), bid_6);
 
   utils::ProtoVec region_GLOBAL;
   region_GLOBAL.Add("GLOBAL");
-  std::string bid_7 = server.registerBranch(request, SUB_RID, "notification", region_GLOBAL, "tagC", "");
+  std::string bid_7 = server.registerBranch(request, SUB_RID_0, "notification", region_GLOBAL, "tagC", "");
   ASSERT_EQ(getBid(7), bid_7);
 
   threads.emplace_back([&server, request] {
@@ -382,13 +388,13 @@ TEST(ConcurrencyTest, WaitRequest) {
 
   sleep(1);
 
-  found_region = server.closeBranch(request, SUB_RID, getBid(4), "region2");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(4), "region2");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID, getBid(5), "EU");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(5), "EU");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID, getBid(6), "US");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(6), "US");
   ASSERT_EQ(1, found_region);
-  found_region = server.closeBranch(request, SUB_RID, getBid(7), "GLOBAL");
+  found_region = server.closeBranch(request, SUB_RID_0, getBid(7), "GLOBAL");
   ASSERT_EQ(1, found_region);
   
   // wait for all threads
