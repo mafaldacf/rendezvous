@@ -22,6 +22,7 @@
 #include <sstream>
 #include <thread>
 #include <unordered_set>
+#include <stack>
 
 #include "oneapi/tbb/concurrent_hash_map.h"
 #include "oneapi/tbb/concurrent_vector.h"
@@ -36,7 +37,7 @@ namespace metadata {
             typedef struct ServiceNodeStruct {
                 std::string name;
                 int opened_global_region;
-                int num_opened_branches;
+                int opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
                 struct ServiceNodeStruct * parent;
@@ -46,7 +47,7 @@ namespace metadata {
             typedef struct SubRequestStruct {
                 int i;
                 std::string sub_rid;
-                // does not need to be atomic since it is always acquired the subrequests lock
+                // protected by sub_requests mutex
                 int num_current_waits;
 
                 std::atomic<int> next_sub_rid_index;
@@ -97,10 +98,10 @@ namespace metadata {
             std::mutex _mutex_branches;
             std::mutex _mutex_regions;
             // service nodes
-            std::mutex _mutex_service_nodes;
-            std::condition_variable _cond_service_nodes;
+            std::shared_mutex _mutex_service_nodes;
+            std::condition_variable_any _cond_service_nodes;
             // service nodes -- wait with async option
-            std::condition_variable _cond_new_service_nodes;
+            std::condition_variable_any _cond_new_service_nodes;
             // sub requests
             std::shared_mutex _mutex_subrequests;
             std::condition_variable_any _cond_subrequests;

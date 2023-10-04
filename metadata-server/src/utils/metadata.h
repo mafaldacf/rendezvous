@@ -3,7 +3,7 @@
 
 #include <string>
 #include <map>
-#include <vector>
+#include <set>
 
 namespace utils {
 
@@ -23,7 +23,8 @@ namespace utils {
     /* ------------------------------------ */
     typedef struct DependenciesStruct {
         int res;
-        std::vector<std::string> deps;
+        std::set<std::string> deps;
+        std::set<std::string> indirect_deps;
     } Dependencies;
     
     /* --------------*/
@@ -34,6 +35,7 @@ namespace utils {
     const int UNKNOWN = 2;
 
     // helper for errors
+    const int OK = 0;
     const int INVALID_SERVICE = -2;
     const int INVALID_CONTEXT = -3;
 }

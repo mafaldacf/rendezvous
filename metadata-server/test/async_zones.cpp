@@ -138,12 +138,12 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   std::string bid_3 = server.registerBranch(request, SUB_RID_1, "notifier", regions_empty, "", "");
   ASSERT_EQ(getBid(3), bid_3);
 
-  // register post-storage async branch for write post operation
+  // register notifier async branch for write notification operation
   std::string sub_rid_1_0 = server.addNextSubRequest(request, SUB_RID_1);
   ASSERT_EQ(SUB_RID_1_0, sub_rid_1_0);
   utils::ProtoVec regions_notifier;
   regions_notifier.Add("US");
-  std::string bid_4 = server.registerBranch(request, SUB_RID_1, "notifier", regions_notifier, "", "");
+  std::string bid_4 = server.registerBranch(request, SUB_RID_1_0, "notifier", regions_notifier, "", "");
   ASSERT_EQ(getBid(4), bid_4);
 
   // do wait call on notifier
@@ -153,13 +153,17 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
     int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
-  sleep(0.5);
+  sleep(1);
+
+  // check status call by compose-post
+  utils::Status res = server.checkStatus(request, ROOT_SUB_RID, "", "");
+  ASSERT_EQ(OPENED, res.status);
 
   // close all branches for compose-post
   found_region = server.closeBranch(request, getBid(0), "");
   ASSERT_EQ(1, found_region);
 
-  // close all branches for post-storage
+  // close main branche for post-storage
   found_region = server.closeBranch(request, getBid(1), "");
   ASSERT_EQ(1, found_region);
 
@@ -169,13 +173,37 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
     int status = server.wait(request, SUB_RID_1, "", "INVALID REGION", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
-  sleep(0.5);
+  sleep(1);
 
   // close all branches for write-post operation in post-storage
   found_region = server.closeBranch(request, getBid(2), "EU");
   ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, getBid(2), "US");
   ASSERT_EQ(1, found_region);
+
+  // check status call by post-storage
+  res = server.checkStatus(request, SUB_RID_0, "", "");
+  ASSERT_EQ(OPENED, res.status);
+
+  // check status call by compose-post
+  res = server.checkStatus(request, ROOT_SUB_RID, "notifier", "");
+  ASSERT_EQ(OPENED, res.status);
+  res = server.checkStatus(request, ROOT_SUB_RID, "", "");
+  ASSERT_EQ(OPENED, res.status);
+
+  // check status call by notifier
+  // we still have one async notifier branch opened
+  res = server.checkStatus(request, SUB_RID_1, "", "");
+  ASSERT_EQ(OPENED, res.status);
+
+  // close notification operation branch
+  found_region = server.closeBranch(request, getBid(4), "US");
+  ASSERT_EQ(1, found_region);
+
+  // check status call by notifier
+  // only one branch left opened (the main branch for the identifier) which we ignore
+  res = server.checkStatus(request, SUB_RID_1, "", "");
+  ASSERT_EQ(CLOSED, res.status);
 
   // wait for all threads
   for(auto& thread : threads) {

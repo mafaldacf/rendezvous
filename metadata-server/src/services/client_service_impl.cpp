@@ -429,8 +429,14 @@ grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context,
   }
 
   for (const auto& dep: result.deps) {
-    response->add_dependencies(dep);
+    response->add_deps(dep);
   }
+
+  // only used when service is specified
+  for (const auto& indirect_dep: result.indirect_deps) {
+    response->add_indirect_deps(indirect_dep);
+  }
+  
 
   return grpc::Status::OK;
 }

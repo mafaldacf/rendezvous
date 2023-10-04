@@ -133,5 +133,6 @@ message FetchDependenciesMessage {
 }
 
 message FetchDependenciesResponse {
-  repeated string dependencies = 1;
+  repeated string deps = 1;
+  repeated string indirect_deps = 2;
 }

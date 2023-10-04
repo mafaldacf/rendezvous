@@ -178,12 +178,12 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
     // ---------------------------
-    std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
+    std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
     // decrease opened branches in all direct parents (start with the current one)
     if (region.empty()) {
         for (ServiceNode * parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
             // by default, empty region means global region => we can decrement the entire branch
-            parent_node->num_opened_branches--;
+            parent_node->opened_branches--;
             parent_node->opened_global_region--;
 
         }
@@ -191,7 +191,7 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     else {
         for (ServiceNode * parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
             if (globally_closed) {
-                parent_node->num_opened_branches--;
+                parent_node->opened_branches--;
             }
             parent_node->opened_regions[region]--;
 
@@ -264,7 +264,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
     // ---------------------------
-    std::unique_lock<std::mutex> lock_services(_mutex_service_nodes);
+    std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
     
     // ABORT: prev service does not exist - error propagating context by client
     if (_service_nodes.count(prev_service) == 0) {
@@ -299,7 +299,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     if (regions.size() > 0) {
         // increment REGIONS in all direct parents
         for (parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            parent_node->num_opened_branches++;
+            parent_node->opened_branches++;
             for (const auto& region: regions) {
                 parent_node->opened_regions[region]++;
             }
@@ -309,7 +309,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     else {
         // increment GLOBAL REGION in all direct parents
         for (parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            parent_node->num_opened_branches++;
+            parent_node->opened_branches++;
             parent_node->opened_global_region++;
         }
     }
@@ -520,7 +520,7 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
                 break;
             }
             // wait for branch
-            while ((*it)->num_opened_branches != 0) {
+            while ((*it)->opened_branches != 0) {
                 _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
                 inconsistency = 1;
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -665,7 +665,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
     // --------------
     // CONTEXT CHECKS
@@ -709,7 +709,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     }
     // overall service
     else {
-        int * num_branches_ptr = &(_service_nodes[service]->num_opened_branches);
+        int * num_branches_ptr = &(_service_nodes[service]->opened_branches);
         while (*num_branches_ptr != 0) {
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
@@ -728,7 +728,7 @@ const::std::string& tag, bool async, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
     // --------------
     // CONTEXT CHECKS
@@ -840,7 +840,7 @@ utils::Status Request::checkStatus(const std::string& sub_rid, const std::string
             // - return OPENED if at least one branch is opened
             // - otherwise, we keep iterating to make sure every branch is CLOSED
             // ------------------
-            if ((*it)->num_opened_branches != 0) {
+            if ((*it)->opened_branches != 0) {
                 res.status = OPENED;
                 return res;
             }
@@ -940,7 +940,7 @@ utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::
 
 utils::Status Request::checkStatusService(const std::string& service, bool detailed) {
     utils::Status res;
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    std::shared_lock<std::shared_mutex>lock(_mutex_service_nodes);
 
     // find out if service context exists
     if (_service_nodes.count(service) == 0) {
@@ -949,7 +949,7 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
     }
     
     // get overall status of request
-    if (_service_nodes[service]->num_opened_branches == 0) {
+    if (_service_nodes[service]->opened_branches == 0) {
         res.status = CLOSED;
     } else {
         res.status = OPENED;
@@ -973,7 +973,7 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
 }
 
 utils::Status Request::checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
     utils::Status res;
 
     // find out if service context exists
@@ -1008,9 +1008,9 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
 }
 
 utils::Dependencies Request::fetchDependencies(const std::string& prev_service) {
-    utils::Dependencies result {0};
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    // find out if context is valid
+    utils::Dependencies result {OK};
+    std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
+    /* // find out if context is valid
     if (_service_nodes.count(prev_service) == 0) {
         result.res = INVALID_CONTEXT;
         return result;
@@ -1018,22 +1018,51 @@ utils::Dependencies Request::fetchDependencies(const std::string& prev_service) 
     // get children nodes of current service
     for (auto it = _service_nodes[prev_service]->children.begin(); it != _service_nodes[prev_service]->children.end(); ++it) {
         result.deps.emplace_back((*it)->name);
+    } */
+
+    for (auto it = _service_nodes.begin(); it != _service_nodes.end(); it++) {
+        if (it->second->opened_branches > 0) {
+            result.deps.insert(it->first);
+        }
     }
+
     return result;
 }
 
 utils::Dependencies Request::fetchDependenciesService(const std::string& service) {
     utils::Dependencies result {0};
-    std::unique_lock<std::mutex> lock(_mutex_service_nodes);
+    std::stack<std::string> lookup_deps;
+    std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
     if (_service_nodes.count(service) == 0) {
         result.res = INVALID_SERVICE;
         return result;
     }
 
-    // get children nodes of current service
+    // get direct children nodes of current service
     for (auto it = _service_nodes[service]->children.begin(); it != _service_nodes[service]->children.end(); ++it) {
-        result.deps.emplace_back((*it)->name);
+        const std::string& curr_service = (*it)->name;
+        result.deps.insert(curr_service);
+
+        // store indirect (deph 1) dependencies
+        for (auto children_it = _service_nodes[curr_service]->children.begin(); children_it != _service_nodes[curr_service]->children.end(); children_it++) {
+            lookup_deps.push((*children_it)->name);
+        }
     }
+
+    // get all indirect nodes
+    while (lookup_deps.size() != 0) {
+        const std::string& curr_service = lookup_deps.top();
+        lookup_deps.pop();
+
+        // first children lookup for this service
+        if (result.indirect_deps.count(curr_service) == 0) {
+            for (auto children_it = _service_nodes[curr_service]->children.begin(); children_it != _service_nodes[curr_service]->children.end(); children_it++) {
+                lookup_deps.push((*children_it)->name);
+            }
+        }
+        result.indirect_deps.insert(curr_service);
+    }
+
     return result;
 }
