@@ -44,6 +44,8 @@ namespace metadata {
                 std::list<struct ServiceNodeStruct*> children;
             } ServiceNode;
 
+        // public for testing purposes
+        public:
             typedef struct SubRequestStruct {
                 int i;
                 std::string sub_rid;
@@ -114,32 +116,48 @@ namespace metadata {
              * @param start_time
             */
             std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
+            
+        // public for testing purposes
+        public:
+            /**
+            * Verify that given sub_rid exists
+            * 
+            * @param sub_rid The sub request identifier
+            * @return return pointer to SubRequest if found and nullptr otherwise
+            */
+            SubRequest *  _validateSubRid(const std::string& sub_rid);
 
             /**
              * Add current sub request to wait logs
              * 
-             * @param sub_rid The current sub request identifier
              * @param subrequest The current sub request
             */
-            void _addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest);
+            void _addToWaitLogs(SubRequest* subrequest);
 
             /**
              * Remove current sub request from wait logs
              * 
-             * @param sub_rid The current sub request identifier
              * @param subrequest The current sub request
             */
-            void _removeFromWaitLogs(const std::string& sub_rid, SubRequest* subrequest);
+            void _removeFromWaitLogs(SubRequest* subrequest);
+
+            /**
+             * Check if first async zone precedes second async zone
+             * 
+             * @param subrequest_1 Subrequest ptr for the first async zone
+             * @param subrequest_2 Subrequest ptr for the second async zone
+             * @return true if first async zone precedes second and false otherwise
+            */
+            bool _isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subrequest_2);
 
             /**
              * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
              * (used to be ignored in the wait call)
              * 
-             * @param sub_rid The current sub request identifier
              * @param subrequest The current sub request
              * @return vector of all preceding sub rids
             */
-            std::vector<std::string> _getPrecedingWaitLogsEntries(const std::string& sub_rid, SubRequest* subrequest);
+            std::vector<std::string> _getPrecedingAsyncZones(SubRequest* subrequest);
 
             /**
              * Get number of opened branches for all preceding sub requests
@@ -147,7 +165,7 @@ namespace metadata {
              * @param sub_rids Vector of all preceding sub requests identifiers
              * @return number of opened branches
             */
-            int _openedBranchesPrecedingSubRids(const std::vector<std::string>& sub_rids);
+            int _numOpenedBranchesAsyncZones(const std::vector<std::string>& sub_rids);
 
             /**
              * Get number of opened branches for all preceding sub requests in current region and global region
@@ -156,7 +174,7 @@ namespace metadata {
              * @param region Targeted region
              * @return pair for number of opened branches with format: <global region, targeted region>
             */
-            std::pair<int, int> _openedBranchesRegionPrecedingSubRids(
+            std::pair<int, int> _numOpenedRegionsAsyncZones(
                 const std::vector<std::string>& sub_rids, const std::string& region);
 
         public:

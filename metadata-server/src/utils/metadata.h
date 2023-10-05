@@ -7,11 +7,17 @@
 
 namespace utils {
 
+    /* ------------------------ */
+    /* parsing/formating of IDs */
+    /*     (subrids, bids)      */
+    /* ------------------------ */
+    static int SIZE_SIDS = 1;
     static const char FULL_ID_DELIMITER = ':';
+    static std::string ROOT_ASYNC_ZONE_ID = "r";
 
     /* ------------------------------ */
     /* helper for CheckStatus request */
-    /* ------------------------------- */
+    /* ------------------------------ */
     typedef struct StatusStruct {
         int status;
         std::map<std::string, int> tagged;

@@ -1,4 +1,5 @@
 #include "server.h"
+#include "utils/metadata.h"
 
 using namespace rendezvous;
 
@@ -10,16 +11,19 @@ Server::Server(std::string sid, json settings)
     _cleanup_subscribers_validity_m(settings["cleanup_subscribers_validity_m"].get<int>()),
     _subscribers_refresh_interval_s(settings["subscribers_refresh_interval_s"].get<int>()),
     _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
+
+    utils::SIZE_SIDS = sid.size();
     
-    spdlog::info("------------------------------------------------------");
-    spdlog::info("- Garbage Collector Info (minutes):");
-    spdlog::info("\t - Requests interval: {}", _cleanup_requests_interval_m);
-    spdlog::info("\t - Requests validity: {}", _cleanup_requests_validity_m);
-    spdlog::info("\t - Subscribers interval: {}", _cleanup_subscribers_interval_m);
-    spdlog::info("\t - Subscribers validity: {}", _cleanup_subscribers_validity_m);
-    spdlog::info("- Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
-    spdlog::info("- Wait replica timeout: {} seconds", _wait_replica_timeout_s);
-    spdlog::info("------------------------------------------------------");
+    spdlog::info("----------------------- SETTINGS ---------------------\n");
+    spdlog::info("> SIDs' size: {} chars", utils::SIZE_SIDS);
+    spdlog::info("> Garbage Collector Info (minutes):");
+    spdlog::info("\t >> Requests interval: {}", _cleanup_requests_interval_m);
+    spdlog::info("\t >> Requests validity: {}", _cleanup_requests_validity_m);
+    spdlog::info("\t >> Subscribers interval: {}", _cleanup_subscribers_interval_m);
+    spdlog::info("\t >> Subscribers validity: {}", _cleanup_subscribers_validity_m);
+    spdlog::info("> Subscribers max wait time: {} seconds", _subscribers_refresh_interval_s);
+    spdlog::info("> Wait replica timeout: {} seconds", _wait_replica_timeout_s);
+    spdlog::info("\n------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
@@ -35,6 +39,7 @@ Server::Server(std::string sid)
     _subscribers_refresh_interval_s(60),
     _wait_replica_timeout_s(60) {
     
+    utils::SIZE_SIDS = sid.size();
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
 }
@@ -188,7 +193,7 @@ std::pair<std::string, std::string> Server::parseFullId(const std::string& full_
   // cannot happen when parsing branch identifiers
   else {
     primary_id = full_id;
-    secondary_id = "r";
+    secondary_id = utils::ROOT_ASYNC_ZONE_ID;
   }
 
   return std::make_pair(primary_id, secondary_id);

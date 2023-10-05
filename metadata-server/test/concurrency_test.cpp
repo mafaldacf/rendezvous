@@ -127,13 +127,10 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   ASSERT_EQ(getBid(1), bid_1);
   // -----------------------
 
-
   utils::ProtoVec regions2;
   regions2.Add("AP");
   std::string bid_2 = server.registerBranch(request, SUB_RID_0, "new-service", regions2, "tag", "");
   ASSERT_EQ(getBid(2), bid_2);
-
-  sleep(0.2);
   
   threads.emplace_back([&server, request] {
     int status = server.wait(request, ROOT_SUB_RID, "", "AP", "", "", false, 5);
@@ -155,8 +152,6 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   utils::ProtoVec regions_empty2;
   std::string bid_3 = server.registerBranch(request, SUB_RID_0, "new-service", regions_empty2, "tag2", "");
   ASSERT_EQ(getBid(3), bid_3);
-
-  sleep(0.2);
 
   // we try for global region
   threads.emplace_back([&server, request] {

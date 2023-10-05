@@ -7,8 +7,104 @@
 
 // --------------
 // WAIT LOGS TEST
-// --------------
 
+/* --------------------------------------------
+NOTICE (1): here we test the for async zones and their wait calls with the following call graph:
+                r:a1:b1
+              /
+          r:a1
+        /     \
+      /        r:a1:b2
+    /
+  r 
+    \
+      r:c1
+          \
+            r:c1:d1
+
+Wait calls on:
+1. (r:a1:b2) need to detect (r:a1:b1) as preceding
+2. (r:a1:b2) need to detect (r:a1) as preceding
+3. (r:a1) cannot detect (r:a1:b1) as preceding
+3. (r:c1) need to detect (r:a1) as preceding
+4. (r:a1) cannot detect (r:c1) nor (r:c1-d1) as preceding
+5. (r:c1-d1) need to detect (r:a1:b1) as preceding EVEN IF IT WAS REGISTERED BEFORE!!!! 
+----------------------------------------------- */
+TEST(WaitLogsTest, PrecedingDetection) { 
+  std::vector<std::thread> threads;
+  rendezvous::Server server("a");
+  bool is_preceding;
+
+  utils::ProtoVec regions_empty;
+
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+  ASSERT_EQ(RID, request->getRid());
+
+  // register all async zones
+  std::string r_a1 = server.addNextSubRequest(request, "r:a1", false);
+  ASSERT_EQ("r:a1", r_a1);
+  std::string r_c1 = server.addNextSubRequest(request, "r:c1", false);
+  ASSERT_EQ("r:c1", r_c1);
+  std::string r_c1_d1 = server.addNextSubRequest(request, "r:c1:d1", false);
+  ASSERT_EQ("r:c1:d1", r_c1_d1);
+  std::string r_a1_b1 = server.addNextSubRequest(request, "r:a1:b1", false);
+  ASSERT_EQ("r:a1:b1", r_a1_b1);
+  std::string r_a1_b2 = server.addNextSubRequest(request, "r:a1:b2", false);
+  ASSERT_EQ("r:a1:b2", r_a1_b2);
+
+  // get root async zone
+  metadata::Request::SubRequest * subrequest_r = request->_validateSubRid(ROOT_SUB_RID);
+  ASSERT_TRUE(subrequest_r != nullptr);
+
+  // add to wait logs: async zone r:a1
+  metadata::Request::SubRequest * subrequest_r_a1 = request->_validateSubRid(r_a1);
+  ASSERT_TRUE(subrequest_r_a1 != nullptr);
+  request->_addToWaitLogs(subrequest_r_a1);
+
+  // add to wait logs: async zone r:c1
+  metadata::Request::SubRequest * subrequest_r_c1 = request->_validateSubRid(r_c1);
+  ASSERT_TRUE(subrequest_r_c1 != nullptr);
+  request->_addToWaitLogs(subrequest_r_c1);
+
+  // add to wait logs: async zone r:c1:d1
+  metadata::Request::SubRequest * subrequest_r_c1_d1 = request->_validateSubRid(r_c1_d1);
+  ASSERT_TRUE(subrequest_r_c1_d1 != nullptr);
+  request->_addToWaitLogs(subrequest_r_c1_d1);
+
+  // add to wait logs: async zone r:a1:b1
+  metadata::Request::SubRequest * subrequest_r_a1_b1 = request->_validateSubRid(r_a1_b1);
+  ASSERT_TRUE(subrequest_r_a1_b1 != nullptr);
+  request->_addToWaitLogs(subrequest_r_a1_b1);
+
+  // add to wait logs: async zone r:a1:b2
+  metadata::Request::SubRequest * subrequest_r_a1_b2 = request->_validateSubRid(r_a1_b2);
+  ASSERT_TRUE(subrequest_r_a1_b2 != nullptr);
+  request->_addToWaitLogs(subrequest_r_a1_b2);
+
+  // r:a1 is preceding of r:a1:b1 since it is its parent
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1, subrequest_r_a1_b1);
+  ASSERT_TRUE(is_preceding);
+
+  // now we test the opposite
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b2, subrequest_r_a1);
+  ASSERT_FALSE(is_preceding);
+
+  // test preceeding between neighboors r:a1:b1 and r:a1:b2
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b1, subrequest_r_a1_b2);
+  ASSERT_TRUE(is_preceding);
+
+  // r:c1 is always after r:a1:b1 and r:a1:b2 even if it was registered after
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b1, subrequest_r_c1);
+  ASSERT_TRUE(is_preceding);
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b2, subrequest_r_c1);
+  ASSERT_TRUE(is_preceding);
+
+  // r is always preceding of any other
+  is_preceding = request->_isPrecedingAsyncZone(subrequest_r, subrequest_r_c1);
+  ASSERT_TRUE(is_preceding);
+
+}
+// --------------
 
 /* --------------------------------------------
 NOTICE (1): here we force a HIDDEN EDGE CASE e.g.
@@ -100,7 +196,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.2);
+  sleep(0.5);
 
   // close all branches for post-storage
   found_region = server.closeBranch(request, getBid(1), "");

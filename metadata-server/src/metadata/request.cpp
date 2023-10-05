@@ -20,8 +20,8 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
 
     // insert the subrequest of the root
     tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
-    _sub_requests.insert(write_accessor, "r");
-    write_accessor->second = new SubRequest{0, "r"};
+    _sub_requests.insert(write_accessor, utils::ROOT_ASYNC_ZONE_ID);
+    write_accessor->second = new SubRequest{0, utils::ROOT_ASYNC_ZONE_ID};
 }
 
 Request::~Request() {
@@ -93,12 +93,22 @@ std::string Request::addNextSubRequest(const std::string& sid, const std::string
         next_sub_rid = sub_rid;
     }
 
-    // insert the next subrequest and return its id
-    tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
-    _sub_requests.insert(write_accessor, next_sub_rid);
-    write_accessor->second = new SubRequest{sub_requests_i.fetch_add(1), next_sub_rid};
+    // sanity check
+    if (next_sub_rid != utils::ROOT_ASYNC_ZONE_ID) {
+        // insert the next subrequest and return its id
+        tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
+        _sub_requests.insert(write_accessor, next_sub_rid);
+        write_accessor->second = new SubRequest{sub_requests_i.fetch_add(1), next_sub_rid};
+    }
 
     return next_sub_rid;
+}
+
+metadata::Request::SubRequest * Request::_validateSubRid(const std::string& sub_rid) {
+    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
+    bool found = _sub_requests.find(read_accessor, sub_rid);
+    if (found) return read_accessor->second;
+    return nullptr;
 }
 
 // ---------------------
@@ -214,14 +224,8 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     std::shared_lock<std::shared_mutex> lock_subrequests(_mutex_subrequests);
 
     if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-        bool found = _sub_requests.find(read_accessor, sub_rid);
-
-        // sanity check, should never happen
-        if (!found) return false;
-
-        SubRequest * subrequest = read_accessor->second;
-        read_accessor.release();
+        SubRequest * subrequest = _validateSubRid(sub_rid);
+        if (subrequest == nullptr) return false;
 
         if (globally_closed) {
             subrequest->opened_branches.fetch_add(-1);
@@ -266,10 +270,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     // ---------------------------
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
     
-    // ABORT: prev service does not exist - error propagating context by client
-    if (_service_nodes.count(prev_service) == 0) {
-        return false;
-    }
+    if (_service_nodes.count(prev_service) == 0) return false;
 
     // create new node if service does not exist yet
     // SERVICES CANNOT HAVE EMPTY NAME otherwise we create a loop when adding parent
@@ -322,16 +323,8 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     // SUBREQUEST
     // ----------
     if (!sub_rid.empty()) {
-        tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-        bool found = _sub_requests.find(read_accessor, sub_rid);
-
-        // sanity check >> should never happen
-        if (!found) {
-            return false;
-        }
-
-        SubRequest * subrequest = read_accessor->second;
-        read_accessor.release();
+        SubRequest * subrequest = _validateSubRid(sub_rid);
+        if (subrequest == nullptr) return false;
         subrequest->opened_branches.fetch_add(1);
 
         tbb::concurrent_hash_map<std::string, int>::accessor write_accessor;
@@ -378,7 +371,7 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
-void Request::_addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest) {
+void Request::_addToWaitLogs(SubRequest* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     // try to insert if not yet done
@@ -391,7 +384,7 @@ void Request::_addToWaitLogs(const std::string& sub_rid, SubRequest* subrequest)
     _cond_subrequests.notify_all();
 }
 
-void Request::_removeFromWaitLogs(const std::string& sub_rid, SubRequest* subrequest) {
+void Request::_removeFromWaitLogs(SubRequest* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     int n = --subrequest->num_current_waits;
@@ -400,19 +393,85 @@ void Request::_removeFromWaitLogs(const std::string& sub_rid, SubRequest* subreq
     }
 }
 
-std::vector<std::string> Request::_getPrecedingWaitLogsEntries(const std::string& sub_rid, SubRequest* subrequest) {
+// Examples of IDs: 
+// eu0:eu0 vs eu0:eu1
+// eu0:us0 vs eu0:ap0
+// eu0:eu0 vs eu0:eu0:eu0
+
+bool Request::_isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subrequest_2) {
+    std::vector<std::string> sub_zone(2), sid(2);
+    std::vector<size_t> local_pos(2), global_pos(2);
+    std::vector<std::string> id {subrequest_1->sub_rid, subrequest_2->sub_rid};
+    std::vector<int> idx {subrequest_1->i, subrequest_2->i};
+
+    // remove 'root' id
+    for (int i = 0; i < 2; i++) {
+        local_pos[i] = id[i].find(utils::FULL_ID_DELIMITER);
+        if (local_pos[i] != std::string::npos) {
+            id[i] = id[i].substr(local_pos[i] + 1);
+        }
+    }
+    
+    while (true) {
+        // reached the same async zone
+        // return false since branches within the same async zone are later ignored by default
+        if (local_pos[0] == std::string::npos && local_pos[1] == std::string::npos) return false;
+        // reached end of first zone
+        // first zone is the parent, so we want to ignore the first in the wait logic
+        else if (local_pos[0] == std::string::npos && local_pos[1] != std::string::npos) return true;
+        // reached end of second zone
+        // first zone is the child, so we want to include the first n the wait logic
+        else if (local_pos[0] != std::string::npos && local_pos[1] == std::string::npos) return false;
+
+        // parse id: <sid>:<sub_zone>:<remaining of next id>
+        // otherwise, we are at the end
+        for (int i = 0; i < 2; i++) {
+            local_pos[i] = id[i].find(utils::FULL_ID_DELIMITER, global_pos[i]);
+            sid[i] = id[i].substr(global_pos[i], utils::SIZE_SIDS);
+            if (local_pos[i] != std::string::npos) {
+                sub_zone[i] = id[i].substr(global_pos[i] + utils::SIZE_SIDS, local_pos[i] - utils::SIZE_SIDS);
+                global_pos[i] += local_pos[i] + 1;
+            }
+            else {
+                sub_zone[i] = id[i].substr(global_pos[i] + utils::SIZE_SIDS);
+            }
+        }
+
+        // if SIDs are different, compare by index of insertion of the DIRECT PARENT
+        if (sid[0] != sid[1]) {
+            std::string async_zone_parent_1 = id[0].substr(0, global_pos[0]);
+            std::string async_zone_parent_2 = id[1].substr(0, global_pos[1]);
+            SubRequest * sub_request_parent_1 = _validateSubRid(async_zone_parent_1);
+            SubRequest * sub_request_parent_2 = _validateSubRid(async_zone_parent_2);
+
+            // sanity check and return true to avoid any unwanted cycles
+            if (sub_request_parent_1 == nullptr || sub_request_parent_2 == nullptr) {
+                return true;
+            }
+            return sub_request_parent_1->i < sub_request_parent_2->i;
+        }
+
+        // compare by async zone id if they are different and SIDs are equal, otherwise we keep iterating for next zones
+        if (sub_zone[0] != sub_zone[1]) {
+            return sub_zone[0] < sub_zone[1];
+        }
+
+    }
+}
+
+std::vector<std::string> Request::_getPrecedingAsyncZones(SubRequest* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     std::vector<std::string> entries;
     for (const auto& entry: _wait_logs) {
-        if (entry->i < subrequest->i) {
+        if (_isPrecedingAsyncZone(entry, subrequest)) {
             entries.emplace_back(entry->sub_rid);
         }
     }
     return entries;
 }
 
-int Request::_openedBranchesPrecedingSubRids(const std::vector<std::string>& sub_rids) {
+int Request::_numOpenedBranchesAsyncZones(const std::vector<std::string>& sub_rids) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     int num = 0;
@@ -429,7 +488,7 @@ int Request::_openedBranchesPrecedingSubRids(const std::vector<std::string>& sub
     return num;
 }
 
-std::pair<int, int> Request::_openedBranchesRegionPrecedingSubRids(
+std::pair<int, int> Request::_numOpenedRegionsAsyncZones(
     const std::vector<std::string>& sub_rids, const std::string& region) {
     // REMINDER: the function that calls this method already acquires lock!
 
@@ -464,38 +523,27 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
     //           VALIDATIONS
     // -----------------------------------
 
-    // prev service does not exist - error propagating context by client
-    if (_service_nodes.count(prev_service) == 0) {
-        return -3;
-    }
+    if (_service_nodes.count(prev_service) == 0) return -3;
 
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-    bool found = _sub_requests.find(read_accessor, sub_rid);
-    // subrequest does not exist - error propagating rid by client
-    if (!found) {
-        return -4;
-    }
-
-    SubRequest * subrequest = read_accessor->second;
-    read_accessor.release();
-
+    SubRequest * subrequest = _validateSubRid(sub_rid);
+    if (subrequest == nullptr) return -4;
 
     // -----------------------------------
     //           CORE WAIT LOGIC
     // -----------------------------------
     std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
-    _addToWaitLogs(sub_rid, subrequest);
+    _addToWaitLogs(subrequest);
     while (true) {
         // get number of branches to ignore from preceding subrids in the wait logs
-        const auto& preceding_subrids = _getPrecedingWaitLogsEntries(sub_rid, subrequest);
-        int offset = _openedBranchesPrecedingSubRids(preceding_subrids);
+        const auto& preceding_subrids = _getPrecedingAsyncZones(subrequest);
+        int offset = _numOpenedBranchesAsyncZones(preceding_subrids);
 
         if (_num_opened_branches.load() - subrequest->opened_branches.load() - offset != 0) {
             _cond_subrequests.wait_for(lock, std::chrono::seconds(remaining_timeout));
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
-                _removeFromWaitLogs(sub_rid, subrequest);
+                _removeFromWaitLogs(subrequest);
                 return -1;
             }
         }
@@ -503,7 +551,7 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
             break;
         }
     }
-    _removeFromWaitLogs(sub_rid, subrequest);
+    _removeFromWaitLogs(subrequest);
 
     // -----------------------------------
     // TRANSVERSE DEPENDENCIES ALGORITHM:
@@ -547,10 +595,10 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
     //           VALIDATIONS
     // -----------------------------------
 
-    // prev service does not exist - error propagating context by client
-    if (_service_nodes.count(prev_service) == 0) {
-        return -3;
-    }
+    if (_service_nodes.count(prev_service) == 0) return -3;
+
+    SubRequest * subrequest = _validateSubRid(sub_rid);
+    if (subrequest == nullptr) return -4;
 
     std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
 
@@ -571,21 +619,11 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
         }
     }
 
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
-    bool found = _sub_requests.find(read_accessor_sr, sub_rid);
-    // subrequest does not exist - error propagating rid by client
-    if (!found) {
-        return -4;
-    }
-
-    SubRequest * subrequest = read_accessor_sr->second;
-    read_accessor_sr.release();
-
     // -----------------------------------
     //           CORE WAIT LOGIC
     // -----------------------------------
     tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
-    _addToWaitLogs(sub_rid, subrequest);
+    _addToWaitLogs(subrequest);
     while(true) {
         // get counters (region and globally, in terms of region) for current sub request
         int opened_sub_request_global_region = subrequest->opened_global_region.load();
@@ -593,8 +631,8 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
         int opened_sub_request_region = found ? read_accessor_num->second : 0;
 
         // get number of branches to ignore from preceding subrids in the wait logs
-        const auto& preceding_subrids = _getPrecedingWaitLogsEntries(sub_rid, subrequest);
-        std::pair<int, int> offset = _openedBranchesRegionPrecedingSubRids(preceding_subrids, region);
+        const auto& preceding_subrids = _getPrecedingAsyncZones(subrequest);
+        std::pair<int, int> offset = _numOpenedRegionsAsyncZones(preceding_subrids, region);
 
         if (_opened_global_region.load() - opened_sub_request_global_region - offset.first != 0 
             || _opened_regions[region] - opened_sub_request_region - offset.second != 0) {
@@ -604,7 +642,7 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
-                _removeFromWaitLogs(sub_rid, subrequest);
+                _removeFromWaitLogs(subrequest);
                 return -1;
             }
         }
@@ -612,7 +650,7 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
             break;
         }
     }
-    _removeFromWaitLogs(sub_rid, subrequest);
+    _removeFromWaitLogs(subrequest);
 
     // -----------------------------------
     // TRANSVERSE DEPENDENCIES ALGORITHM:
@@ -795,32 +833,16 @@ const::std::string& tag, bool async, int timeout) {
 }
 
 utils::Status Request::checkStatus(const std::string& sub_rid, const std::string& prev_service) {
-    utils::Status res {UNKNOWN};
+    if (_service_nodes.count(prev_service) == 0) return utils::Status {UNKNOWN};
 
-    // prev service does not exist - error propagating context by client
-    if (_service_nodes.count(prev_service) == 0) {
-        res.status = INVALID_CONTEXT;
-        return res;
-    }
-
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-    bool found = _sub_requests.find(read_accessor, sub_rid);
-    // subrequest does not exist - error propagating rid by client
-    if (!found) {
-        res.status = INVALID_CONTEXT;
-        return res;
-    }
-
-    SubRequest * subrequest = read_accessor->second;
-    read_accessor.release();
+    SubRequest * subrequest = _validateSubRid(sub_rid);
+    if (subrequest == nullptr) return utils::Status {INVALID_CONTEXT};
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
     if (_num_opened_branches.load() > subrequest->opened_branches.load()) {
-        res.status = OPENED;
+        return utils::Status {OPENED};
     }
-    else {
-        res.status = CLOSED;
-    }
+    return utils::Status {CLOSED};
 
     // -----------------------------------
     // TRANSVERSE DEPENDENCIES ALGORITHM:
@@ -848,22 +870,13 @@ utils::Status Request::checkStatus(const std::string& sub_rid, const std::string
         stop = parent;
         parent = parent->parent;
     } while (parent != nullptr); */
-
-    return res;
 }
 
 utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::string& region, const std::string& prev_service) {
     utils::Status res {UNKNOWN};
 
-    // prev service does not exist - error propagating context by client
-    if (_service_nodes.count(prev_service) == 0) {
-        res.status = INVALID_CONTEXT;
-        return res;
-    }
-
-    if (_opened_regions.count(region) == 0) {
-        return res;
-    }
+    if (_service_nodes.count(prev_service) == 0) return utils::Status {INVALID_CONTEXT};
+    if (_opened_regions.count(region) == 0) return utils::Status {UNKNOWN};
 
     tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
     bool found = _sub_requests.find(read_accessor_sr, sub_rid);
@@ -1030,15 +1043,12 @@ utils::Dependencies Request::fetchDependencies(const std::string& prev_service) 
 }
 
 utils::Dependencies Request::fetchDependenciesService(const std::string& service) {
-    utils::Dependencies result {0};
-    std::stack<std::string> lookup_deps;
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
-    if (_service_nodes.count(service) == 0) {
-        result.res = INVALID_SERVICE;
-        return result;
-    }
+    if (_service_nodes.count(service) == 0) return utils::Dependencies {INVALID_SERVICE};
 
+    utils::Dependencies result {0};
+    std::stack<std::string> lookup_deps;
     // get direct children nodes of current service
     for (auto it = _service_nodes[service]->children.begin(); it != _service_nodes[service]->children.end(); ++it) {
         const std::string& curr_service = (*it)->name;
