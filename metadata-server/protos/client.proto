@@ -102,8 +102,9 @@ message WaitRequestMessage {
   string region = 4;
   string tag = 5;
   int32 timeout = 6;
+  bool wait_deps = 7;
   //bool async = 6;
-  RequestContext context = 7;
+  RequestContext context = 8;
 }
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;

@@ -299,16 +299,16 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
 
 int Server::wait(metadata::Request * request, const std::string& sub_rid, 
   const std::string& service, const::std::string& region, 
-  std::string tag, std::string prev_service, bool async, int timeout) {
+  std::string tag, std::string prev_service, bool async, int timeout, bool wait_deps) {
 
   int result;
   metadata::Subscriber * subscriber;
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitServiceRegion(service, region, tag, async, timeout);
+    result = request->waitServiceRegion(service, region, tag, async, timeout, wait_deps);
   else if (!service.empty())
-    result = request->waitService(service, tag, async, timeout);
+    result = request->waitService(service, tag, async, timeout, wait_deps);
   else if (!region.empty())
     result = request->waitRegion(sub_rid, region, prev_service, async, timeout);
   else

@@ -270,6 +270,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   const auto& services = request->services();
   const std::string& tag = request->tag();
   const std::string& region = request->region();
+  bool wait_deps = request->wait_deps();
   //bool async = request->async();
   int timeout = request->timeout();
 
@@ -315,14 +316,14 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   // wait logic for multiple services
   if (services.size() > 0) {
     for (const auto& service: services) {
-      result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout);
+      result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout, wait_deps);
       if (result < 0) {
         break;
       }
     }
   }
   else {
-    int result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout);
+    int result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout, wait_deps);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
     }

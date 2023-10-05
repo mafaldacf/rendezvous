@@ -699,7 +699,7 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
     return inconsistency;
 }
 
-int Request::waitService(const std::string& service, const std::string& tag, bool async, int timeout) {
+int Request::waitService(const std::string& service, const std::string& tag, bool async, int timeout, bool wait_deps) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -721,13 +721,9 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     // context error checking
     else {
         // no current branch for this service
-        if (_service_nodes.count(service) == 0) {
-            return -2;
-        }
+        if (_service_nodes.count(service) == 0) return -2;
         // no current branch for this service (non async) tag
-        if (!tag.empty() && _service_nodes[service]->tagged_branches.count(tag) == 0) {
-            return -2;
-        }
+        if (!tag.empty() && _service_nodes[service]->tagged_branches.count(tag) == 0) return -2;
     }
 
     // ----------
@@ -756,12 +752,43 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 return -1;
             }
         }
+        // wait for all dependencies for this service
+        if (wait_deps) {
+            ServiceNode * curr_service = _service_nodes[service];
+            std::stack<ServiceNode*> deps;
+            std::unordered_set<ServiceNode*> transversed {curr_service};
+            deps.push(curr_service);
+
+            while (deps.size() != 0) {
+                // wait for each service in deps
+                auto dep = deps.top();
+                deps.pop();
+                transversed.insert(dep);
+
+                for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+                    if (transversed.count((*it)) == 0) {
+                        deps.push((*it));
+                    }
+                }
+                if (deps.size() == 0) break;
+
+                num_branches_ptr = &dep->opened_branches;
+                while (*num_branches_ptr != 0) {
+                    _cond_service_nodes.wait_for(lock, remaining_timeout);
+                    inconsistency = 1;
+                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                    if (remaining_timeout <= std::chrono::seconds(0)) {
+                        return -1;
+                    }
+                }
+            }
+        }
     }
     return inconsistency;
 }
 
 int Request::waitServiceRegion(const std::string& service, const std::string& region, 
-const::std::string& tag, bool async, int timeout) {
+const::std::string& tag, bool async, int timeout, bool wait_deps) {
 
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
@@ -820,12 +847,46 @@ const::std::string& tag, bool async, int timeout) {
     // overall service
     else {
         int * num_branches_ptr = &_service_nodes[service]->opened_regions[region];
-        while (*num_branches_ptr != 0) {
+        int * num_global_region_ptr = &_service_nodes[service]->opened_global_region;
+        while (*num_branches_ptr != 0 || *num_global_region_ptr != 0) {
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
                 return -1;
+            }
+        }
+        
+        // wait for all dependencies for this service
+        if (wait_deps) {
+            ServiceNode * curr_service = _service_nodes[service];
+            std::stack<ServiceNode*> deps;
+            std::unordered_set<ServiceNode*> transversed {curr_service};
+            deps.push(curr_service);
+
+            while (deps.size() != 0) {
+                // wait for each service in deps
+                auto dep = deps.top();
+                deps.pop();
+                transversed.insert(dep);
+
+                for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+                    if (transversed.count((*it)) == 0) {
+                        deps.push((*it));
+                    }
+                }
+                if (deps.size() == 0) break;
+
+                num_branches_ptr = &dep->opened_regions[region];
+                num_global_region_ptr = &dep->opened_global_region;
+                while (*num_branches_ptr != 0 || *num_global_region_ptr != 0) {
+                    _cond_service_nodes.wait_for(lock, remaining_timeout);
+                    inconsistency = 1;
+                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                    if (remaining_timeout <= std::chrono::seconds(0)) {
+                        return -1;
+                    }
+                }
             }
         }
     }

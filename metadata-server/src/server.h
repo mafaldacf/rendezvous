@@ -223,7 +223,7 @@ namespace rendezvous {
              */
             int wait(metadata::Request * request, const std::string& sub_rid, const std::string& service, 
                 const::std::string& region, std::string tag = "", std::string prev_service = "", 
-                bool async = false, int timeout = 0);
+                bool async = false, int timeout = 0, bool wait_deps = false);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)

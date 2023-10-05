@@ -315,6 +315,7 @@ namespace metadata {
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
              * - 0 if call did not block, 
@@ -322,7 +323,7 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              */
-            int waitService(const std::string& service, const std::string& tag, bool async, int timeout);
+            int waitService(const std::string& service, const std::string& tag, bool async, int timeout, bool wait_deps);
 
 
             /**
@@ -333,6 +334,7 @@ namespace metadata {
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
              * - 0 if call did not block, 
@@ -343,7 +345,7 @@ namespace metadata {
              * - (-4) if tag was not found
              */
             int waitServiceRegion(const std::string& service, const std::string& region, 
-                const std::string& tag, bool async, int timeout);
+                const std::string& tag, bool async, int timeout, bool wait_deps);
 
             /**
              * Check status of request
