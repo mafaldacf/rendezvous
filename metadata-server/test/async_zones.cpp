@@ -9,7 +9,7 @@
 // ASYNC ZONES TEST
 // ----------------
 
-/* TEST(AsyncZonesTest, RidParsing) { 
+TEST(AsyncZonesTest, RidParsing) { 
   rendezvous::Server server(SID);
   std::string composed_id;
   std::pair<std::string, std::string> parsed_id;
@@ -98,7 +98,7 @@ TEST(AsyncZonesTest, AddNextSubRids) {
   // -----------------
   std::string sub_rid_0_0_0 = server.addNextSubRequest(request, SUB_RID_0_0);
   ASSERT_EQ(SUB_RID_0_0_0, sub_rid_0_0_0);
-} */
+}
 
 
 TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) { 

@@ -189,24 +189,22 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     // SERVICE NODE & DEPENDENCIES
     // ---------------------------
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
-    // decrease opened branches in all direct parents (start with the current one)
-    if (region.empty()) {
-        for (ServiceNode * parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            // by default, empty region means global region => we can decrement the entire branch
-            parent_node->opened_branches--;
-            parent_node->opened_global_region--;
 
-        }
+    // sanity check
+    auto it = _service_nodes.find(service);
+    if (it == _service_nodes.end()) return false;
+    ServiceNode * service_node = it->second;
+    
+    if (globally_closed) {
+        service_node->opened_branches++;
+    }
+    if (region.empty()) {
+        service_node->opened_global_region--;
     }
     else {
-        for (ServiceNode * parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            if (globally_closed) {
-                parent_node->opened_branches--;
-            }
-            parent_node->opened_regions[region]--;
-
-        }
+        service_node->opened_regions[region]--;
     }
+
     // notify creation of new branch
     _cond_service_nodes.notify_all();
     lock_services.unlock();
@@ -264,31 +262,34 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
 
 bool Request::trackBranch(const std::string& sub_rid, const std::string& service, 
     const utils::ProtoVec& regions, int num, const std::string& prev_service, metadata::Branch * branch) {
+        
+    ServiceNode * service_node;
 
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
     // ---------------------------
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
-    
-    if (_service_nodes.count(prev_service) == 0) return false;
 
-    // create new node if service does not exist yet
-    // SERVICES CANNOT HAVE EMPTY NAME otherwise we create a loop when adding parent
+    auto it = _service_nodes.find(prev_service);
+    if (it == _service_nodes.end()) return false;
+    ServiceNode * parent_node = it->second;
+    
+    // sanity check
     if (_service_nodes.count(service) == 0) {
-        _service_nodes[service] = new ServiceNode({service});
+        service_node = new ServiceNode({service});
+        _service_nodes[service] = service_node;
     }
 
     // validate tag
     if (branch->hasTag()) {
         // ABORT - unique tag already exists
-        if (_service_nodes[service]->tagged_branches.count(branch->getTag()) != 0) {
+        if (service_node->tagged_branches.count(branch->getTag()) != 0) {
             return false;
         }
         // track on SERVICE TAG
-        _service_nodes[service]->tagged_branches[branch->getTag()] = branch;
+        service_node->tagged_branches[branch->getTag()] = branch;
     }
     
-    ServiceNode * parent_node;
     // current node is the first child
     if (_service_nodes[service]->parent == nullptr) {
         parent_node = _service_nodes[prev_service];
@@ -296,23 +297,13 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
         parent_node->children.emplace_back(_service_nodes[service]);
     }
 
-    // track on REGIONS of SERVICE
-    if (regions.size() > 0) {
-        // increment REGIONS in all direct parents
-        for (parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            parent_node->opened_branches++;
-            for (const auto& region: regions) {
-                parent_node->opened_regions[region]++;
-            }
-        }
+    parent_node->children.emplace_back(service_node);
+    service_node->opened_branches++;
+    for (const auto& region: regions) {
+        service_node->opened_regions[region]++;
     }
-    // track on GLOBAL REGION of SERVICE
-    else {
-        // increment GLOBAL REGION in all direct parents
-        for (parent_node = _service_nodes[service]; parent_node != nullptr; parent_node = parent_node->parent) {
-            parent_node->opened_branches++;
-            parent_node->opened_global_region++;
-        }
+    if (regions.empty()) {
+        service_node->opened_global_region++;
     }
 
     // notify upon creation (due to async waits)
@@ -552,34 +543,6 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
         }
     }
     _removeFromWaitLogs(subrequest);
-
-    // -----------------------------------
-    // TRANSVERSE DEPENDENCIES ALGORITHM:
-    // - only wait for top/left neighboors
-    // - discard direct parents
-    // -----------------------------------
-    /* std::unique_lock<std::mutex> lock(_mutex_service_nodes);
-    ServiceNode * stop = nullptr;
-    ServiceNode * parent = _service_nodes[prev_service];
-    do { 
-        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
-            // break if we reach previous checkpoint
-            if (*it == stop) {
-                break;
-            }
-            // wait for branch
-            while ((*it)->opened_branches != 0) {
-                _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
-                inconsistency = 1;
-                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                if (remaining_timeout <= std::chrono::seconds(0)) {
-                    return -1;
-                }
-            }
-        }
-        stop = parent;
-        parent = parent->parent;
-    } while (parent != nullptr); */
     
     return inconsistency;
 }
@@ -651,50 +614,6 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
         }
     }
     _removeFromWaitLogs(subrequest);
-
-    // -----------------------------------
-    // TRANSVERSE DEPENDENCIES ALGORITHM:
-    // - only wait for top/left neighboors
-    // - discard direct parents
-    // -----------------------------------
-    /* ServiceNode * stop = nullptr;
-    ServiceNode * parent = _service_nodes[prev_service];
-    do {
-        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
-            // break if we reach previous checkpoint
-            if (*it == stop) {
-                break;
-            }
-            // check if region exists
-            if ((*it)->opened_regions.count(region) != 0) {
-                int * opened_global_region_ptr = &((*it)->opened_global_region);
-                int * num_opened_regions_ptr = &((*it)->opened_regions[region]);
-                // wait logic (need to check global branch that encompasses all regions!)
-                while (*opened_global_region_ptr != 0 || *num_opened_regions_ptr != 0) {
-                    _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
-                    inconsistency = 1;
-                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                    if (remaining_timeout <= std::chrono::seconds(0)) {
-                        return -1;
-                    }
-                }
-            }
-            // if region does not exist, we still need to check global branch that encompasses all regions!
-            else {
-                int * opened_global_region_ptr = &((*it)->opened_global_region);
-                while (*opened_global_region_ptr != 0) {
-                    _cond_service_nodes.wait_for(lock, std::chrono::seconds(remaining_timeout));
-                    inconsistency = 1;
-                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                    if (remaining_timeout <= std::chrono::seconds(0)) {
-                        return -1;
-                    }
-                }
-            }
-        }
-        stop = parent;
-        parent = parent->parent;
-    } while (parent != nullptr); */
 
     return inconsistency;
 }
@@ -904,33 +823,6 @@ utils::Status Request::checkStatus(const std::string& sub_rid, const std::string
         return utils::Status {OPENED};
     }
     return utils::Status {CLOSED};
-
-    // -----------------------------------
-    // TRANSVERSE DEPENDENCIES ALGORITHM:
-    // - only wait for top/left neighboors
-    // - discard direct parents
-    // -----------------------------------
-    /* ServiceNode * stop = nullptr;
-    ServiceNode * parent = _service_nodes[prev_service];
-    do {
-        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
-            // we reached last checkpoint
-            if (*it == stop) {
-                break;
-            }
-            // ------------------
-            // CHECK STATUS LOGIC
-            // - return OPENED if at least one branch is opened
-            // - otherwise, we keep iterating to make sure every branch is CLOSED
-            // ------------------
-            if ((*it)->opened_branches != 0) {
-                res.status = OPENED;
-                return res;
-            }
-        }
-        stop = parent;
-        parent = parent->parent;
-    } while (parent != nullptr); */
 }
 
 utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::string& region, const std::string& prev_service) {
@@ -964,50 +856,6 @@ utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::
     else {
         res.status = CLOSED;
     }
-
-    // -----------------------------------
-    // TRANSVERSE DEPENDENCIES ALGORITHM:
-    // - only wait for top/left neighboors
-    // - discard direct parents
-    // -----------------------------------
-
-    /* ServiceNode * stop = nullptr;
-    ServiceNode * parent = _service_nodes[prev_service];
-    do {
-        for (auto it = parent->children.begin(); it != parent->children.end(); it++) {
-            // we reached last checkpoint
-            if (*it == stop) {
-                break;
-            }
-
-            // ------------------
-            // CHECK STATUS LOGIC
-            // - return OPENED if at least one branch is opened
-            // - otherwise, we keep iterating to make sure every branch is CLOSED
-            // ------------------
-
-            // check if region exists (still need to check global branch that encompasses all regions!)
-            if ((*it)->opened_regions.count(region) != 0) {
-                if ((*it)->opened_regions[region] != 0 || (*it)->opened_global_region != 0) {
-                    res.status = OPENED;
-                    return res;
-                }
-                // we force to CLOSED everytime since default value is UNKNOWN
-                res.status = CLOSED;
-            }
-            // if region does not exist, we still need to check global branch that encompasses all regions!
-            else {
-                // if global region is not open it can also mean that there
-                // is no global region => we mantain the UNKNOWN res.status (do not set to CLOSED)
-                if ((*it)->opened_global_region != 0) {
-                    res.status = OPENED;
-                    return res;
-                }
-            }
-        }
-        stop = parent;
-        parent = parent->parent;
-    } while (parent != nullptr); */
 
     return res;
 }
@@ -1084,15 +932,6 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
 utils::Dependencies Request::fetchDependencies(const std::string& prev_service) {
     utils::Dependencies result {OK};
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
-    /* // find out if context is valid
-    if (_service_nodes.count(prev_service) == 0) {
-        result.res = INVALID_CONTEXT;
-        return result;
-    }
-    // get children nodes of current service
-    for (auto it = _service_nodes[prev_service]->children.begin(); it != _service_nodes[prev_service]->children.end(); ++it) {
-        result.deps.emplace_back((*it)->name);
-    } */
 
     for (auto it = _service_nodes.begin(); it != _service_nodes.end(); it++) {
         if (it->second->opened_branches > 0) {
