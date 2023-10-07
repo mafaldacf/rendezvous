@@ -210,8 +210,8 @@ std::string Server::composeFullId(const std::string& primary_id, const std::stri
 // Helpers
 //------------
 
-std::string Server::addNextSubRequest(metadata::Request * request, const std::string& sub_rid, bool gen_id) {
-  return request->addNextSubRequest(_sid, sub_rid, gen_id);
+std::string Server::addNextSubRequest(metadata::Request * request, const std::string& async_zone_id, bool gen_id) {
+  return request->addNextSubRequest(_sid, async_zone_id, gen_id);
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {
@@ -252,11 +252,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 
 // helper for GTests
 std::string Server::registerBranchGTest(metadata::Request * request, 
-  const std::string& sub_rid, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service) {
+  const std::string& async_zone_id, const std::string& service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service) {
     
     std::string bid = genBid(request);
-    bool r = registerBranch(request, sub_rid, service, regions, tag, prev_service, bid, false);
+    bool r = registerBranch(request, async_zone_id, service, regions, tag, parent_service, bid, false);
     if (!r) return "";
     return bid;
 }
@@ -266,11 +266,11 @@ std::string Server::registerBranchGTest(metadata::Request * request,
 //----------------------
 
 bool Server::registerBranch(metadata::Request * request, 
-  const std::string& sub_rid, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
+  const std::string& async_zone_id, const std::string& service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
   const std::string& bid, bool monitor) {
 
-  metadata::Branch * branch = request->registerBranch(sub_rid, bid, service, tag, regions, prev_service);
+  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, parent_service);
   // unexpected error
   if (!branch) {
     return false;
@@ -303,9 +303,9 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return r;
 }
 
-int Server::wait(metadata::Request * request, const std::string& sub_rid, 
+int Server::wait(metadata::Request * request, const std::string& async_zone_id, 
   const std::string& service, const::std::string& region, 
-  std::string tag, std::string prev_service, bool async, int timeout, bool wait_deps) {
+  std::string tag, bool async, int timeout, bool wait_deps) {
 
   int result;
   metadata::Subscriber * subscriber;
@@ -316,9 +316,9 @@ int Server::wait(metadata::Request * request, const std::string& sub_rid,
   else if (!service.empty())
     result = request->waitService(service, tag, async, timeout, wait_deps);
   else if (!region.empty())
-    result = request->waitRegion(sub_rid, region, prev_service, async, timeout);
+    result = request->waitRegion(async_zone_id, region, async, timeout);
   else
-    result = request->wait(sub_rid, prev_service, timeout);
+    result = request->wait(async_zone_id, async, timeout);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
   if (result == 1) {
@@ -328,22 +328,22 @@ int Server::wait(metadata::Request * request, const std::string& sub_rid,
   return result;
 }
 
-utils::Status Server::checkStatus(metadata::Request * request, const std::string& sub_rid, 
-  const std::string& service, const std::string& region, std::string prev_service, bool detailed) {
+utils::Status Server::checkStatus(metadata::Request * request, const std::string& async_zone_id, 
+  const std::string& service, const std::string& region, bool detailed) {
 
   if (!service.empty() && !region.empty())
     return request->checkStatusServiceRegion(service, region, detailed);
   else if (!service.empty())
     return request->checkStatusService(service, detailed);
   else if (!region.empty())
-    return request->checkStatusRegion(sub_rid, region, prev_service);
+    return request->checkStatusRegion(async_zone_id, region);
 
-  return request->checkStatus(sub_rid, prev_service);
+  return request->checkStatus(async_zone_id);
 }
 
-utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, std::string prev_service) {
+utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service) {
   if (service.empty()) {
-    return request->fetchDependencies(prev_service);
+    return request->fetchDependencies();
   }
   return request->fetchDependenciesService(service);
 }

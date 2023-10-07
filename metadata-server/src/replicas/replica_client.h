@@ -41,7 +41,7 @@ namespace replicas {
 
             /* Helpers */
             void _doRegisterRequest(const std::string& rid);
-            void _doRegisterBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+            void _doRegisterBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
                 const rendezvous::RequestContext& ctx);
@@ -62,15 +62,15 @@ namespace replicas {
              * Send register branches call to all replicas
              * 
              * @param root_rid The identifier of the root request
-             * @param sub_rid The identifier of the sub request
+             * @param async_zone The identifier of the async zone
              * @param core_bid The identifier of the set of branches (without rid)
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param monitor If enabled, we publish the branch for datastore monitor subscribers
-             * @param async If enabled, we register/track the new async zone from the previously generated sub_rid
+             * @param async If enabled, we register/track the new async zone from the previously generated async_zone
              * @param ctx Additional metadata context
              */
-            void registerBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid, 
+            void registerBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
                 const rendezvous::RequestContext& ctx);

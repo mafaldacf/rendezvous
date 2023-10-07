@@ -195,7 +195,7 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   // it will ignore every branch from notifier
   // so we don't even need to close the notifier branches
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   sleep(1);
@@ -215,7 +215,7 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   // at this point, no global branch is opened so 
   // we attempt to wait on a non existent region
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "INVALID REGION", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "INVALID REGION", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
   sleep(1);

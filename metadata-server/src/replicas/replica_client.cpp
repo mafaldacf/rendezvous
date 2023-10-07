@@ -60,7 +60,7 @@ void ReplicaClient::registerRequest(const std::string& rid) {
     }
 }
 
-void ReplicaClient::_doRegisterBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid,
+void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
     const rendezvous::RequestContext& ctx) {
@@ -77,8 +77,8 @@ void ReplicaClient::_doRegisterBranch(const std::string& root_rid, const std::st
             req_helper.responses.emplace_back(response);
 
             rendezvous_server::RegisterBranchMessage request;
-            request.set_root_rid(root_rid);
-            request.set_sub_rid(sub_rid);
+            request.set_rid(rid);
+            request.set_async_zone(async_zone);
             request.set_core_bid(core_bid);
             request.set_service(service);
             request.set_tag(tag);
@@ -102,22 +102,22 @@ void ReplicaClient::_doRegisterBranch(const std::string& root_rid, const std::st
         _waitCompletionQueue("RB", req_helper);
     }
 
-void ReplicaClient::registerBranch(const std::string& root_rid, const std::string& sub_rid, const std::string& core_bid,
+void ReplicaClient::registerBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
     const rendezvous::RequestContext& ctx) {
 
         if (utils::ASYNC_REPLICATION) {
-        std::thread([this, root_rid, sub_rid, core_bid, service, tag, regions, monitor, async, ctx]() {
-            _doRegisterBranch(root_rid, sub_rid, core_bid, service, tag, regions, monitor, async, ctx);
+        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx]() {
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx);
         }).detach();
         }
         else {
-            _doRegisterBranch(root_rid, sub_rid, core_bid, service, tag, regions, monitor, async, ctx);
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx);
         }
 }
 
-void ReplicaClient::_doCloseBranch(const std::string& root_rid, const std::string& core_bid, 
+void ReplicaClient::_doCloseBranch(const std::string& rid, const std::string& core_bid, 
     const std::string& region, const rendezvous::RequestContext& ctx) {
 
         struct RequestHelper req_helper;
@@ -132,7 +132,7 @@ void ReplicaClient::_doCloseBranch(const std::string& root_rid, const std::strin
             req_helper.responses.emplace_back(response);
 
             rendezvous_server::CloseBranchMessage request;
-            request.set_root_rid(root_rid);
+            request.set_rid(rid);
             request.set_core_bid(core_bid);
             request.set_region(region);
 
@@ -152,20 +152,20 @@ void ReplicaClient::_doCloseBranch(const std::string& root_rid, const std::strin
         _waitCompletionQueue("CB", req_helper);
     }
 
-void ReplicaClient::closeBranch(const std::string& root_rid, const std::string& core_bid, 
+void ReplicaClient::closeBranch(const std::string& rid, const std::string& core_bid, 
     const std::string& region, const rendezvous::RequestContext& ctx) {
 
     if (utils::ASYNC_REPLICATION) {
-        std::thread([this, root_rid, core_bid, region, ctx]() {
-            _doCloseBranch(root_rid, core_bid, region, ctx);
+        std::thread([this, rid, core_bid, region, ctx]() {
+            _doCloseBranch(rid, core_bid, region, ctx);
         }).detach();
     }
     else {
-        _doCloseBranch(root_rid, core_bid, region, ctx);
+        _doCloseBranch(rid, core_bid, region, ctx);
     }
 }
 
-void ReplicaClient::addWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx) {
+void ReplicaClient::addWaitLog(const std::string& rid, const std::string& async_zone, rendezvous::RequestContext& ctx) {
     struct RequestHelper req_helper;
     for (const auto& server : _servers) {
         grpc::ClientContext * context = new grpc::ClientContext();
@@ -178,7 +178,7 @@ void ReplicaClient::addWaitLog(const std::string& root_rid, const std::string& a
         req_helper.responses.emplace_back(response);
 
         rendezvous_server::AddWaitLogMessage request;
-        request.set_root_rid(root_rid);
+        request.set_rid(rid);
         request.set_async_zone(async_zone);
 
         // async replication requires context propagation
@@ -197,7 +197,7 @@ void ReplicaClient::addWaitLog(const std::string& root_rid, const std::string& a
     _waitCompletionQueue("AWL", req_helper);
 }
 
-void ReplicaClient::removeWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx) {
+void ReplicaClient::removeWaitLog(const std::string& rid, const std::string& async_zone, rendezvous::RequestContext& ctx) {
     struct RequestHelper req_helper;
     for (const auto& server : _servers) {
         grpc::ClientContext * context = new grpc::ClientContext();
@@ -210,7 +210,7 @@ void ReplicaClient::removeWaitLog(const std::string& root_rid, const std::string
         req_helper.responses.emplace_back(response);
 
         rendezvous_server::RemoveWaitLogMessage request;
-        request.set_root_rid(root_rid);
+        request.set_rid(rid);
         request.set_async_zone(async_zone);
 
         // async replication requires context propagation

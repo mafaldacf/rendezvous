@@ -2,8 +2,8 @@
 
 using namespace metadata;
 
-Branch::Branch(std::string service, std::string tag, std::string sub_rid, const utils::ProtoVec& vector_regions)
-    : _service(service), _tag(tag), _sub_rid(sub_rid) {
+Branch::Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions)
+    : _service(service), _tag(tag), _sub_rid(async_zone_id) {
         _regions = std::unordered_map<std::string, int>();
         for (const auto& region : vector_regions) {
             _regions[region] = OPENED;
@@ -11,8 +11,8 @@ Branch::Branch(std::string service, std::string tag, std::string sub_rid, const 
         _num_opened_regions = vector_regions.size();
     }
 
-Branch::Branch(std::string service, std::string tag, std::string sub_rid)
-    : _service(service), _tag(tag), _sub_rid(sub_rid) {
+Branch::Branch(std::string service, std::string tag, std::string async_zone_id)
+    : _service(service), _tag(tag), _sub_rid(async_zone_id) {
         _regions = std::unordered_map<std::string, int>();
 
         _regions[GLOBAL_REGION] = OPENED;

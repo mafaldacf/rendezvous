@@ -12,16 +12,16 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     // <bid, branch>
     _branches = std::unordered_map<std::string, metadata::Branch*>();
     _service_nodes = std::unordered_map<std::string, ServiceNode*>();
-    _sub_requests = oneapi::tbb::concurrent_hash_map<std::string, SubRequest*>();
-    _wait_logs = std::unordered_set<SubRequest*>();
+    _sub_requests = oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*>();
+    _wait_logs = std::unordered_set<AsyncZone*>();
 
     // add root node
     _service_nodes[""] = new ServiceNode{""};
 
     // insert the subrequest of the root
-    tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
+    tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
     _sub_requests.insert(write_accessor, utils::ROOT_ASYNC_ZONE_ID);
-    write_accessor->second = new SubRequest{0, utils::ROOT_ASYNC_ZONE_ID};
+    write_accessor->second = new AsyncZone{0, utils::ROOT_ASYNC_ZONE_ID};
 }
 
 Request::~Request() {
@@ -61,52 +61,52 @@ replicas::VersionRegistry * Request::getVersionsRegistry() {
     return _versions_registry;
 }
 
-std::string Request::addNextSubRequest(const std::string& sid, const std::string& sub_rid, bool gen_id) {
-    int next_sub_rid_index;
+std::string Request::addNextSubRequest(const std::string& sid, const std::string& async_zone_id, bool gen_id) {
+    int next_async_zone_index;
     std::string next_sub_rid;
 
-    // if we are currently in a sub_rid we fetch its next sub_rid
+    // if we are currently in a async_zone_id we fetch its next async_zone_id
     if (gen_id) {
-        if (!sub_rid.empty()) {
-            tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
-            bool found = _sub_requests.find(write_accessor, sub_rid);
-            // current sub_rid does not exist
+        if (!async_zone_id.empty()) {
+            tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
+            bool found = _sub_requests.find(write_accessor, async_zone_id);
+            // current async_zone_id does not exist
             if (!found) {
                 return "";
             }
 
-            // get next sub_rid
-            next_sub_rid_index = write_accessor->second->next_sub_rid_index++;
-            // parse the index to full string of sub_rid
-            next_sub_rid = sub_rid;
+            // get next async_zone_id
+            next_async_zone_index = write_accessor->second->next_async_zone_index++;
+            // parse the index to full string of async_zone_id
+            next_sub_rid = async_zone_id;
         }
-        // otherwise we obtain the next sub_rid from current request
+        // otherwise we obtain the next async_zone_id from current request
         else {
-            next_sub_rid_index = _next_sub_rid_index.fetch_add(1);
-            // parse the index to full string of sub_rid
+            next_async_zone_index = _next_sub_rid_index.fetch_add(1);
+            // parse the index to full string of async_zone_id
             next_sub_rid = "root";
         }
-        next_sub_rid += utils::FULL_ID_DELIMITER + sid + std::to_string(next_sub_rid_index);
+        next_sub_rid += utils::FULL_ID_DELIMITER + sid + std::to_string(next_async_zone_index);
     }
     // skip the id generation step
     else {
-        next_sub_rid = sub_rid;
+        next_sub_rid = async_zone_id;
     }
 
     // sanity check
     if (next_sub_rid != utils::ROOT_ASYNC_ZONE_ID) {
         // insert the next subrequest and return its id
-        tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
+        tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
         _sub_requests.insert(write_accessor, next_sub_rid);
-        write_accessor->second = new SubRequest{sub_requests_i.fetch_add(1), next_sub_rid};
+        write_accessor->second = new AsyncZone{sub_requests_i.fetch_add(1), next_sub_rid};
     }
 
     return next_sub_rid;
 }
 
-metadata::Request::SubRequest * Request::_validateSubRid(const std::string& sub_rid) {
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-    bool found = _sub_requests.find(read_accessor, sub_rid);
+metadata::Request::AsyncZone * Request::_validateSubRid(const std::string& async_zone_id) {
+    tbb::concurrent_hash_map<std::string, AsyncZone*>::const_accessor read_accessor;
+    bool found = _sub_requests.find(read_accessor, async_zone_id);
     if (found) return read_accessor->second;
     return nullptr;
 }
@@ -115,8 +115,8 @@ metadata::Request::SubRequest * Request::_validateSubRid(const std::string& sub_
 // Core Rendezvous Logic
 //----------------------
 
-metadata::Branch * Request::registerBranch(const std::string& sub_rid, const std::string& bid, const std::string& service,  
-    const std::string& tag, const utils::ProtoVec& regions, const std::string& prev_service) {
+metadata::Branch * Request::registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service,  
+    const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service) {
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
     auto branch_it = _branches.find(bid);
@@ -125,31 +125,34 @@ metadata::Branch * Request::registerBranch(const std::string& sub_rid, const std
     if (branch_it != _branches.end()) {
         return nullptr;
     }
+    lock.unlock();
 
     metadata::Branch * branch;
     int num = regions.size();
 
     // branch with specified regions
     if (num > 0) {
-        branch = new metadata::Branch(service, tag, sub_rid, regions);
+        branch = new metadata::Branch(service, tag, async_zone_id, regions);
     }
 
     // no region specified - global region
     else {
         num = 1;
-        branch = new metadata::Branch(service, tag, sub_rid);
+        branch = new metadata::Branch(service, tag, async_zone_id);
     }
-    _branches[bid] = branch;
-    lock.unlock();
 
     // error tracking branch (tag already exists!)
-    if (!trackBranch(sub_rid, service, regions, num, prev_service, branch)) {
+    if (!trackBranch(async_zone_id, service, regions, num, parent_service, branch)) {
         lock.lock();
-        _branches.erase(bid);
         delete branch;
         lock.unlock();
         return nullptr;
     }
+
+    lock.lock();
+    _branches[bid] = branch;
+    _cond_new_branch.notify_all();
+    lock.unlock();
 
     return branch;
 }
@@ -165,7 +168,7 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
     }
     metadata::Branch * branch = branch_it->second;
 
-    const std::string& sub_rid = branch->getSubRid();
+    const std::string& async_zone_id = branch->getSubRid();
 
     int r = branch->close(region);
     bool globally_closed = branch->isClosed();
@@ -175,14 +178,14 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
         const std::string& tag = branch->getTag();
 
         // error in sub_requests tbb map
-        if (!untrackBranch(sub_rid, service, region, globally_closed)) {
+        if (!untrackBranch(async_zone_id, service, region, globally_closed)) {
             r = -1;
         }
     }
     return r;
 }
 
-bool Request::untrackBranch(const std::string& sub_rid, const std::string& service, 
+bool Request::untrackBranch(const std::string& async_zone_id, const std::string& service, 
     const std::string& region, bool globally_closed) {
 
     // ---------------------------
@@ -221,8 +224,8 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
 
     std::shared_lock<std::shared_mutex> lock_subrequests(_mutex_subrequests);
 
-    if (!sub_rid.empty()) {
-        SubRequest * subrequest = _validateSubRid(sub_rid);
+    if (!async_zone_id.empty()) {
+        AsyncZone * subrequest = _validateSubRid(async_zone_id);
         if (subrequest == nullptr) return false;
 
         if (globally_closed) {
@@ -264,8 +267,8 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     return true;
 }
 
-bool Request::trackBranch(const std::string& sub_rid, const std::string& service, 
-    const utils::ProtoVec& regions, int num, const std::string& prev_service, metadata::Branch * branch) {
+bool Request::trackBranch(const std::string& async_zone_id, const std::string& service, 
+    const utils::ProtoVec& regions, int num, const std::string& parent_service, metadata::Branch * branch) {
         
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
@@ -273,7 +276,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     ServiceNode * service_node;
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
 
-    auto it = _service_nodes.find(prev_service);
+    auto it = _service_nodes.find(parent_service);
     if (it == _service_nodes.end()) return false;
     ServiceNode * parent_node = it->second;
     
@@ -309,8 +312,8 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     // ----------
     // SUBREQUEST
     // ----------
-    if (!sub_rid.empty()) {
-        SubRequest * subrequest = _validateSubRid(sub_rid);
+    if (!async_zone_id.empty()) {
+        AsyncZone * subrequest = _validateSubRid(async_zone_id);
         if (subrequest == nullptr) return false;
         subrequest->opened_branches.fetch_add(1);
 
@@ -362,7 +365,7 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
-void Request::_addToWaitLogs(SubRequest* subrequest) {
+void Request::_addToWaitLogs(AsyncZone* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     // try to insert if not yet done
@@ -375,7 +378,7 @@ void Request::_addToWaitLogs(SubRequest* subrequest) {
     _cond_subrequests.notify_all();
 }
 
-void Request::_removeFromWaitLogs(SubRequest* subrequest) {
+void Request::_removeFromWaitLogs(AsyncZone* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     int n = --subrequest->num_current_waits;
@@ -389,10 +392,10 @@ void Request::_removeFromWaitLogs(SubRequest* subrequest) {
 // eu0:us0 vs eu0:ap0
 // eu0:eu0 vs eu0:eu0:eu0
 
-bool Request::_isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subrequest_2) {
+bool Request::_isPrecedingAsyncZone(AsyncZone* subrequest_1, AsyncZone* subrequest_2) {
     std::vector<std::string> sub_zone(2), sid(2);
     std::vector<size_t> local_pos(2), global_pos(2);
-    std::vector<std::string> id {subrequest_1->sub_rid, subrequest_2->sub_rid};
+    std::vector<std::string> id {subrequest_1->async_zone_id, subrequest_2->async_zone_id};
     std::vector<int> idx {subrequest_1->i, subrequest_2->i};
 
     // remove 'root' id
@@ -432,8 +435,8 @@ bool Request::_isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subreq
         if (sid[0] != sid[1]) {
             std::string async_zone_parent_1 = id[0].substr(0, global_pos[0]);
             std::string async_zone_parent_2 = id[1].substr(0, global_pos[1]);
-            SubRequest * sub_request_parent_1 = _validateSubRid(async_zone_parent_1);
-            SubRequest * sub_request_parent_2 = _validateSubRid(async_zone_parent_2);
+            AsyncZone * sub_request_parent_1 = _validateSubRid(async_zone_parent_1);
+            AsyncZone * sub_request_parent_2 = _validateSubRid(async_zone_parent_2);
 
             // sanity check and return true to avoid any unwanted cycles
             if (sub_request_parent_1 == nullptr || sub_request_parent_2 == nullptr) {
@@ -450,13 +453,13 @@ bool Request::_isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subreq
     }
 }
 
-std::vector<std::string> Request::_getPrecedingAsyncZones(SubRequest* subrequest) {
+std::vector<std::string> Request::_getPrecedingAsyncZones(AsyncZone* subrequest) {
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     std::vector<std::string> entries;
     for (const auto& entry: _wait_logs) {
         if (_isPrecedingAsyncZone(entry, subrequest)) {
-            entries.emplace_back(entry->sub_rid);
+            entries.emplace_back(entry->async_zone_id);
         }
     }
     return entries;
@@ -466,12 +469,12 @@ int Request::_numOpenedBranchesAsyncZones(const std::vector<std::string>& sub_ri
     // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
 
     int num = 0;
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor;
-    for (const auto& sub_rid: sub_rids) {
-        bool found = _sub_requests.find(read_accessor, sub_rid);
+    tbb::concurrent_hash_map<std::string, AsyncZone*>::const_accessor read_accessor;
+    for (const auto& async_zone_id: sub_rids) {
+        bool found = _sub_requests.find(read_accessor, async_zone_id);
         // sanity check
         if (!found) continue;
-        SubRequest * subrequest = read_accessor->second;
+        AsyncZone * subrequest = read_accessor->second;
         num += subrequest->opened_branches.load();
 
     }
@@ -485,14 +488,14 @@ std::pair<int, int> Request::_numOpenedRegionsAsyncZones(
 
     // <global region counter, current region counter>
     std::pair<int, int> num = {0, 0};
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
+    tbb::concurrent_hash_map<std::string, AsyncZone*>::const_accessor read_accessor_sr;
     tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
-    for (const auto& sub_rid: sub_rids) {
-        bool found = _sub_requests.find(read_accessor_sr, sub_rid);
+    for (const auto& async_zone_id: sub_rids) {
+        bool found = _sub_requests.find(read_accessor_sr, async_zone_id);
 
         // sanity check
         if (!found) continue;
-        SubRequest * subrequest = read_accessor_sr->second;
+        AsyncZone * subrequest = read_accessor_sr->second;
 
         // get number of opened branches globally, in terms of regions
         num.second += subrequest->opened_global_region.load();
@@ -505,19 +508,37 @@ std::pair<int, int> Request::_numOpenedRegionsAsyncZones(
     return num;
 }
 
-int Request::wait(const std::string& sub_rid, std::string prev_service, int timeout) {
+bool Request::_waitFirstBranch(const std::chrono::steady_clock::time_point& start_time, int timeout) {
+    std::unique_lock<std::mutex> lock(_mutex_branches);
+    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+    while (_branches.size() == 0) {
+        _cond_new_branch.wait_for(lock, std::chrono::seconds(remaining_timeout));
+        if (remaining_timeout <= std::chrono::seconds(0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int Request::wait(const std::string& async_zone_id, bool async, int timeout) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
-    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
 
     // -----------------------------------
     //           VALIDATIONS
     // -----------------------------------
 
-    if (_service_nodes.count(prev_service) == 0) return -3;
-
-    SubRequest * subrequest = _validateSubRid(sub_rid);
+    AsyncZone * subrequest = _validateSubRid(async_zone_id);
     if (subrequest == nullptr) return -4;
+
+    // -----------------------------------
+    //           ASYNC CREATION
+    // -----------------------------------
+
+    if (async) {
+        _waitFirstBranch(start_time, timeout);
+    }
+    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
 
     // -----------------------------------
     //           CORE WAIT LOGIC
@@ -547,26 +568,29 @@ int Request::wait(const std::string& sub_rid, std::string prev_service, int time
     return inconsistency;
 }
 
-int Request::waitRegion(const std::string& sub_rid, const std::string& region, 
-    std::string prev_service, bool async, int timeout) {
+int Request::waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout) {
         
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
-    auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+    std::chrono::seconds remaining_timeout;
 
     // -----------------------------------
     //           VALIDATIONS
     // -----------------------------------
 
-    if (_service_nodes.count(prev_service) == 0) return -3;
-
-    SubRequest * subrequest = _validateSubRid(sub_rid);
+    AsyncZone * subrequest = _validateSubRid(async_zone_id);
     if (subrequest == nullptr) return -4;
 
-    std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
+    // -----------------------------------
+    //           ASYNC CREATION
+    // -----------------------------------
 
     // wait for creation
     if (async) {
+        _waitFirstBranch(start_time, timeout);
+        remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+
+        std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
         while (_opened_regions.count(region) == 0) {
             _cond_subrequests.wait_for(lock, std::chrono::seconds(remaining_timeout));
             inconsistency = 1;
@@ -577,10 +601,15 @@ int Request::waitRegion(const std::string& sub_rid, const std::string& region,
         }
     }
     else {
+        std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
         if (_opened_regions.count(region) == 0) {
             return 0;
         }
     }
+
+    std::unique_lock<std::shared_mutex> lock(_mutex_subrequests);
+
+    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
 
     // -----------------------------------
     //           CORE WAIT LOGIC
@@ -636,11 +665,13 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 return -1;
             }
         }
-        while (_service_nodes[service]->tagged_branches.count(tag) == 0) {
-            _cond_new_service_nodes.wait_for(lock, remaining_timeout);
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
+        if (!tag.empty()) {
+            while (_service_nodes[service]->tagged_branches.count(tag) == 0) {
+                _cond_new_service_nodes.wait_for(lock, remaining_timeout);
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
+                }
             }
         }
     }
@@ -826,10 +857,8 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
     return inconsistency;
 }
 
-utils::Status Request::checkStatus(const std::string& sub_rid, const std::string& prev_service) {
-    if (_service_nodes.count(prev_service) == 0) return utils::Status {UNKNOWN};
-
-    SubRequest * subrequest = _validateSubRid(sub_rid);
+utils::Status Request::checkStatus(const std::string& async_zone_id) {
+    AsyncZone * subrequest = _validateSubRid(async_zone_id);
     if (subrequest == nullptr) return utils::Status {INVALID_CONTEXT};
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
@@ -839,21 +868,20 @@ utils::Status Request::checkStatus(const std::string& sub_rid, const std::string
     return utils::Status {CLOSED};
 }
 
-utils::Status Request::checkStatusRegion(const std::string& sub_rid, const std::string& region, const std::string& prev_service) {
+utils::Status Request::checkStatusRegion(const std::string& async_zone_id, const std::string& region) {
     utils::Status res {UNKNOWN};
 
-    if (_service_nodes.count(prev_service) == 0) return utils::Status {INVALID_CONTEXT};
     if (_opened_regions.count(region) == 0) return utils::Status {UNKNOWN};
 
-    tbb::concurrent_hash_map<std::string, SubRequest*>::const_accessor read_accessor_sr;
-    bool found = _sub_requests.find(read_accessor_sr, sub_rid);
+    tbb::concurrent_hash_map<std::string, AsyncZone*>::const_accessor read_accessor_sr;
+    bool found = _sub_requests.find(read_accessor_sr, async_zone_id);
     // subrequest does not exist - error propagating rid by client
     if (!found) {
         res.status = INVALID_CONTEXT;
         return res;
     }
 
-    SubRequest * subrequest = read_accessor_sr->second;
+    AsyncZone * subrequest = read_accessor_sr->second;
     read_accessor_sr.release();
 
     tbb::concurrent_hash_map<std::string, int>::const_accessor read_accessor_num;
@@ -957,7 +985,7 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
     return res;
 }
 
-utils::Dependencies Request::fetchDependencies(const std::string& prev_service) {
+utils::Dependencies Request::fetchDependencies() {
     utils::Dependencies result {OK};
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
 

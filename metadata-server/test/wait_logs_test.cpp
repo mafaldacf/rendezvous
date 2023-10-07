@@ -53,31 +53,31 @@ TEST(WaitLogsTest, PrecedingDetection) {
   ASSERT_EQ("r:a1:b2", r_a1_b2);
 
   // get root async zone
-  metadata::Request::SubRequest * subrequest_r = request->_validateSubRid(ROOT_SUB_RID);
+  metadata::Request::AsyncZone * subrequest_r = request->_validateSubRid(ROOT_SUB_RID);
   ASSERT_TRUE(subrequest_r != nullptr);
 
   // add to wait logs: async zone r:a1
-  metadata::Request::SubRequest * subrequest_r_a1 = request->_validateSubRid(r_a1);
+  metadata::Request::AsyncZone * subrequest_r_a1 = request->_validateSubRid(r_a1);
   ASSERT_TRUE(subrequest_r_a1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1);
 
   // add to wait logs: async zone r:c1
-  metadata::Request::SubRequest * subrequest_r_c1 = request->_validateSubRid(r_c1);
+  metadata::Request::AsyncZone * subrequest_r_c1 = request->_validateSubRid(r_c1);
   ASSERT_TRUE(subrequest_r_c1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1);
 
   // add to wait logs: async zone r:c1:d1
-  metadata::Request::SubRequest * subrequest_r_c1_d1 = request->_validateSubRid(r_c1_d1);
+  metadata::Request::AsyncZone * subrequest_r_c1_d1 = request->_validateSubRid(r_c1_d1);
   ASSERT_TRUE(subrequest_r_c1_d1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1_d1);
 
   // add to wait logs: async zone r:a1:b1
-  metadata::Request::SubRequest * subrequest_r_a1_b1 = request->_validateSubRid(r_a1_b1);
+  metadata::Request::AsyncZone * subrequest_r_a1_b1 = request->_validateSubRid(r_a1_b1);
   ASSERT_TRUE(subrequest_r_a1_b1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b1);
 
   // add to wait logs: async zone r:a1:b2
-  metadata::Request::SubRequest * subrequest_r_a1_b2 = request->_validateSubRid(r_a1_b2);
+  metadata::Request::AsyncZone * subrequest_r_a1_b2 = request->_validateSubRid(r_a1_b2);
   ASSERT_TRUE(subrequest_r_a1_b2 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b2);
 
@@ -161,14 +161,14 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   // and then disregards the post-storage wait call
   sleep(0.2);
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   // do wait call on post-storage
   sleep(0.5);
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_0, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -177,7 +177,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   // so it cannot prevent any inconsistency from the post-storage, as expected :)
   // but compose-post is still opened!!
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -192,7 +192,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   // now that compose-post is closed and we are able to detect wait cycle
   // this wait does not block
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 

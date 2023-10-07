@@ -17,7 +17,7 @@ message Empty {
 
 /* Metadata for server replication */
 message RequestContext {
-  string prev_service = 1;
+  string parent_service = 1;
   map<string, int32> versions = 2;
 }
 
@@ -28,8 +28,8 @@ message RegisterRequestMessage {
 
 /* Registers Branches */
 message RegisterBranchMessage {
-  string root_rid = 1;
-  string sub_rid = 2;
+  string rid = 1;
+  string async_zone = 2;
   string core_bid = 3;
   string service = 4;
   string tag = 5;
@@ -41,7 +41,7 @@ message RegisterBranchMessage {
 
 /* Close Branch */
 message CloseBranchMessage {
-  string root_rid = 1;
+  string rid = 1;
   string core_bid = 2;
   string region = 3;
   RequestContext context = 4;
@@ -49,14 +49,14 @@ message CloseBranchMessage {
 
 /* Register Wait */
 message AddWaitLogMessage {
-  string root_rid = 1;
+  string rid = 1;
   string async_zone = 2;
   RequestContext context = 3;
 }
 
 /* Remove Wait */
 message RemoveWaitLogMessage {
-  string root_rid = 1;
+  string rid = 1;
   string async_zone = 2;
   RequestContext context = 3;
 }

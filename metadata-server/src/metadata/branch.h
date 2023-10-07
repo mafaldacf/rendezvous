@@ -30,13 +30,13 @@ namespace metadata {
 
 
         public:
-            Branch(std::string service, std::string tag, std::string sub_rid, const utils::ProtoVec& vector_regions);
-            Branch(std::string service, std::string tag, std::string sub_rid);
+            Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions);
+            Branch(std::string service, std::string tag, std::string async_zone_id);
 
             /**
-             * Get the branch's sub_rid
+             * Get the branch's async_zone_id
              * 
-             * @return sub_rid
+             * @return async_zone_id
              */
             std::string getSubRid();
 

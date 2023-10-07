@@ -42,13 +42,13 @@ TEST(ConcurrencyTest, WaitRequest_ContextNotFound) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_EQ(RID, request->getRid());
 
-  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "");
+  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "", "", false, 5);
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  status = server.wait(request, ROOT_SUB_RID, "", "wrong_region");
+  status = server.wait(request, ROOT_SUB_RID, "", "wrong_region", "", false, 5);
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
-  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "wrong_region");
+  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "wrong_region", "", false, 5);
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
   utils::ProtoVec regions;
@@ -56,10 +56,10 @@ TEST(ConcurrencyTest, WaitRequest_ContextNotFound) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  status = server.wait(request, ROOT_SUB_RID, "service", "wrong_region");
+  status = server.wait(request, ROOT_SUB_RID, "service", "wrong_region", "", false, 5);
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 
-  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "region");
+  status = server.wait(request, ROOT_SUB_RID, "wrong_service", "region", "", false, 5);
   ASSERT_EQ(CONTEXT_NOT_FOUND, status);
 }
 
@@ -75,10 +75,10 @@ TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  status = server.wait(request, ROOT_SUB_RID, "service", "region", EMPTY_TAG, "", false, 1);
+  status = server.wait(request, ROOT_SUB_RID, "service", "region", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.wait(request, ROOT_SUB_RID, "service2", "", EMPTY_TAG, "", true, 1);
+  status = server.wait(request, ROOT_SUB_RID, "service2", "", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 
@@ -133,13 +133,13 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   ASSERT_EQ(getBid(2), bid_2);
   
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "AP", "", "", false, 5);
+    int status = server.wait(request, ROOT_SUB_RID, "", "AP", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
     // we put a wrong region
-    int status = server.wait(request, ROOT_SUB_RID, "", "WRONG REGION", "", "", false, 5);
+    int status = server.wait(request, ROOT_SUB_RID, "", "WRONG REGION", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
@@ -155,14 +155,14 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   // we try for global region
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "EU", "", "", false, 5);
+    int status = server.wait(request, ROOT_SUB_RID, "", "EU", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
     // we put wrong region
     // in this case, even with a global branch opened, we cannot prevent an inconsistency
-    int status = server.wait(request, ROOT_SUB_RID, "", "WRONG REGION", "", "", false, 5);
+    int status = server.wait(request, ROOT_SUB_RID, "", "WRONG REGION", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
@@ -189,7 +189,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_EQ(RID, request->getRid());
 
-  status = server.wait(request, ROOT_SUB_RID, "", "", "", "", false, 5);
+  status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 5);
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
   utils::ProtoVec region;
@@ -199,7 +199,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
 
   // we cannot wait for branches within the same subrid
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "", "", "", false, 5);
+    int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
@@ -217,12 +217,12 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   ASSERT_EQ(getBid(1), bid_1);
   // we do a global wait (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_0, "", "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   // we do a wait on region1 (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_0, "", "region1", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "region1", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   // -----------------------------------------------------
@@ -264,7 +264,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
 
   // we timeout
-  status = server.wait(request, SUB_RID_0, "", "", "", "", false, 1);
+  status = server.wait(request, SUB_RID_0, "", "", "", false, 1);
   ASSERT_EQ(TIMED_OUT, status);
 
   utils::ProtoVec emptyRegion;
@@ -285,29 +285,29 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(getBid(4), bid_4);
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "service1", "", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "service1", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "region1", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "region1", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "", "", "service0", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "service2", "region2", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "service2", "region2", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
@@ -319,13 +319,13 @@ TEST(ConcurrencyTest, WaitRequest) {
   // must only check previous service (service0) which is closed
   // must ignore it current service (service1) which is opened
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "region1", "", "service1", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "region1", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   // here we force async because we only register it later?
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "GLOBAL", "", "", true, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "GLOBAL", "", true, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -353,25 +353,25 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(getBid(7), bid_7);
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "storage", "US", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "storage", "US", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "storage", "", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "storage", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
   
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "", "GLOBAL", "", "", false, 7);
+    int status = server.wait(request, ROOT_SUB_RID, "", "GLOBAL", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -446,17 +446,17 @@ TEST(ConcurrencyTest, WaitServiceTagForceAsync) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "service", "EU", "tag", "", true);
+    int status = server.wait(request, ROOT_SUB_RID, "service", "EU", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "service", "US", "tag", "", true);
+    int status = server.wait(request, ROOT_SUB_RID, "service", "US", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, ROOT_SUB_RID, "service", "", "tag", "", true);
+    int status = server.wait(request, ROOT_SUB_RID, "service", "", "tag", true);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 

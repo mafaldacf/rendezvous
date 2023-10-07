@@ -32,29 +32,29 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   const std::string& service = request->service();
   const std::string& tag = request->tag();
-  const std::string& root_rid = request->root_rid();
-  const std::string& sub_rid = request->sub_rid();
+  const std::string& rid = request->rid();
+  const std::string& async_zone = request->async_zone();
   const std::string& core_bid = request->core_bid();
   const auto& regions = request->regions();
   bool monitor = request->monitor();
   bool async = request->async();
   int num = request->regions().size();
 
-  spdlog::trace("> [REPLICATED RB] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", num, service, monitor, core_bid, root_rid, sub_rid);
+  spdlog::trace("> [REPLICATED RB] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", num, service, monitor, core_bid, rid, async_zone);
 
-  metadata::Request * rdv_request = _server->getOrRegisterRequest(root_rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}:{}", core_bid, root_rid, sub_rid);
+    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}:{}", core_bid, rid, async_zone);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
   
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
 
   if (async) {
-    _server->addNextSubRequest(rdv_request, sub_rid, false);
+    _server->addNextSubRequest(rdv_request, async_zone, false);
   }
 
-  _server->registerBranch(rdv_request, sub_rid, service, regions, tag, request->context().prev_service(), core_bid, monitor);
+  _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().parent_service(), core_bid, monitor);
 
   return grpc::Status::OK;
 }
@@ -65,15 +65,15 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
 
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-  const std::string& root_rid = request->root_rid();
+  const std::string& rid = request->rid();
   const std::string& core_bid = request->core_bid();
   const std::string& region = request->region();
   
-  spdlog::trace("> [REPLICATED CB] closing branch on region '{}' for ids {}:{}", region, core_bid, root_rid);
+  spdlog::trace("> [REPLICATED CB] closing branch on region '{}' for ids {}:{}", region, core_bid, rid);
 
-  metadata::Request * rdv_request = _server->getOrRegisterRequest(root_rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}", core_bid, root_rid);
+    spdlog::critical("< [REPLICATED CB] Error: invalid request for ids {}:{}", core_bid, rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
@@ -83,10 +83,10 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   int res = _server->closeBranch(rdv_request, core_bid, region, true);
 
   if (res == 0) {
-    spdlog::critical("< [REPLICATED CB] Error: branch not found for ids {}:{}", core_bid, root_rid);
+    spdlog::critical("< [REPLICATED CB] Error: branch not found for ids {}:{}", core_bid, rid);
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
   } else if (res == -1) {
-    spdlog::critical("< [REPLICATED CB] Error: region '{}' not found for branch for ids {}:{}", region, core_bid, root_rid);
+    spdlog::critical("< [REPLICATED CB] Error: region '{}' not found for branch for ids {}:{}", region, core_bid, rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
   
@@ -99,20 +99,20 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
 
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-  const std::string& root_rid = request->root_rid();
+  const std::string& rid = request->rid();
   const std::string& async_zone = request->async_zone();
   
-  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", root_rid, async_zone);
+  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
 
-  metadata::Request * rdv_request = _server->getOrRegisterRequest(root_rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", root_rid);
+    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
 
-  metadata::Request::SubRequest * subrequest = rdv_request->_validateSubRid(async_zone);
+  metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
   if (subrequest == nullptr) {
     spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
@@ -128,20 +128,20 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
 
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-  const std::string& root_rid = request->root_rid();
+  const std::string& rid = request->rid();
   const std::string& async_zone = request->async_zone();
   
-  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", root_rid, async_zone);
+  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
 
-  metadata::Request * rdv_request = _server->getOrRegisterRequest(root_rid);
+  metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", root_rid);
+    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
 
-  metadata::Request::SubRequest * subrequest = rdv_request->_validateSubRid(async_zone);
+  metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
   if (subrequest == nullptr) {
     spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);

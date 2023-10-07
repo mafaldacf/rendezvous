@@ -46,28 +46,28 @@ namespace metadata {
 
         // public for testing purposes
         public:
-            typedef struct SubRequestStruct {
+            typedef struct AsyncZoneStruct {
                 int i;
-                std::string sub_rid;
+                std::string async_zone_id;
                 // protected by sub_requests mutex
                 int num_current_waits;
 
-                std::atomic<int> next_sub_rid_index;
+                std::atomic<int> next_async_zone_index;
                 std::atomic<int> opened_branches;
                 std::atomic<int> opened_global_region;
                 oneapi::tbb::concurrent_hash_map<std::string, int> opened_regions;
 
-            } SubRequest;
+            } AsyncZone;
 
             /* ----------- */
             /* async zones */
             /* ----------- */
             // index for sub_requests
             std::atomic<int> sub_requests_i;
-            // <sub_rid, sub_request_ptr>
-            oneapi::tbb::concurrent_hash_map<std::string, SubRequest*> _sub_requests;
-            // <sub_rid, num_current_waits>
-            std::unordered_set<SubRequest*> _wait_logs;
+            // <async_zone_id, sub_request_ptr>
+            oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _sub_requests;
+            // <async_zone_id, num_current_waits>
+            std::unordered_set<AsyncZone*> _wait_logs;
 
             /* ------- */
             /* helpers */
@@ -97,7 +97,10 @@ namespace metadata {
             /* ------------------- */
             /* concurrency control */
             /* ------------------- */
+            // branches
             std::mutex _mutex_branches;
+            std::condition_variable _cond_new_branch;
+            // regions
             std::mutex _mutex_regions;
             // service nodes
             std::shared_mutex _mutex_service_nodes;
@@ -113,33 +116,33 @@ namespace metadata {
              * Compute remaining timeout based on the original timeout value and the elapsed time
              * 
              * @param timeout Timeout, in seconds, provided by the user
-             * @param start_time
+             * @param start_time The starting time of the call
             */
             std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
             
         // public for testing purposes
         public:
             /**
-            * Verify that given sub_rid exists
+            * Verify that given async_zone_id exists
             * 
-            * @param sub_rid The sub request identifier
-            * @return return pointer to SubRequest if found and nullptr otherwise
+            * @param async_zone_id The sub request identifier
+            * @return return pointer to AsyncZone if found and nullptr otherwise
             */
-            SubRequest *  _validateSubRid(const std::string& sub_rid);
+            AsyncZone *  _validateSubRid(const std::string& async_zone_id);
 
             /**
              * Add current sub request to wait logs
              * 
              * @param subrequest The current sub request
             */
-            void _addToWaitLogs(SubRequest* subrequest);
+            void _addToWaitLogs(AsyncZone* subrequest);
 
             /**
              * Remove current sub request from wait logs
              * 
              * @param subrequest The current sub request
             */
-            void _removeFromWaitLogs(SubRequest* subrequest);
+            void _removeFromWaitLogs(AsyncZone* subrequest);
 
             /**
              * Check if first async zone precedes second async zone
@@ -148,7 +151,7 @@ namespace metadata {
              * @param subrequest_2 Subrequest ptr for the second async zone
              * @return true if first async zone precedes second and false otherwise
             */
-            bool _isPrecedingAsyncZone(SubRequest* subrequest_1, SubRequest* subrequest_2);
+            bool _isPrecedingAsyncZone(AsyncZone* subrequest_1, AsyncZone* subrequest_2);
 
             /**
              * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
@@ -157,7 +160,7 @@ namespace metadata {
              * @param subrequest The current sub request
              * @return vector of all preceding sub rids
             */
-            std::vector<std::string> _getPrecedingAsyncZones(SubRequest* subrequest);
+            std::vector<std::string> _getPrecedingAsyncZones(AsyncZone* subrequest);
 
             /**
              * Get number of opened branches for all preceding sub requests
@@ -176,6 +179,14 @@ namespace metadata {
             */
             std::pair<int, int> _numOpenedRegionsAsyncZones(
                 const std::vector<std::string>& sub_rids, const std::string& region);
+
+            /**
+             * Wait until the first branch is registered
+             * @param timeout Timeout, in seconds, provided by the user
+             * @param start_time The starting time of the call
+             * 
+             */
+            bool _waitFirstBranch(const std::chrono::steady_clock::time_point& start_time, int timeout);
 
         public:
 
@@ -210,28 +221,29 @@ namespace metadata {
 
             /**
              * Register a new sub request originating from an async branch within the current subrequest with
-             * the folllowing format: <sub_rid>:<sid>-<new_sub_rid>
+             * the folllowing format: <async_zone_id>:<sid>-<new_sub_rid>
              * 
              * @param sid The current server (replica) id
-             * @param sub_rid Current subrequest
-             * @param gen_id If disabled, the next sub_rid is not generated
+             * @param async_zone_id Current subrequest
+             * @param gen_id If disabled, the next async_zone_id is not generated
              * @return new subrequest
             */
-            std::string addNextSubRequest(const std::string& sid, const std::string& sub_rid, bool gen_id);
+            std::string addNextSubRequest(const std::string& sid, const std::string& async_zone_id, bool gen_id);
 
             /**
              * Register a set of branches in the request
              * 
-             * @param sub_rid Current subrequest
+             * @param async_zone_id Current subrequest
              * @param bid The identifier of the set of branches
              * @param service The service where the branches are being registered
              * @param tag The service tag
-             * @param region The regions for each branch
+             * @param regions The regions for each branch
+             * @param parent_service The parent service
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            metadata::Branch * registerBranch(const std::string& sub_rid, const std::string& bid, const std::string& service, 
-                const std::string& tag, const utils::ProtoVec& regions, const std::string& prev_service);
+            metadata::Branch * registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service, 
+                const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service);
 
             /**
              * Remove a branch from the request
@@ -249,52 +261,51 @@ namespace metadata {
             /**
              * Untrack (remove) branch according to its context (service, region or none) in the corresponding maps
              *
-             * @param sub_rid Current subrequest
+             * @param async_zone_id Current subrequest
              * @param service The service context
              * @param region The region context
              * @param globally_closed Indicates if all regions are closed
              * 
              * @return true if successful and false otherwise
              */
-            bool untrackBranch(const std::string& sub_rid, const std::string& service, 
+            bool untrackBranch(const std::string& async_zone_id, const std::string& service, 
                 const std::string& region, bool globally_closed);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
              *
-             * @param sub_rid Current subrequest
+             * @param async_zone_id Current subrequest
              * @param service The service context
              * @param regions The regions for each branch
              * @param num The number of new branches
+             * @param num Parent service
              * @param branch If we want to specify the tag for the service we need to provided the branch
              * 
              * @return true if successful and false otherwise
              */
-            bool trackBranch(const std::string& sub_rid, const std::string& service, const utils::ProtoVec& regions, 
+            bool trackBranch(const std::string& async_zone_id, const std::string& service, const utils::ProtoVec& regions, 
                 int num, const std::string& parent, metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed
              * 
-             * @param sub_rid Current sub request
-             * @param prev_service Previously registered service
+             * @param async_zone_id Current sub request
+             * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
-             * - (-3) if prev_service is invalid
-             * - (-4) if sub_rid does not exist
+             * - (-4) if async_zone_id does not exist
              */
-            int wait(const std::string& sub_rid, std::string prev_service, int timeout);
+            int wait(const std::string& async_zone_id, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (region)
              *
-             * @param sub_rid Current subrequest
+             * @param async_zone_id Current subrequest
              * @param region The name of the region that defines the waiting context
-             * @param prev_service Previously registered service
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              *
@@ -303,10 +314,9 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-2) if context was not found
-             * - (-3) if prev_service is invalid
-             * - (-4) if sub_rid does not exist
+             * - (-4) if async_zone_id does not exist
              */
-            int waitRegion(const std::string& sub_rid, const std::string& region, std::string prev_service, bool async, int timeout);
+            int waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout);
 
             /**
              * Wait until request is closed for a given context (service)
@@ -349,28 +359,26 @@ namespace metadata {
 
             /**
              * Check status of request
-             * @param sub_rid Current sub request
-             * @param prev_service Previously registered service
+             * @param async_zone_id Current sub request
              * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              */
-            Status checkStatus(const std::string& sub_rid, const std::string& prev_service);
+            Status checkStatus(const std::string& async_zone_id);
 
             /**
              * Check status of request for a given context (region)
              *
-             * @param sub_rid Current sub request
+             * @param async_zone_id Current sub request
              * @param region The name of the region that defines the waiting context
-             * @param prev_service Previously registered service
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusRegion(const std::string& sub_rid, const std::string& region, const std::string& prev_service);
+            Status checkStatusRegion(const std::string& async_zone_id, const std::string& region);
 
             /**
              * Check status of request for a given context (service)
@@ -403,13 +411,12 @@ namespace metadata {
              * Fetch dependencies in the call graph
              * 
              * @param request Request where the branch is registered
-             * @param prev_service Previously registered service
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
              * - (-2) if service was not found
              * - (-3) if context was not found
              */
-            utils::Dependencies fetchDependencies(const std::string& prev_service);
+            utils::Dependencies fetchDependencies();
 
             /**
              * Fetch dependencies in the call graph
