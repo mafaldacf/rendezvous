@@ -16,7 +16,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     _wait_logs = std::unordered_set<SubRequest*>();
 
     // add root node
-    _service_nodes[""] = new ServiceNode({""});
+    _service_nodes[""] = new ServiceNode{""};
 
     // insert the subrequest of the root
     tbb::concurrent_hash_map<std::string, SubRequest*>::accessor write_accessor;
@@ -196,7 +196,7 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     ServiceNode * service_node = it->second;
     
     if (globally_closed) {
-        service_node->opened_branches++;
+        service_node->opened_branches--;
     }
     if (region.empty()) {
         service_node->opened_global_region--;
@@ -257,17 +257,20 @@ bool Request::untrackBranch(const std::string& sub_rid, const std::string& servi
     }
     _cond_subrequests.notify_all();
 
+    /* if (service == "storage" || service == "service1") {
+        std::cout << "[" << service << "] UNTRACK. new num opened branches: " << service_node->opened_branches << std::endl;
+    } */
+
     return true;
 }
 
 bool Request::trackBranch(const std::string& sub_rid, const std::string& service, 
     const utils::ProtoVec& regions, int num, const std::string& prev_service, metadata::Branch * branch) {
         
-    ServiceNode * service_node;
-
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
     // ---------------------------
+    ServiceNode * service_node;
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
 
     auto it = _service_nodes.find(prev_service);
@@ -275,9 +278,14 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     ServiceNode * parent_node = it->second;
     
     // sanity check
-    if (_service_nodes.count(service) == 0) {
-        service_node = new ServiceNode({service});
+    auto service_node_it = _service_nodes.find(service);
+    if (service_node_it == _service_nodes.end()) {
+        service_node = new ServiceNode{service};
+        service_node->opened_regions = std::unordered_map<std::string, int>();
         _service_nodes[service] = service_node;
+    }
+    else {
+        service_node = service_node_it->second;
     }
 
     // validate tag
@@ -288,13 +296,6 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
         }
         // track on SERVICE TAG
         service_node->tagged_branches[branch->getTag()] = branch;
-    }
-    
-    // current node is the first child
-    if (_service_nodes[service]->parent == nullptr) {
-        parent_node = _service_nodes[prev_service];
-        _service_nodes[service]->parent = parent_node;
-        parent_node->children.emplace_back(_service_nodes[service]);
     }
 
     parent_node->children.emplace_back(service_node);
@@ -349,6 +350,10 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
     _num_opened_branches.fetch_add(1);
     lock.unlock();
     lock_regions.unlock();
+
+    /* if (service == "storage" || service == "service1") {
+        std::cout << "[" << service << "] TRACK. new num opened branches: " << service_node->opened_branches << std::endl;
+    } */
 
     return true;
 }
@@ -664,6 +669,9 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     else {
         int * num_branches_ptr = &(_service_nodes[service]->opened_branches);
         while (*num_branches_ptr != 0) {
+            /* if (service == "storage" || service == "service1") {
+                std::cout << "[" << service << "] waiting but got num = " << *num_branches_ptr << std::endl;
+            } */
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);

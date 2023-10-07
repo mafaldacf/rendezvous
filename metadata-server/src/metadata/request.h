@@ -41,7 +41,6 @@ namespace metadata {
                 int opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, metadata::Branch*> tagged_branches;
-                struct ServiceNodeStruct * parent;
                 std::list<struct ServiceNodeStruct*> children;
             } ServiceNode;
 

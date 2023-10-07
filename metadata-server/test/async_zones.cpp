@@ -100,6 +100,42 @@ TEST(AsyncZonesTest, AddNextSubRids) {
   ASSERT_EQ(SUB_RID_0_0_0, sub_rid_0_0_0);
 }
 
+TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) { 
+  std::vector<std::thread> threads;
+  rendezvous::Server server(SID);
+  std::string bid;
+  int status;
+  bool found_region;
+
+  utils::ProtoVec regions_empty;
+
+  metadata::Request * request = server.getOrRegisterRequest(RID);
+  ASSERT_EQ(RID, request->getRid());
+
+  // register compose-post branch
+  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "");
+  ASSERT_EQ(getBid(0), bid_0);
+
+  // register post-storage async branch from compose-post
+  std::string sub_rid_0 = server.addNextSubRequest(request, ROOT_SUB_RID);
+  ASSERT_EQ(SUB_RID_0, sub_rid_0);
+  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "");
+  ASSERT_EQ(getBid(1), bid_1);
+
+  // register post-storage async branch for write post operation
+  std::string sub_rid_0_0 = server.addNextSubRequest(request, SUB_RID_0);
+  ASSERT_EQ(SUB_RID_0_0, sub_rid_0_0);
+  utils::ProtoVec regions_post_storage;
+  regions_post_storage.Add("EU");
+  regions_post_storage.Add("US");
+  std::string bid_2 = server.registerBranch(request, SUB_RID_0_0, "post-storage", regions_post_storage, "", "");
+  ASSERT_EQ(getBid(2), bid_2);
+
+  // close all branches for compose-post
+  found_region = server.closeBranch(request, getBid(0), "");
+  ASSERT_EQ(1, found_region);
+}
+
 
 TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) { 
   std::vector<std::thread> threads;

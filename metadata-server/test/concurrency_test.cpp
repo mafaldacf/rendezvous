@@ -203,7 +203,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.2);
+  sleep(1);
 
   // -----------------------------------------------------
   // ASYNC ZONE
@@ -215,13 +215,11 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   // this branch is ignored 
   std::string bid_1 = server.registerBranch(request, SUB_RID_0, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
-  sleep(0.4);
   // we do a global wait (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
     int status = server.wait(request, SUB_RID_0, "", "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
-  sleep(0.2);
   // we do a wait on region1 (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
     int status = server.wait(request, SUB_RID_0, "", "region1", "", "", false, 5);
@@ -376,7 +374,6 @@ TEST(ConcurrencyTest, WaitRequest) {
     int status = server.wait(request, ROOT_SUB_RID, "", "GLOBAL", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
-  
 
   sleep(1);
 
@@ -395,8 +392,6 @@ TEST(ConcurrencyTest, WaitRequest) {
         thread.join();
     }
   }
-
-  sleep(1);
 
   // validate number of prevented inconsistencies
   long value = server._prevented_inconsistencies.load();

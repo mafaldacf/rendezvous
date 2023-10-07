@@ -83,8 +83,6 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   int num = request->regions().size();
   const auto& regions = request->regions();
 
-  // FIXME: VERIFY REGINS ONE BY ONE!!!
-
   spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (async={}, monitor={})", num, composed_rid, service, tag, async, monitor);
   
   // service is empty
