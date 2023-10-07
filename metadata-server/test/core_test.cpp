@@ -96,9 +96,9 @@ TEST(CoreTest, RegisterBranch_SameTags) {
   std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, "tag_A", "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  // server returns empty when registration fails
+  // in this version Rendezvous allows duplicate tags!!
   std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, "tag_A", "");
-  ASSERT_EQ("", bid_1);
+  ASSERT_EQ(getBid(1), bid_1);
 }
 
 TEST(CoreTest, CloseBranch) { 

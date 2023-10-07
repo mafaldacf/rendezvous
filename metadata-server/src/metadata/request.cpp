@@ -290,12 +290,7 @@ bool Request::trackBranch(const std::string& sub_rid, const std::string& service
 
     // validate tag
     if (branch->hasTag()) {
-        // ABORT - unique tag already exists
-        if (service_node->tagged_branches.count(branch->getTag()) != 0) {
-            return false;
-        }
-        // track on SERVICE TAG
-        service_node->tagged_branches[branch->getTag()] = branch;
+        service_node->tagged_branches[branch->getTag()].push_back(branch);
     }
 
     parent_node->children.emplace_back(service_node);
@@ -641,6 +636,13 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 return -1;
             }
         }
+        while (_service_nodes[service]->tagged_branches.count(tag) == 0) {
+            _cond_new_service_nodes.wait_for(lock, remaining_timeout);
+            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+            if (remaining_timeout <= std::chrono::seconds(0)) {
+                return -1;
+            }
+        }
     }
     // context error checking
     else {
@@ -655,13 +657,15 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     //-----------
     // tag-specific
     if (!tag.empty()) {
-        metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag];
-        while (!branch->isClosed()) {
-            inconsistency = 1;
-            _cond_service_nodes.wait_for(lock, remaining_timeout);
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
+        for (int i = 0; i < _service_nodes[service]->tagged_branches[tag].size(); i++) {
+            metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag].at(i);
+            while (!branch->isClosed()) {
+                inconsistency = 1;
+                _cond_service_nodes.wait_for(lock, remaining_timeout);
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
+                }
             }
         }
     }
@@ -761,13 +765,15 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
     //-----------
     // tag-specific
     if (!tag.empty()) {
-        metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag];
-        while (!branch->isClosed(region)) {
-            inconsistency = 1;
-            _cond_service_nodes.wait_for(lock, remaining_timeout);
-            remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-            if (remaining_timeout <= std::chrono::seconds(0)) {
-                return -1;
+        for (int i = 0; i < _service_nodes[service]->tagged_branches[tag].size(); i++) {
+            metadata::Branch * branch = _service_nodes[service]->tagged_branches[tag].at(i);
+            while (!branch->isClosed(region)) {
+                inconsistency = 1;
+                _cond_service_nodes.wait_for(lock, remaining_timeout);
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
+                }
             }
         }
     }
@@ -892,8 +898,15 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
 
     // otherwise, return detailed information
     // get tagged branches within the same service
-    for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
-        res.tagged[branch_it.first] = branch_it.second->getStatus();
+    for (const auto& tag_it: _service_nodes[service]->tagged_branches) {
+        res.tagged[tag_it.first] = CLOSED;
+        // set status to OPENED if at least one branch for this tag is opened
+        for (const auto& branch_it: tag_it.second) {
+            if (branch_it->getStatus() == OPENED) {
+                res.tagged[tag_it.first] = OPENED;
+                break;
+            }
+        }
     }
     // get all regions status
     for (const auto& region_it: _service_nodes[service]->opened_regions) {
@@ -931,8 +944,15 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
     }
 
     // otherwise, return detailed information
-    for (const auto& branch_it: _service_nodes[service]->tagged_branches) {
-        res.tagged[branch_it.first] = branch_it.second->getStatus(region);
+    for (const auto& tag_it: _service_nodes[service]->tagged_branches) {
+        res.tagged[tag_it.first] == CLOSED;
+        // set status to OPENED if at least one branch for this tag is opened
+        for (const auto& branch_it: tag_it.second) {
+            if (branch_it->getStatus(region) == OPENED) {
+                res.tagged[tag_it.first] = OPENED;
+                break;
+            }
+        }
     }
     return res;
 }
@@ -946,7 +966,6 @@ utils::Dependencies Request::fetchDependencies(const std::string& prev_service) 
             result.deps.insert(it->first);
         }
     }
-
     return result;
 }
 
