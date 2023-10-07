@@ -8,6 +8,7 @@
 #include "../replicas/replica_client.h"
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
+#include "../utils/settings.h"
 #include <atomic>
 #include <unordered_set>
 #include <vector>
@@ -24,8 +25,6 @@ namespace service {
     class ClientServiceImpl final : public rendezvous::ClientService::Service {
 
         private:
-            bool _consistency_checks;
-            bool _async_replication;
             std::shared_ptr<rendezvous::Server> _server;
             replicas::ReplicaClient _replica_client;
             
@@ -36,8 +35,7 @@ namespace service {
             metadata::Request * _getRequest(const std::string& rid);
 
         public:
-            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs, 
-                bool async_replication);
+            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs);
 
             grpc::Status Subscribe(grpc::ServerContext * context,
                 const rendezvous::SubscribeMessage * request,

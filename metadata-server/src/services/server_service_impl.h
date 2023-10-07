@@ -6,6 +6,7 @@
 #include "../server.h"
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
+#include "../utils/settings.h"
 #include <atomic>
 #include <mutex>
 #include <iostream>
@@ -19,12 +20,12 @@ namespace service {
     class ServerServiceImpl final : public rendezvous_server::ServerService::Service {
 
         private:
-            bool _consistency_checks;
-            bool _async_replication;
             std::shared_ptr<rendezvous::Server> _server;
 
+            void _waitReplicaVersions(metadata::Request * rdv_request, rendezvous_server::RequestContext rdv_context);
+
         public:
-            ServerServiceImpl(std::shared_ptr<rendezvous::Server> server, bool async_replication);
+            ServerServiceImpl(std::shared_ptr<rendezvous::Server> server);
 
             /* gRPC generated methods*/
             grpc::Status RegisterRequest(grpc::ServerContext * context, 
@@ -37,6 +38,14 @@ namespace service {
             
             grpc::Status CloseBranch(grpc::ServerContext * context, 
                 const rendezvous_server::CloseBranchMessage * request, 
+                rendezvous_server::Empty * response) override;
+
+            grpc::Status AddWaitLog(grpc::ServerContext * context, 
+                const rendezvous_server::AddWaitLogMessage * request, 
+                rendezvous_server::Empty * response) override;
+
+            grpc::Status RemoveWaitLog(grpc::ServerContext * context, 
+                const rendezvous_server::RemoveWaitLogMessage * request, 
                 rendezvous_server::Empty * response) override;
     };
 }

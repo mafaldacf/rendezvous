@@ -18,6 +18,7 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include "utils/settings.h"
 
 using json = nlohmann::json;
 
@@ -46,8 +47,8 @@ void shutdown() {
 
 void run() {
   auto rendezvous_server = std::make_shared<rendezvous::Server> (_replica_id, _settings);
-  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs, _async_replication);
-  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server, _async_replication);
+  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs);
+  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server);
 
   grpc::ServerBuilder builder;
   builder.AddListeningPort(_replica_addr, grpc::InsecureServerCredentials());
@@ -67,6 +68,14 @@ void run() {
 }
 
 void loadConfig() {
+  // load consistency checks flag from environment variable
+  auto consistency_checks_env = std::getenv("CONSISTENCY_CHECKS");
+  if (consistency_checks_env) {
+    utils::CONSISTENCY_CHECKS = (atoi(consistency_checks_env) == 1);
+  } else { // true by default
+    utils::CONSISTENCY_CHECKS = true;
+  }
+
   /* Parse settings config */
   std::ifstream settings_file("../config/settings.json");
   if (!settings_file.is_open()) {
@@ -78,7 +87,8 @@ void loadConfig() {
     json root;
     settings_file >> root;
     _settings = root;
-    _async_replication = _settings["async_replication"].get<bool>();
+    utils::ASYNC_REPLICATION = _settings["async_replication"].get<bool>();
+    utils::CONTEXT_VERSIONING = _settings["context_versioning"].get<bool>();
   }
   catch (json::exception &e) {
     spdlog::error("Error parsing 'settings.json'");
@@ -139,6 +149,8 @@ int main(int argc, char *argv[]) {
   }
   spdlog::info("--------------- RENDEZVOUS SERVER ({}) --------------- ", _replica_id);
   loadConfig();
+  spdlog::info("CONSYSTENCY CHECKS: '{}'", utils::CONSISTENCY_CHECKS);
+  spdlog::info("ASYNC REPLICATION: '{}'", utils::ASYNC_REPLICATION);
   run();
   return 0;
 }

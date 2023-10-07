@@ -5,6 +5,7 @@
 #include "../replicas/version_registry.h"
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
+#include "../utils/settings.h"
 #include <iostream>
 #include <map>
 #include <memory>

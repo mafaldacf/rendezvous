@@ -7,6 +7,7 @@
 #include "client.grpc.pb.h"
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
+#include "../utils/settings.h"
 
 using namespace utils;
 

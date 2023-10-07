@@ -5,6 +5,7 @@
 #include "server.grpc.pb.h"
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
+#include "../utils/settings.h"
 #include <grpcpp/grpcpp.h>
 #include <string>
 #include <thread>
@@ -27,7 +28,6 @@ namespace replicas {
 
         private:
             std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
-            bool _async_replication;
 
             /**
              * Wait for completion queue of async requests
@@ -47,9 +47,10 @@ namespace replicas {
                 const rendezvous::RequestContext& ctx);
             void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, 
                 const std::string& region, const rendezvous::RequestContext& ctx);
+            
 
         public:
-            ReplicaClient(std::vector<std::string> addrs, bool async_replication);
+            ReplicaClient(std::vector<std::string> addrs);
 
             /**
              * Send register request call to all replicas
@@ -84,6 +85,24 @@ namespace replicas {
              */
             void closeBranch(const std::string& root_rid, const std::string& core_bid, 
                 const std::string& region, const rendezvous::RequestContext& ctx);
+
+            /**
+             * Add wait call to log entry (asynchronous broadcast)
+             * 
+             * @param root_rid The identifier of the root request
+             * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param ctx Additional metadata context
+             */
+            void addWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx);
+
+            /**
+             * Remove wait call from log entry (asynchronous broadcast)
+             * 
+             * @param root_rid The identifier of the root request
+             * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param ctx Additional metadata context
+             */
+            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx);
 
         };
     

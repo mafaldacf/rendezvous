@@ -4,21 +4,10 @@ using namespace service;
 
 ClientServiceImpl::ClientServiceImpl(
   std::shared_ptr<rendezvous::Server> server, 
-  std::vector<std::string> addrs,
-  bool async_replication)
-  : _server(server), _num_wait_calls(0), _replica_client(addrs, async_replication),
-  _async_replication(async_replication),
+  std::vector<std::string> addrs)
+  : _server(server), _num_wait_calls(0), _replica_client(addrs),
   _num_replicas(addrs.size()+1) /* current replica is not part of the address vector */ {
 
-    // get consistency checks bool from environment
-    auto consistency_checks_env = std::getenv("CONSISTENCY_CHECKS");
-    if (consistency_checks_env) {
-      _consistency_checks = (atoi(consistency_checks_env) == 1);
-    } else { // true by default
-      _consistency_checks = true;
-    }
-    spdlog::info("CONSYSTENCY CHECKS: '{}'", _consistency_checks);
-    spdlog::info("ASYNC REPLICATION: '{}'", async_replication);
 }
 
 metadata::Request * ClientServiceImpl::_getRequest(const std::string& rid) {
@@ -38,7 +27,7 @@ grpc::Status ClientServiceImpl::Subscribe(grpc::ServerContext * context,
   const rendezvous::SubscribeMessage * request,
   grpc::ServerWriter<rendezvous::SubscribeResponse> * writer) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   spdlog::info("> [SUB] loading subscriber for service '{}' and region '{}'", request->service(), request->region());
   metadata::Subscriber * subscriber = _server->getSubscriber(request->service(), request->region());
   rendezvous::SubscribeResponse response;
@@ -61,7 +50,7 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   const rendezvous::RegisterRequestMessage* request, 
   rendezvous::RegisterRequestResponse* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   std::string rid = request->rid();
   metadata::Request * rdv_request;
   spdlog::trace("> [RR] register request '{}'", rid.c_str());
@@ -70,7 +59,7 @@ grpc::Status ClientServiceImpl::RegisterRequest(grpc::ServerContext* context,
   
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
-    if (_async_replication) {
+    if (utils::ASYNC_REPLICATION) {
       // initialize empty metadata for client to propagate
       rendezvous::RequestContext ctx;
       response->mutable_context()->CopyFrom(ctx);
@@ -84,7 +73,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const rendezvous::RegisterBranchMessage* request, 
   rendezvous::RegisterBranchResponse* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   std::string composed_rid = request->rid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
@@ -147,7 +136,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
-    if (_async_replication) {
+    if (utils::ASYNC_REPLICATION) {
       // update current context
       std::string sid = _server->getSid();
       int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
@@ -164,7 +153,7 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   const rendezvous::RegisterBranchesDatastoresMessage* request, 
   rendezvous::RegisterBranchesDatastoresResponse* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   const std::string& rid = request->rid();
   metadata::Request * rdv_request = _getRequest(rid);
   if (rdv_request == nullptr) {
@@ -220,7 +209,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   const rendezvous::CloseBranchMessage* request, 
   rendezvous::Empty* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& region = request->region();
   bool force = request->force();
@@ -263,7 +252,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
 grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context, 
   const rendezvous::WaitRequestMessage* request, 
   rendezvous::WaitRequestResponse* response) {
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   
   const std::string& full_rid = request->rid();
   const std::string& service = request->service();
@@ -307,7 +296,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   }
 
   // wait until current replica is consistent with this request
-  if (_async_replication && _num_replicas > 1) {
+  if (utils::ASYNC_REPLICATION && _num_replicas > 1) {
     rdv_request->getVersionsRegistry()->waitRemoteVersions(request->context());
   }
 
@@ -316,14 +305,14 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   // wait logic for multiple services
   if (services.size() > 0) {
     for (const auto& service: services) {
-      result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout, wait_deps);
+      result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), utils::ASYNC_REPLICATION, timeout, wait_deps);
       if (result < 0) {
         break;
       }
     }
   }
   else {
-    int result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), _async_replication, timeout, wait_deps);
+    int result = _server->wait(rdv_request, sub_rid, service, region, tag, request->context().prev_service(), utils::ASYNC_REPLICATION, timeout, wait_deps);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
     }
@@ -349,7 +338,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
 grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context, 
   const rendezvous::CheckStatusMessage* request, 
   rendezvous::CheckStatusResponse* response) {
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& composed_rid = request->rid();
   const std::string& service = request->service();
@@ -404,7 +393,7 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
 grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context, 
   const rendezvous::FetchDependenciesMessage* request, 
   rendezvous::FetchDependenciesResponse* response) {
-  if (!_consistency_checks) return grpc::Status::OK;
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
   const std::string& service = request->service();

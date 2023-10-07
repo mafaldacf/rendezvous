@@ -6,6 +6,8 @@ service ServerService {
   rpc RegisterRequest(RegisterRequestMessage) returns (Empty);
   rpc RegisterBranch(RegisterBranchMessage) returns (Empty);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
+  rpc AddWaitLog(AddWaitLogMessage) returns (Empty);
+  rpc RemoveWaitLog(RemoveWaitLogMessage) returns (Empty);
 }
 
 /* Helpers */
@@ -43,4 +45,18 @@ message CloseBranchMessage {
   string core_bid = 2;
   string region = 3;
   RequestContext context = 4;
+}
+
+/* Register Wait */
+message AddWaitLogMessage {
+  string root_rid = 1;
+  string async_zone = 2;
+  RequestContext context = 3;
+}
+
+/* Remove Wait */
+message RemoveWaitLogMessage {
+  string root_rid = 1;
+  string async_zone = 2;
+  RequestContext context = 3;
 }
