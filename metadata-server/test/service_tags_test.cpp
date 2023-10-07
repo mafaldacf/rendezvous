@@ -15,14 +15,14 @@ TEST(ServiceTagsTest, CheckStatusDetailed_Tags) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("US");
 
-  std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
   ASSERT_EQ(getBid(1), bid_1);
   
   utils::Status r = server.checkStatus(request, ROOT_SUB_RID, "post_storage", "", "", true);
@@ -65,19 +65,19 @@ TEST(ServiceTagsTest, CheckStatusDetailedDuplicateTag) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("AP");
 
-  std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
   ASSERT_EQ(getBid(1), bid_1);
 
   utils::ProtoVec regions_2;
   regions_2.Add("AP");
-  std::string bid_2 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_2, "write_post", "");
+  std::string bid_2 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_2, "write_post", "");
   ASSERT_EQ(getBid(2), bid_2);
   
   utils::Status r = server.checkStatus(request, ROOT_SUB_RID, "post_storage", "", "", true);

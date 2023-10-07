@@ -35,35 +35,35 @@ void registerRequestAndAssert(std::string * rid) {
   *rid = response.rid();
 }
 
-void registerBranchAndAssert(std::string rid, long bid, std::string service, std::string region) {
+void registerBranchGTestAndAssert(std::string rid, long bid, std::string service, std::string region) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  rendezvous::RegisterBranchMessage request;
-  rendezvous::RegisterBranchResponse response;
+  rendezvous::registerBranchGTestMessage request;
+  rendezvous::registerBranchGTestResponse response;
   request.set_rid(rid);
   request.set_service(service);
   request.set_region(region);
 
-  auto status = stub->registerBranchRegion(&context, request, &response);
+  auto status = stub->registerBranchGTestRegion(&context, request, &response);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(bid, response.bid());
 }
 
-void registerBranchesAndAssert(std::string rid, long num, std::string service, std::string region) {
+void registerBranchGTestesAndAssert(std::string rid, long num, std::string service, std::string region) {
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
 
   grpc::ClientContext context;
-  rendezvous::RegisterBranchesMessage request;
-  rendezvous::RegisterBranchesResponse response;
+  rendezvous::registerBranchGTestesMessage request;
+  rendezvous::registerBranchGTestesResponse response;
   request.set_rid(rid);
   request.set_num(num);
   request.set_service(service);
   request.set_region(region);
 
-  auto status = stub->registerBranch(&context, request, &response);
+  auto status = stub->registerBranchGTest(&context, request, &response);
   ASSERT_TRUE(status.ok());
   ASSERT_EQ(num, response.bid().size());
 }
@@ -173,8 +173,8 @@ TEST(gRPCTest, RegisterRequest_WithRID_RegisterAndCloseBranches) {
 
   registerRequestAndAssert(&rid);
 
-  registerBranchAndAssert(rid, 0, "s", "r");
-  registerBranchesAndAssert(rid, 3, "", "");
+  registerBranchGTestAndAssert(rid, 0, "s", "r");
+  registerBranchGTestesAndAssert(rid, 3, "", "");
 
   /* Close All Branches */
   for(int bid = 0; bid < 4; bid++) {
@@ -182,34 +182,34 @@ TEST(gRPCTest, RegisterRequest_WithRID_RegisterAndCloseBranches) {
   }
 }
 
-TEST(gRPCTest, RegisterBranch_NoRID) { 
+TEST(gRPCTest, registerBranchGTest_NoRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Branch */
   grpc::ClientContext context;
-  rendezvous::RegisterBranchMessage request;
-  rendezvous::RegisterBranchResponse response;
+  rendezvous::registerBranchGTestMessage request;
+  rendezvous::registerBranchGTestResponse response;
 
-  status = stub->registerBranchRegion(&context, request, &response);
+  status = stub->registerBranchGTestRegion(&context, request, &response);
 
   ASSERT_TRUE(status.ok());
   ASSERT_EQ("rendezvous-0", response.rid());
 }
 
-TEST(gRPCTest, RegisterBranches_NoRID) { 
+TEST(gRPCTest, registerBranchGTestes_NoRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Multiple Branches */
   grpc::ClientContext context;
-  rendezvous::RegisterBranchesMessage request;
-  rendezvous::RegisterBranchesResponse response;
+  rendezvous::registerBranchGTestesMessage request;
+  rendezvous::registerBranchGTestesResponse response;
   request.set_num(3);
 
-  status = stub->registerBranch(&context, request, &response);
+  status = stub->registerBranchGTest(&context, request, &response);
 
   ASSERT_TRUE(status.ok());
   ASSERT_EQ("rendezvous-1", response.rid());
@@ -219,7 +219,7 @@ TEST(gRPCTest, RegisterBranches_NoRID) {
   ASSERT_EQ(2, response.bid()[2]);
 }
 
-TEST(gRPCTest, RegisterBranch_InvalidRID) { 
+TEST(gRPCTest, registerBranchGTest_InvalidRID) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
@@ -229,29 +229,29 @@ TEST(gRPCTest, RegisterBranch_InvalidRID) {
 
   /* Register Branch */
   grpc::ClientContext context;
-  rendezvous::RegisterBranchMessage request;
-  rendezvous::RegisterBranchResponse response;
+  rendezvous::registerBranchGTestMessage request;
+  rendezvous::registerBranchGTestResponse response;
   request.set_rid("invalid_rid");
 
-  status = stub->registerBranchRegion(&context, request, &response);
+  status = stub->registerBranchGTestRegion(&context, request, &response);
 
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(grpc::INVALID_ARGUMENT, status.error_code());
 }
 
-TEST(gRPCTest, RegisterBranches_InvalidRid) { 
+TEST(gRPCTest, registerBranchGTestes_InvalidRid) { 
   auto channel = grpc::CreateChannel("localhost:8000", grpc::InsecureChannelCredentials());
   auto stub = rendezvous::RendezvousService::NewStub(channel);
   auto status = grpc::Status::OK;
 
   /* Register Branch */
   grpc::ClientContext context;
-  rendezvous::RegisterBranchesMessage request;
-  rendezvous::RegisterBranchesResponse response;
+  rendezvous::registerBranchGTestesMessage request;
+  rendezvous::registerBranchGTestesResponse response;
   request.set_num(3);
   request.set_rid("invalid_rid");
 
-  status = stub->registerBranch(&context, request, &response);
+  status = stub->registerBranchGTest(&context, request, &response);
 
   ASSERT_FALSE(status.ok());
   ASSERT_EQ(grpc::INVALID_ARGUMENT, status.error_code());
@@ -289,9 +289,9 @@ TEST(gRPCTest, CheckRequest) {
 
   checkRequestAndAssert(rid, "", "", CLOSED);
 
-  registerBranchAndAssert(rid, 0, "s", "r");
-  registerBranchAndAssert(rid, 1, "s", "");
-  registerBranchAndAssert(rid, 2, "s1", "r");
+  registerBranchGTestAndAssert(rid, 0, "s", "r");
+  registerBranchGTestAndAssert(rid, 1, "s", "");
+  registerBranchGTestAndAssert(rid, 2, "s1", "r");
 
   checkRequestAndAssert(rid, "", "", OPENED);
   checkRequestAndAssert(rid, "s", "", OPENED);
@@ -325,7 +325,7 @@ TEST(gRPCTest, CheckRequest_ContextNotFound) {
 
   registerRequestAndAssert(&rid);
 
-  registerBranchAndAssert(rid, 0, "s", "r");
+  registerBranchGTestAndAssert(rid, 0, "s", "r");
 
   checkRequestAndAssertError(rid, "wrong_service", "", grpc::NOT_FOUND);
   checkRequestAndAssertError(rid, "", "wrong_region", grpc::NOT_FOUND);
@@ -348,12 +348,12 @@ TEST(gRPCTest, CheckRequestByRegions_ContextAndRegionNotFound) {
 
   registerRequestAndAssert(&rid);
 
-  registerBranchAndAssert(rid, 0, "", "");
+  registerBranchGTestAndAssert(rid, 0, "", "");
 
   /* Check Request By Regions But Region Not Found */
   checkRequestByRegionsAndAssertError(rid, "", grpc::NOT_FOUND);
 
-  registerBranchAndAssert(rid, 1, "s", "");
+  registerBranchGTestAndAssert(rid, 1, "s", "");
 
   checkRequestByRegionsAndAssertError(rid, "wrong_service", grpc::NOT_FOUND);
 }
@@ -366,10 +366,10 @@ TEST(gRPCTest, CheckRequestByRegions) {
 
   registerRequestAndAssert(&rid);
 
-  registerBranchAndAssert(rid, 0, "", "");
-  registerBranchAndAssert(rid, 1, "s", "");
-  registerBranchAndAssert(rid, 2, "", "r1");
-  registerBranchAndAssert(rid, 3, "s", "r2");
+  registerBranchGTestAndAssert(rid, 0, "", "");
+  registerBranchGTestAndAssert(rid, 1, "s", "");
+  registerBranchGTestAndAssert(rid, 2, "", "r1");
+  registerBranchGTestAndAssert(rid, 3, "s", "r2");
 
   /* Check Request By Regions */
   grpc::ClientContext context_chr2;
@@ -432,10 +432,10 @@ TEST(gRPCTest, WaitRequest) {
 
   registerRequestAndAssert(&rid);
 
-  registerBranchAndAssert(rid, 0, "", "");
-  registerBranchAndAssert(rid, 1, "service1", "");
-  registerBranchAndAssert(rid, 2, "", "region1");
-  registerBranchAndAssert(rid, 3, "service2", "region2");
+  registerBranchGTestAndAssert(rid, 0, "", "");
+  registerBranchGTestAndAssert(rid, 1, "service1", "");
+  registerBranchGTestAndAssert(rid, 2, "", "region1");
+  registerBranchGTestAndAssert(rid, 3, "service2", "region2");
   sleep(0.2);
 
   threads.emplace_back([rid] {
@@ -464,9 +464,9 @@ TEST(gRPCTest, WaitRequest) {
   closeBranchAndAssert(rid, 2);
 
   /* Sanity Check - ensure that locks still work */
-  registerBranchAndAssert(rid, 4, "storage", "EU");
-  registerBranchAndAssert(rid, 5, "storage", "US");
-  registerBranchAndAssert(rid, 6, "notification", "GLOBAL");
+  registerBranchGTestAndAssert(rid, 4, "storage", "EU");
+  registerBranchGTestAndAssert(rid, 5, "storage", "US");
+  registerBranchGTestAndAssert(rid, 6, "notification", "GLOBAL");
   sleep(0.2);
 
   threads.emplace_back([rid] {

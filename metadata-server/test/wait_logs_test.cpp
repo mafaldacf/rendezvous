@@ -128,32 +128,32 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(RID, request->getRid());
 
   // register compose-post branch
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   // register post-storage async branch from compose-post
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
-  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "");
+  std::string bid_1 = server.registerBranchGTest(request, SUB_RID_0, "post-storage", regions_empty, "", "");
   ASSERT_EQ(getBid(1), bid_1);
 
   // register post-storage (NOT ASYNC) branch for write post operation
   utils::ProtoVec regions_post_storage;
   regions_post_storage.Add("EU");
   regions_post_storage.Add("US");
-  std::string bid_2 = server.registerBranch(request, SUB_RID_0, "post-storage", regions_post_storage, "", "");
+  std::string bid_2 = server.registerBranchGTest(request, SUB_RID_0, "post-storage", regions_post_storage, "", "");
   ASSERT_EQ(getBid(2), bid_2);
 
   // register notifier async branch from compose-post
   next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, next_sub_rid);
-  std::string bid_3 = server.registerBranch(request, SUB_RID_1, "notifier", regions_empty, "", "");
+  std::string bid_3 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_empty, "", "");
   ASSERT_EQ(getBid(3), bid_3);
 
   // register post-storage (NOT ASYNC) branch for write post operation
   utils::ProtoVec regions_notifier;
   regions_notifier.Add("US");
-  std::string bid_4 = server.registerBranch(request, SUB_RID_1, "notifier", regions_notifier, "", "");
+  std::string bid_4 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_notifier, "", "");
   ASSERT_EQ(getBid(4), bid_4);
 
   // do wait call on notifier

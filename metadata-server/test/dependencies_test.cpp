@@ -23,12 +23,12 @@ TEST(DependenciesTest, CheckStatus) {
   utils::ProtoVec regions_0;
   regions_0.Add("EU");
   regions_0.Add("US");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   utils::ProtoVec regions_1;
   regions_1.Add("AP");
-  std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
   ASSERT_EQ(getBid(1), bid_1);
   
   // ignore parents (analytics, post_storage)
@@ -37,12 +37,12 @@ TEST(DependenciesTest, CheckStatus) {
 
   utils::ProtoVec regions_2;
   regions_2.Add("US");
-  std::string bid_2 = server.registerBranch(request, ROOT_SUB_RID, "notification_storage", regions_2, "", "post_storage");
+  std::string bid_2 = server.registerBranchGTest(request, ROOT_SUB_RID, "notification_storage", regions_2, "", "post_storage");
   ASSERT_EQ(getBid(2), bid_2);
 
   utils::ProtoVec regions_3;
   regions_3.Add("US");
-  std::string bid_3 = server.registerBranch(request, ROOT_SUB_RID, "media_service", regions_3, "", "notification_storage");
+  std::string bid_3 = server.registerBranchGTest(request, ROOT_SUB_RID, "media_service", regions_3, "", "notification_storage");
   ASSERT_EQ(getFullBid(request->getRid(), 3), bid_3);
   
   // from the notification storage point of view
@@ -93,11 +93,11 @@ TEST(DependenciesTest, FetchDependencies_Root) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "notification_storage", regions_1, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "notification_storage", regions_1, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
@@ -118,11 +118,11 @@ TEST(DependenciesTest, FetchDependencies_PostStorage) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
@@ -141,7 +141,7 @@ TEST(DependenciesTest, FetchDependencies_InvalidContext) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
@@ -156,7 +156,7 @@ TEST(DependenciesTest, FetchDependencies_InvalidService) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   // fetch dependencies from root
@@ -176,11 +176,11 @@ TEST(DependenciesTest, Wait) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_1, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
   int r = server.closeBranch(request, getBid(0), ""); // post_storage
@@ -215,18 +215,18 @@ TEST(DependenciesTest, WaitService_PostStorage) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("US");
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("AP");
-  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
   int r = server.closeBranch(request, getBid(0), ""); // post_storage
@@ -266,18 +266,18 @@ TEST(DependenciesTest, WaitServiceTag_PostStorage_WritePost) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_1;
   regions_1.Add("EU");
   regions_1.Add("US");
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_1, "write_post", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("AP");
-  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
   sleep(1);
@@ -311,12 +311,12 @@ TEST(DependenciesTest, WaitRegion_EU_OnAnalyticsNode) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
 
   utils::ProtoVec regions_0;
-  bid = server.registerBranch(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "post_storage", regions_0, "", "");
   ASSERT_EQ(getBid(0), bid);
 
   utils::ProtoVec regions_2;
   regions_2.Add("EU");
-  bid = server.registerBranch(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
+  bid = server.registerBranchGTest(request, ROOT_SUB_RID, "analytics", regions_2, "", "post_storage");
   ASSERT_EQ(getBid(0), bid);
 
   sleep(1);

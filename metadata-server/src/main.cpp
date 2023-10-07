@@ -89,6 +89,7 @@ void loadConfig() {
     _settings = root;
     utils::ASYNC_REPLICATION = _settings["async_replication"].get<bool>();
     utils::CONTEXT_VERSIONING = _settings["context_versioning"].get<bool>();
+    utils::ASYNC_SERVICE_REGISTER_CALLS = _settings["async_service_register_calls"].get<bool>();
   }
   catch (json::exception &e) {
     spdlog::error("Error parsing 'settings.json'");

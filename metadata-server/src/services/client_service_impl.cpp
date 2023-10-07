@@ -8,6 +8,7 @@ ClientServiceImpl::ClientServiceImpl(
   : _server(server), _num_wait_calls(0), _replica_client(addrs),
   _num_replicas(addrs.size()+1) /* current replica is not part of the address vector */ {
 
+  _pending_service_branches = std::unordered_map<std::string, PendingServiceBranch*>();
 }
 
 metadata::Request * ClientServiceImpl::_getRequest(const std::string& rid) {
@@ -77,6 +78,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   std::string composed_rid = request->rid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
+  const std::string& service_call_bid = request->service_call_bid();
   bool monitor = request->monitor();
   bool async = request->async();
   rendezvous::RequestContext ctx = request->context();
@@ -118,12 +120,44 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     }
   }
 
-  const std::string& core_bid = _server->registerBranch(rdv_request, sub_rid, service, regions, tag, ctx.prev_service(), monitor);
+  const std::string& core_bid = _server->genBid(rdv_request);
+
+  bool r = true;
+  if (ASYNC_SERVICE_REGISTER_CALLS) {
+    // add as a pending register to be completed later
+    PendingServiceBranch * pending_service;
+
+    std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
+    auto it = _pending_service_branches.find(service_call_bid);
+    if (it == _pending_service_branches.end()) {
+      pending_service = new PendingServiceBranch {};
+      _pending_service_branches[service_call_bid] = pending_service;
+      _cond_pending_service_branch.notify_all();
+    }
+    else {
+      pending_service = it->second;
+    }
+    lock_map.release();
+
+    std::unique_lock<std::mutex> lock(pending_service->mutex);
+    pending_service->num++;
+    lock.unlock();
+
+    std::thread([this, rdv_request, sub_rid, service, regions, tag, ctx, core_bid, monitor, pending_service]() {
+      _server->registerBranch(rdv_request, sub_rid, service, regions, tag, ctx.prev_service(), core_bid, monitor);
+      std::unique_lock<std::mutex> lock(pending_service->mutex);
+      pending_service->num--;
+      pending_service->condv.notify_all();
+      lock.unlock();
+    }).detach();
+  }
+  else {
+    r = _server->registerBranch(rdv_request, sub_rid, service, regions, tag, ctx.prev_service(), core_bid, monitor);
+  }
 
   // could not create branch (tag already exists)
-  if (core_bid.empty()) {
-    spdlog::error("< [RB] Error: tag '{}' already exists for service '{}' OR invalid context (field: prev_service)", 
-      tag, service, composed_rid);
+  if (!r) {
+    spdlog::error("< [RB] Error: could not register branch for core bid {}", core_bid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT);
   }
 
@@ -161,8 +195,9 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
   // client specifies different regions for each datastores using the DatastoreBranching type
   if (request->branches().size() > 0){
     for (const auto& branches : request->branches()) {
-      std::string bid = _server->registerBranch(rdv_request, "", branches.datastore(), branches.regions(), branches.tag(), "prev_service");
-      if (bid.empty()) {
+      const std::string& bid = _server->genBid(rdv_request);
+      bool r = _server->registerBranch(rdv_request, "", branches.datastore(), branches.regions(), branches.tag(), "prev_service", bid, true);
+      if (!r) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
       response->add_bids(bid);
@@ -175,7 +210,8 @@ grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* 
     auto tags = request->tags();
     int i = 0;
     for (const auto& datastore: request->datastores()) {
-      std::string bid = _server->registerBranch(rdv_request, "", datastore, regions, tags[i], "prev_service");
+      const std::string& bid = _server->genBid(rdv_request);
+      bool r = _server->registerBranch(rdv_request, "", datastore, regions, tags[i], "prev_service", bid, true);
       if (bid.empty()) {
         return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
       }
@@ -228,6 +264,25 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (rdv_request == nullptr) {
     spdlog::error("< [CB] Error: invalid request '{}'", root_rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
+  }
+
+  if (ASYNC_SERVICE_REGISTER_CALLS) {
+    // wait until entry is added to the pending map
+    std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
+    auto it = _pending_service_branches.find(bid);
+    while (it == _pending_service_branches.end()) {
+      _cond_pending_service_branch.wait(lock_map);
+      it = _pending_service_branches.find(bid);
+    }
+    PendingServiceBranch * pending_service = it->second;
+    lock_map.release();
+
+    // wait until all pending registrations are finished
+    std::unique_lock<std::mutex> lock(pending_service->mutex);
+    while (pending_service->num == 0) {
+      pending_service->condv.wait(lock);
+    }
+    lock.unlock();
   }
 
   int res = _server->closeBranch(rdv_request, bid, region, force);

@@ -58,8 +58,9 @@ TEST(AsyncZonesTest, RegisterWrongBranchId) {
   ASSERT_EQ(RID, request->getRid());
 
   // register branch
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "post-storage", regions, "", "");
-  ASSERT_EQ(getBid(0), bid_0);
+  std::string bid_0 = server.genBid(request);
+  bool r = server.registerBranch(request, ROOT_SUB_RID, "post-storage", regions, "", "", bid_0, false);
+  ASSERT_TRUE(r);
 
   // attempt to close but bid does not exist
   closed = server.closeBranch(request, getBid(1), "EU");
@@ -113,14 +114,16 @@ TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) {
   ASSERT_EQ(RID, request->getRid());
 
   // register compose-post branch
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "");
-  ASSERT_EQ(getBid(0), bid_0);
+  std::string bid_0 = server.genBid(request);
+  bool r = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "", bid_0, false);
+  ASSERT_TRUE(r);
 
   // register post-storage async branch from compose-post
   std::string sub_rid_0 = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, sub_rid_0);
-  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "");
-  ASSERT_EQ(getBid(1), bid_1);
+  std::string bid_1 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "", bid_1, false);
+  ASSERT_TRUE(r);
 
   // register post-storage async branch for write post operation
   std::string sub_rid_0_0 = server.addNextSubRequest(request, SUB_RID_0);
@@ -128,8 +131,9 @@ TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) {
   utils::ProtoVec regions_post_storage;
   regions_post_storage.Add("EU");
   regions_post_storage.Add("US");
-  std::string bid_2 = server.registerBranch(request, SUB_RID_0_0, "post-storage", regions_post_storage, "", "");
-  ASSERT_EQ(getBid(2), bid_2);
+  std::string bid_2 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_0_0, "post-storage", regions_post_storage, "", "", bid_2, false);
+  ASSERT_TRUE(r);
 
   // close all branches for compose-post
   found_region = server.closeBranch(request, getBid(0), "");
@@ -150,14 +154,16 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   ASSERT_EQ(RID, request->getRid());
 
   // register compose-post branch
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "");
-  ASSERT_EQ(getBid(0), bid_0);
+  std::string bid_0 = server.genBid(request);
+  bool r = server.registerBranch(request, ROOT_SUB_RID, "compose-post", regions_empty, "", "", bid_0, false);
+  ASSERT_TRUE(r);
 
   // register post-storage async branch from compose-post
   std::string sub_rid_0 = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, sub_rid_0);
-  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "");
-  ASSERT_EQ(getBid(1), bid_1);
+  std::string bid_1 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "", bid_1, false);
+  ASSERT_TRUE(r);
 
   // register post-storage async branch for write post operation
   std::string sub_rid_0_0 = server.addNextSubRequest(request, SUB_RID_0);
@@ -165,22 +171,25 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   utils::ProtoVec regions_post_storage;
   regions_post_storage.Add("EU");
   regions_post_storage.Add("US");
-  std::string bid_2 = server.registerBranch(request, SUB_RID_0_0, "post-storage", regions_post_storage, "", "");
-  ASSERT_EQ(getBid(2), bid_2);
+  std::string bid_2 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_0_0, "post-storage", regions_post_storage, "", "", bid_2, false);
+  ASSERT_TRUE(r);
 
   // register notifier async branch from compose-post
   std::string sub_rid_1 = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, sub_rid_1);
-  std::string bid_3 = server.registerBranch(request, SUB_RID_1, "notifier", regions_empty, "", "");
-  ASSERT_EQ(getBid(3), bid_3);
+  std::string bid_3 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_1, "notifier", regions_empty, "", "", bid_3, false);
+  ASSERT_TRUE(r);
 
   // register notifier async branch for write notification operation
   std::string sub_rid_1_0 = server.addNextSubRequest(request, SUB_RID_1);
   ASSERT_EQ(SUB_RID_1_0, sub_rid_1_0);
   utils::ProtoVec regions_notifier;
   regions_notifier.Add("US");
-  std::string bid_4 = server.registerBranch(request, SUB_RID_1_0, "notifier", regions_notifier, "", "");
-  ASSERT_EQ(getBid(4), bid_4);
+  std::string bid_4 = server.genBid(request);
+  r = server.registerBranch(request, SUB_RID_1_0, "notifier", regions_notifier, "", "", bid_4, false);
+  ASSERT_TRUE(r);
 
   // do wait call on notifier
   // it will ignore every branch from notifier

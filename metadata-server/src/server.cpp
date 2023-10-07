@@ -250,31 +250,37 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
   return request;
 }
 
+// helper for GTests
+std::string Server::registerBranchGTest(metadata::Request * request, 
+  const std::string& sub_rid, const std::string& service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service) {
+    
+    std::string bid = genBid(request);
+    bool r = registerBranch(request, sub_rid, service, regions, tag, prev_service, bid, false);
+    if (!r) return "";
+    return bid;
+}
+
 // ---------------------
 // Core Rendezvous Logic
 //----------------------
 
-std::string Server::registerBranch(metadata::Request * request, 
+bool Server::registerBranch(metadata::Request * request, 
   const std::string& sub_rid, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
-  bool monitor, std::string bid) {
-
-  // bid already defined when we have a replicated request from another server
-  if (bid.empty()) {
-    bid = genBid(request);
-  }
+  const std::string& bid, bool monitor) {
 
   metadata::Branch * branch = request->registerBranch(sub_rid, bid, service, tag, regions, prev_service);
   // unexpected error
   if (!branch) {
-    return "";
+    return false;
   }
 
   const std::string& composed_bid = composeFullId(bid, request->getRid());
   if (monitor) {
     publishBranches(service, tag, composed_bid);
   }
-  return bid;
+  return true;
 }
 
 int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force) {

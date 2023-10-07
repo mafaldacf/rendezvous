@@ -169,6 +169,11 @@ namespace rendezvous {
              */
             metadata::Request * getOrRegisterRequest(std::string rid);
 
+            // helper for GTest: it calls registerBranch method
+            std::string registerBranchGTest(metadata::Request * request, 
+                const std::string& sub_rid, const std::string& service, 
+                const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service);
+
             /**
              * Register new branch for a given request
              * 
@@ -183,9 +188,9 @@ namespace rendezvous {
              * - The new identifier (core_bid) of the set of branches 
              * - Or empty if an error ocurred (branches already exist with bid)
              */
-            std::string registerBranch(metadata::Request * request, const std::string& sub_rid, const std::string& service, 
+            bool registerBranch(metadata::Request * request, const std::string& sub_rid, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& prev_service, 
-                bool monitor = false, std::string bid = "");
+                const std::string& bid, bool monitor);
 
             /**
              * Close a branch according to its identifier

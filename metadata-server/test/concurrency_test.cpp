@@ -24,7 +24,7 @@ TEST(ConcurrencyTest, CloseBranchBeforeRegister) {
 
   utils::ProtoVec regions;
   regions.Add("region");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, TAG, "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
   // sanity check - wait threads
@@ -53,7 +53,7 @@ TEST(ConcurrencyTest, WaitRequest_ContextNotFound) {
 
   utils::ProtoVec regions;
   regions.Add("region");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, TAG, "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
   status = server.wait(request, ROOT_SUB_RID, "service", "wrong_region");
@@ -72,7 +72,7 @@ TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
 
   utils::ProtoVec regions;
   regions.Add("region");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
   status = server.wait(request, ROOT_SUB_RID, "service", "region", EMPTY_TAG, "", false, 1);
@@ -98,7 +98,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, "tag", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, "tag", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   threads.emplace_back([&server, request] {
@@ -123,13 +123,13 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec regions_empty;
-  std::string bid_1 = server.registerBranch(request, ROOT_SUB_RID, "dummy-service", regions_empty, "", "");
+  std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", regions_empty, "", "");
   ASSERT_EQ(getBid(1), bid_1);
   // -----------------------
 
   utils::ProtoVec regions2;
   regions2.Add("AP");
-  std::string bid_2 = server.registerBranch(request, SUB_RID_0, "new-service", regions2, "tag", "");
+  std::string bid_2 = server.registerBranchGTest(request, SUB_RID_0, "new-service", regions2, "tag", "");
   ASSERT_EQ(getBid(2), bid_2);
   
   threads.emplace_back([&server, request] {
@@ -150,7 +150,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
 
   // try for GLOBAL branch
   utils::ProtoVec regions_empty2;
-  std::string bid_3 = server.registerBranch(request, SUB_RID_0, "new-service", regions_empty2, "tag2", "");
+  std::string bid_3 = server.registerBranchGTest(request, SUB_RID_0, "new-service", regions_empty2, "tag2", "");
   ASSERT_EQ(getBid(3), bid_3);
 
   // we try for global region
@@ -194,7 +194,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
 
   utils::ProtoVec region;
   region.Add("region1");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", region, EMPTY_TAG, "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
   // we cannot wait for branches within the same subrid
@@ -213,7 +213,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   // this branch is ignored 
-  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "dummy-service", empty_region, EMPTY_TAG, "");
+  std::string bid_1 = server.registerBranchGTest(request, SUB_RID_0, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
   // we do a global wait (implicitly on the ROOT_SUB_RID)
   threads.emplace_back([&server, request] {
@@ -255,7 +255,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
   // -------------
 
@@ -268,20 +268,20 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(TIMED_OUT, status);
 
   utils::ProtoVec emptyRegion;
-  std::string bid_1 = server.registerBranch(request, SUB_RID_0, "service0", emptyRegion, EMPTY_TAG, "");
+  std::string bid_1 = server.registerBranchGTest(request, SUB_RID_0, "service0", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
 
-  std::string bid_2 = server.registerBranch(request, SUB_RID_0, "service1", emptyRegion, EMPTY_TAG, "");
+  std::string bid_2 = server.registerBranchGTest(request, SUB_RID_0, "service1", emptyRegion, EMPTY_TAG, "");
   ASSERT_EQ(getBid(2), bid_2);
 
   utils::ProtoVec region1;
   region1.Add("region1");
-  std::string bid_3 = server.registerBranch(request, SUB_RID_0, "service0", region1, EMPTY_TAG, "");
+  std::string bid_3 = server.registerBranchGTest(request, SUB_RID_0, "service0", region1, EMPTY_TAG, "");
   ASSERT_EQ(getBid(3), bid_3);
 
   utils::ProtoVec region2;
   region2.Add("region2");
-  std::string bid_4 = server.registerBranch(request, SUB_RID_0, "service2", region2, EMPTY_TAG, "");
+  std::string bid_4 = server.registerBranchGTest(request, SUB_RID_0, "service2", region2, EMPTY_TAG, "");
   ASSERT_EQ(getBid(4), bid_4);
 
   threads.emplace_back([&server, request] {
@@ -339,17 +339,17 @@ TEST(ConcurrencyTest, WaitRequest) {
   // Sanity Check - ensure that locks still work
   utils::ProtoVec region_EU;
   region_EU.Add("EU");
-  std::string bid_5 = server.registerBranch(request, SUB_RID_0, "storage", region_EU, EMPTY_TAG, "");
+  std::string bid_5 = server.registerBranchGTest(request, SUB_RID_0, "storage", region_EU, EMPTY_TAG, "");
   ASSERT_EQ(getBid(5), bid_5);
 
   utils::ProtoVec region_US;
   region_US.Add("US");
-  std::string bid_6 = server.registerBranch(request, SUB_RID_0, "storage", region_US, EMPTY_TAG, "");
+  std::string bid_6 = server.registerBranchGTest(request, SUB_RID_0, "storage", region_US, EMPTY_TAG, "");
   ASSERT_EQ(getBid(6), bid_6);
 
   utils::ProtoVec region_GLOBAL;
   region_GLOBAL.Add("GLOBAL");
-  std::string bid_7 = server.registerBranch(request, SUB_RID_0, "notification", region_GLOBAL, "tagC", "");
+  std::string bid_7 = server.registerBranchGTest(request, SUB_RID_0, "notification", region_GLOBAL, "tagC", "");
   ASSERT_EQ(getBid(7), bid_7);
 
   threads.emplace_back([&server, request] {
@@ -406,7 +406,7 @@ TEST(ConcurrencyTest, WaitServiceTag) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, "tag", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, "tag", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   sleep(1);
@@ -465,7 +465,7 @@ TEST(ConcurrencyTest, WaitServiceTagForceAsync) {
   utils::ProtoVec regions;
   regions.Add("EU");
   regions.Add("US");
-  std::string bid_0 = server.registerBranch(request, ROOT_SUB_RID, "service", regions, "tag", "");
+  std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, "tag", "");
   ASSERT_EQ(getBid(0), bid_0);
 
   sleep(1);

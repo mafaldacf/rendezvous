@@ -58,7 +58,8 @@ message RegisterBranchMessage {
   repeated string regions = 4;
   bool monitor = 5;
   bool async = 6;
-  RequestContext context = 7;
+  string service_call_bid = 7;
+  RequestContext context = 8;
 }
 message RegisterBranchResponse {
   string rid = 1;

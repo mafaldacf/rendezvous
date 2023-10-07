@@ -19,6 +19,7 @@
 #include <chrono>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
+#include <unordered_map>
 
 namespace service {
 
@@ -31,6 +32,17 @@ namespace service {
             // debugging purposes
             std::atomic<int> _num_wait_calls;
             int _num_replicas;
+
+            typedef struct ServiceNodeStruct {
+                int num;
+                std::mutex mutex;
+                std::condition_variable condv;
+            } PendingServiceBranch;
+
+            // <service, PendingServiceBranch>
+            std::unordered_map<std::string, PendingServiceBranch*> _pending_service_branches;
+            std::mutex _mutex_pending_service_branches;
+            std::condition_variable _cond_pending_service_branch;
 
             metadata::Request * _getRequest(const std::string& rid);
 
