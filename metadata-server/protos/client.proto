@@ -8,6 +8,7 @@ service ClientService {
   /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
+  rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
   rpc RegisterBranchesDatastores(RegisterBranchesDatastoresMessage) returns (RegisterBranchesDatastoresResponse);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
@@ -52,7 +53,7 @@ message RegisterRequestResponse {
   RequestContext context = 2;
 }
 
-/* Registers Branches */
+/* Registers Branch */
 message RegisterBranchMessage {
   string rid = 1;
   string service = 2;
@@ -66,6 +67,21 @@ message RegisterBranchResponse {
   string rid = 1;
   string bid = 2;
   RequestContext context = 3;
+}
+
+/* Registers Branches */
+message RegisterBranchesMessage {
+  string rid = 1;
+  repeated string services = 2;
+  repeated string tags = 3;
+  string region = 4;
+  string service_call_bid = 6;
+  repeated RequestContext contexts = 7;
+}
+message RegisterBranchesResponse {
+  string rid = 1;
+  repeated string bids = 2;
+  repeated RequestContext contexts = 3;
 }
 
 /* Register Branches - SERVERLESS VERSION */

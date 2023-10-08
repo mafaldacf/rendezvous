@@ -161,6 +161,127 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
+grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context, 
+  const rendezvous::RegisterBranchesMessage* request, 
+  rendezvous::RegisterBranchesResponse* response) {
+
+  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
+  const auto& contexts = request->contexts();
+  std::string rid = request->rid();
+  const auto& services = request->services();
+  const auto& tags = request->tags();
+  const std::string& service_call_bid = request->service_call_bid();
+  const std::string& region = request->region();
+
+  if (tags.size() > 0 && services.size() != tags.size()) {
+    spdlog::error("< [RBs] Error: number of services and tags do not match for for rid {}", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_NUM_SERVICES_TAGS_DOES_NOT_MATCH);
+  }
+
+  if (contexts.size() > 0 && services.size() != contexts.size()) {
+    spdlog::error("< [RBs] Error: number of services and contexts do not match for for rid {}", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_NUM_SERVICES_CONTEXTS_DOES_NOT_MATCH);
+  }
+
+  spdlog::trace("> [RBs] register #{} service branches for request '{}')", services.size(), rid);
+
+  metadata::Request * rdv_request = _getRequest(rid);
+  if (rdv_request == nullptr) {
+    spdlog::error("< [RBs] Error: invalid request '{}'", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
+  }
+
+  for (int i = 0; i < services.size(); i++) {
+    const std::string& service = services[i];
+    const std::string& tag = tags.size() > 0 ? tags[i] : "";
+    // workaround
+    utils::ProtoVec regions;
+    regions.Add()->assign(region);
+
+    rendezvous::RequestContext ctx = contexts[i];
+    std::string async_zone = ctx.async_zone();
+    if (async_zone.empty()) {
+      async_zone = utils::ROOT_ASYNC_ZONE_ID;
+    }
+
+    const std::string& parent_service = ctx.parent_service();
+
+    const std::string& core_bid = _server->genBid(rdv_request);
+
+    bool r = true;
+    if (ASYNC_SERVICE_REGISTER_CALLS) {
+      // add as a pending register to be completed later
+      PendingServiceBranch * pending_service;
+
+      std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
+      auto it = _pending_service_branches.find(service_call_bid);
+      if (it == _pending_service_branches.end()) {
+        pending_service = new PendingServiceBranch {};
+        _pending_service_branches[service_call_bid] = pending_service;
+        _cond_pending_service_branch.notify_all();
+      }
+      else {
+        pending_service = it->second;
+      }
+      lock_map.release();
+
+      std::unique_lock<std::mutex> lock(pending_service->mutex);
+      pending_service->num++;
+      lock.unlock();
+
+      std::thread([this, rdv_request, async_zone, service, regions, tag, parent_service, core_bid, pending_service]() {
+        _server->registerBranch(rdv_request, async_zone, service, regions, tag, parent_service, core_bid, false);
+        std::unique_lock<std::mutex> lock(pending_service->mutex);
+        pending_service->num--;
+        pending_service->condv.notify_all();
+        lock.unlock();
+      }).detach();
+    }
+    else {
+      r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, parent_service, core_bid, false);
+    }
+
+    // could not create branch (tag already exists)
+    if (!r) {
+      spdlog::error("< [RBs] Error: could not register branch for core bid {}", core_bid);
+      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT);
+    }
+
+    response->set_rid(rid);
+    response->add_bids(_server->composeFullId(core_bid, rid));
+
+    // replicate client request to remaining replicas
+    if (_num_replicas > 1) {
+      if (utils::ASYNC_REPLICATION) {
+        // update current context
+        std::string sid = _server->getSid();
+        int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
+        ctx.mutable_versions()->insert({sid, version});
+      }
+      _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, false, ctx);
+    }
+
+    ctx.set_parent_service(service);
+    rendezvous::RequestContext * new_ctx_ptr = response->add_contexts();
+    new_ctx_ptr->CopyFrom(ctx);
+  }
+
+  return grpc::Status::OK;
+
+  /* for (int i = 0; i < services.size(); i++) {
+    rendezvous::RegisterBranchMessage request_v2;
+    request_v2.set_rid(rid);
+    request_v2.set_service(services[i]);
+    request_v2.set_tag(tags[i]);
+    request_v2.add_regions(region);
+    request_v2.mutable_context()->CopyFrom(contexts[i]);
+    rendezvous::RegisterBranchResponse response_v2;
+    grpc::Status status = registerBranch(&request_v2, &response_v2);
+  } */
+
+  return grpc::Status::OK;
+}
+
 
 grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* context, 
   const rendezvous::RegisterBranchesDatastoresMessage* request, 

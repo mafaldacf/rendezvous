@@ -28,6 +28,8 @@ namespace utils {
     const std::string ERR_MSG_FAILED_DETAILED_QUERY = "Cannot provide detailed information without specifying service";
     const std::string ERR_MSG_TAG_ALREADY_EXISTS = "Tag already exists and must to be unique";
     const std::string ERR_MSG_TAG_ALREADY_EXISTS_OR_INVALID_CONTEXT = "Tag already exists OR invalid context ('prev_service' field)";
+    const std::string ERR_MSG_NUM_SERVICES_TAGS_DOES_NOT_MATCH = "If tags are provided, the number is required to be equal to the number of services";
+    const std::string ERR_MSG_NUM_SERVICES_CONTEXTS_DOES_NOT_MATCH = "Number of contexts does not match the number of services";
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid rendezvous context (prev_service or rid)";
     const std::string ERR_MSG_INVALID_SERVICE_REGION = "Invalid service or region provided";
     const std::string ERR_MSG_INVALID_TAG = "Invalid service tag";

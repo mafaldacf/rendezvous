@@ -16,7 +16,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     _wait_logs = std::set<AsyncZone*>();
 
     // add root node
-    _service_nodes[""] = new ServiceNode{""};
+    _service_nodes[utils::ROOT_SERVICE_NODE_ID] = new ServiceNode{utils::ROOT_SERVICE_NODE_ID, utils::ROOT_ASYNC_ZONE_ID};
 
     // insert the subrequest of the root
     tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
@@ -274,10 +274,6 @@ bool Request::untrackBranch(const std::string& async_zone_id, const std::string&
     }
     _cond_subrequests.notify_all();
 
-    /* if (service == "storage" || service == "service1") {
-        std::cout << "[" << service << "] UNTRACK. new num opened branches: " << service_node->opened_branches << std::endl;
-    } */
-
     return true;
 }
 
@@ -362,10 +358,6 @@ bool Request::trackBranch(const std::string& async_zone_id, const std::string& s
     _num_opened_branches.fetch_add(1);
     lock.unlock();
     lock_regions.unlock();
-
-    /* if (service == "storage" || service == "service1") {
-        std::cout << "[" << service << "] TRACK. new num opened branches: " << service_node->opened_branches << std::endl;
-    } */
 
     return true;
 }
@@ -673,9 +665,10 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
     std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
-    // --------------
-    // CONTEXT CHECKS
-    //---------------
+    // -----------------------------------
+    //           VALIDATIONS
+    // -----------------------------------
+
     // branch is expected to be asynchronously opened so we need to wait for the branch context
     if (async) {
         while (_service_nodes.count(service) == 0) {
@@ -724,9 +717,6 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
     else {
         int * num_branches_ptr = &(_service_nodes[service]->opened_branches);
         while (*num_branches_ptr != 0) {
-            /* if (service == "storage" || service == "service1") {
-                std::cout << "[" << service << "] waiting but got num = " << *num_branches_ptr << std::endl;
-            } */
             _cond_service_nodes.wait_for(lock, remaining_timeout);
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -734,34 +724,45 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 return -1;
             }
         }
-        // wait for all dependencies for this service
-        if (wait_deps) {
-            ServiceNode * curr_service = _service_nodes[service];
-            std::stack<ServiceNode*> deps;
-            std::unordered_set<ServiceNode*> transversed {curr_service};
-            deps.push(curr_service);
+    }
+    // wait for all dependencies
+    if (wait_deps) {
+        const std::string& async_zone_id = _service_nodes[service]->async_zone_id;
+        AsyncZone * async_zone = _validateSubRid(async_zone_id);
 
-            while (deps.size() != 0) {
-                // wait for each service in deps
-                auto dep = deps.top();
-                deps.pop();
-                transversed.insert(dep);
+        ServiceNode * curr_service = _service_nodes[service];
+        std::stack<ServiceNode*> deps;
+        std::unordered_set<ServiceNode*> visited {curr_service};
+        visited.insert(curr_service);
 
-                for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
-                    if (transversed.count((*it)) == 0) {
-                        deps.push((*it));
-                    }
+        // get all depends for current service
+        for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+            deps.push((*it));
+        }
+
+        // iterate and wait all on all dependencies
+        while (deps.size() != 0) {
+            auto dep = deps.top();
+            deps.pop();
+            visited.insert(dep);
+
+            // wait on fetched service 
+            int * num_branches_ptr = &dep->opened_branches;
+            while (*num_branches_ptr != 0) {
+                _cond_service_nodes.wait_for(lock, remaining_timeout);
+                inconsistency = 1;
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
                 }
-                if (deps.size() == 0) break;
+            }
 
-                num_branches_ptr = &dep->opened_branches;
-                while (*num_branches_ptr != 0) {
-                    _cond_service_nodes.wait_for(lock, remaining_timeout);
-                    inconsistency = 1;
-                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                    if (remaining_timeout <= std::chrono::seconds(0)) {
-                        return -1;
-                    }
+            // get all following dependencies for fetched service
+            // - cannot be already visited
+            // - cannot be in the same async zone
+            for (auto it = dep->children.begin(); it != dep->children.end(); it++) {
+                if (visited.count((*it)) == 0 && (*it)->async_zone_id != async_zone->async_zone_id) {
+                    deps.push((*it));
                 }
             }
         }
@@ -777,9 +778,10 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
     std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
-    // --------------
-    // CONTEXT CHECKS
-    //---------------
+    // -----------------------------------
+    //           VALIDATIONS
+    // -----------------------------------
+    
     // wait for branch context (service and region)
     if (async) {
         auto service_it = _service_nodes.find(service);
@@ -840,36 +842,45 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
                 return -1;
             }
         }
-        
-        // wait for all dependencies for this service
-        if (wait_deps) {
-            ServiceNode * curr_service = _service_nodes[service];
-            std::stack<ServiceNode*> deps;
-            std::unordered_set<ServiceNode*> transversed {curr_service};
-            deps.push(curr_service);
+    }
+    // wait for all dependencies
+    if (wait_deps) {
+        const std::string& async_zone_id = _service_nodes[service]->async_zone_id;
+        AsyncZone * async_zone = _validateSubRid(async_zone_id);
 
-            while (deps.size() != 0) {
-                // wait for each service in deps
-                auto dep = deps.top();
-                deps.pop();
-                transversed.insert(dep);
+        ServiceNode * curr_service = _service_nodes[service];
+        std::stack<ServiceNode*> deps;
+        std::unordered_set<ServiceNode*> visited {curr_service};
+        visited.insert(curr_service);
 
-                for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
-                    if (transversed.count((*it)) == 0) {
-                        deps.push((*it));
-                    }
+        // get all depends for current service
+        for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+            deps.push((*it));
+        }
+
+        // iterate and wait all on all dependencies
+        while (deps.size() != 0) {
+            auto dep = deps.top();
+            deps.pop();
+            visited.insert(dep);
+
+            int * num_branches_ptr = &dep->opened_regions[region];
+            int * num_global_region_ptr = &dep->opened_global_region;
+            while (*num_branches_ptr != 0 || *num_global_region_ptr != 0) {
+                _cond_service_nodes.wait_for(lock, remaining_timeout);
+                inconsistency = 1;
+                remaining_timeout = _computeRemainingTimeout(timeout, start_time);
+                if (remaining_timeout <= std::chrono::seconds(0)) {
+                    return -1;
                 }
-                if (deps.size() == 0) break;
+            }
 
-                num_branches_ptr = &dep->opened_regions[region];
-                num_global_region_ptr = &dep->opened_global_region;
-                while (*num_branches_ptr != 0 || *num_global_region_ptr != 0) {
-                    _cond_service_nodes.wait_for(lock, remaining_timeout);
-                    inconsistency = 1;
-                    remaining_timeout = _computeRemainingTimeout(timeout, start_time);
-                    if (remaining_timeout <= std::chrono::seconds(0)) {
-                        return -1;
-                    }
+            // get all following dependencies for fetched service
+            // - cannot be already visited
+            // - cannot be in the same async zone
+            for (auto it = dep->children.begin(); it != dep->children.end(); it++) {
+                if (visited.count((*it)) == 0 && (*it)->async_zone_id != async_zone->async_zone_id) {
+                    deps.push((*it));
                 }
             }
         }

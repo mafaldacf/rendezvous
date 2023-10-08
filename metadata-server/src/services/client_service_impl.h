@@ -61,6 +61,10 @@ namespace service {
                 const rendezvous::RegisterBranchMessage * request, 
                 rendezvous::RegisterBranchResponse * response) override;
 
+            grpc::Status RegisterBranches(grpc::ServerContext * context, 
+                const rendezvous::RegisterBranchesMessage * request, 
+                rendezvous::RegisterBranchesResponse * response) override;
+
             grpc::Status RegisterBranchesDatastores(grpc::ServerContext * context, 
                 const rendezvous::RegisterBranchesDatastoresMessage * request, 
                 rendezvous::RegisterBranchesDatastoresResponse * response) override;

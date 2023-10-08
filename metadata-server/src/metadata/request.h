@@ -37,6 +37,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
+                std::string async_zone_id;
                 int opened_global_region;
                 int opened_branches;
                 std::unordered_map<std::string, int> opened_regions;
