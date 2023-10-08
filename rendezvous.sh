@@ -21,7 +21,7 @@ AWS_ACCOUNT_ID=851889773113
 
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, monitor}"
+    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rdv-lib, monitor}"
     echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
@@ -111,6 +111,11 @@ local_run_server() {
 local_run_client() {
   cd metadata-server/examples/python
   python3 client.py
+}
+
+local_run_rdv_lib() {
+  cd metadata-server/examples/python
+  python3 rendezvous-lib.py
 }
 
 local_run_monitor() {
@@ -328,6 +333,8 @@ elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--py" ]; 
   local_build_py
 elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
   local_run_server $4 $5
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "rdv-lib" ]; then
+  local_run_rdv_lib
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
   local_run_client
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "monitor" ]; then

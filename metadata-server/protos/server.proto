@@ -35,8 +35,7 @@ message RegisterBranchMessage {
   string tag = 5;
   repeated string regions = 6;
   bool monitor = 7;
-  bool async = 8;
-  RequestContext context = 9;
+  RequestContext context = 8;
 }
 
 /* Close Branch */

@@ -37,7 +37,6 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& core_bid = request->core_bid();
   const auto& regions = request->regions();
   bool monitor = request->monitor();
-  bool async = request->async();
   int num = request->regions().size();
 
   spdlog::trace("> [REPLICATED RB] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", num, service, monitor, core_bid, rid, async_zone);
@@ -49,11 +48,6 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   }
   
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
-
-  if (async) {
-    _server->addNextSubRequest(rdv_request, async_zone, false);
-  }
-
   _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().parent_service(), core_bid, monitor);
 
   return grpc::Status::OK;

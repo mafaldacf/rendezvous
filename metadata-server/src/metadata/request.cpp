@@ -13,7 +13,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     _branches = std::unordered_map<std::string, metadata::Branch*>();
     _service_nodes = std::unordered_map<std::string, ServiceNode*>();
     _sub_requests = oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*>();
-    _wait_logs = std::unordered_set<AsyncZone*>();
+    _wait_logs = std::set<AsyncZone*>();
 
     // add root node
     _service_nodes[""] = new ServiceNode{""};
@@ -21,7 +21,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     // insert the subrequest of the root
     tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
     _sub_requests.insert(write_accessor, utils::ROOT_ASYNC_ZONE_ID);
-    write_accessor->second = new AsyncZone{0, utils::ROOT_ASYNC_ZONE_ID};
+    write_accessor->second = new AsyncZone{utils::ROOT_ASYNC_ZONE_ID, 0};
 }
 
 Request::~Request() {
@@ -98,10 +98,22 @@ std::string Request::addNextSubRequest(const std::string& sid, const std::string
         // insert the next subrequest and return its id
         tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
         _sub_requests.insert(write_accessor, next_sub_rid);
-        write_accessor->second = new AsyncZone{sub_requests_i.fetch_add(1), next_sub_rid};
+        write_accessor->second = new AsyncZone{next_sub_rid, sub_requests_i.fetch_add(1)};
     }
 
     return next_sub_rid;
+}
+
+void Request::insertAsyncZone(const std::string& async_zone_id) {
+    // sanity check
+    if (async_zone_id != utils::ROOT_ASYNC_ZONE_ID) {
+        // insert the next subrequest and return its id
+        tbb::concurrent_hash_map<std::string, AsyncZone*>::accessor write_accessor;
+        bool new_zone = _sub_requests.insert(write_accessor, async_zone_id);
+        if (new_zone) {
+            write_accessor->second = new AsyncZone{async_zone_id};
+        }
+    }
 }
 
 metadata::Request::AsyncZone * Request::_validateSubRid(const std::string& async_zone_id) {
@@ -140,6 +152,8 @@ metadata::Branch * Request::registerBranch(const std::string& async_zone_id, con
         num = 1;
         branch = new metadata::Branch(service, tag, async_zone_id);
     }
+
+    insertAsyncZone(async_zone_id);
 
     // error tracking branch (tag already exists!)
     if (!trackBranch(async_zone_id, service, regions, num, parent_service, branch)) {
@@ -458,9 +472,15 @@ std::vector<std::string> Request::_getPrecedingAsyncZones(AsyncZone* subrequest)
 
     std::vector<std::string> entries;
     for (const auto& entry: _wait_logs) {
-        if (_isPrecedingAsyncZone(entry, subrequest)) {
+        if (entry->async_zone_id < subrequest->async_zone_id) {
             entries.emplace_back(entry->async_zone_id);
         }
+        else {
+            break;
+        }
+        /* if (_isPrecedingAsyncZone(entry, subrequest)) {
+            entries.emplace_back(entry->async_zone_id);
+        } */
     }
     return entries;
 }

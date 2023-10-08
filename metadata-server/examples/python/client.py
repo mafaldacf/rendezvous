@@ -51,26 +51,14 @@ def wait(stub, rid, service, region, ctx=None):
 def checkStatus(stub, rid, service, region, detailed=False, ctx=None):
     try:
         #response = stub.CheckStatus(pb.CheckRequestMessage(rid=rid, service=service, region=region, serverctx=fromBytes(ctx)))
-        response = stub.CheckStatus(pb.CheckRequestMessage(rid=rid, service=service, region=region, detailed=detailed))
+        response = stub.CheckStatus(pb.CheckStatusMessage(rid=rid, service=service, region=region, detailed=detailed))
         
         # python does not output OPENED (denoted as 0) values if we print the whole response
         status = pb.RequestStatus.Name(response.status)
         print(f"[Check Status] status:\"{status}\"")
         if detailed:
             print(f'--> tagged status: {response.tagged}')
-            print(f'--> dependencies status: {response.dependencies}')
             print(f'--> regions status: {response.regions}')
-    except grpc.RpcError as e:
-        print(f"[Error] {e.details()}")
-
-def checkRequestByRegions(stub, rid, service, ctx=None):
-    try:
-        #response = stub.CheckRequestByRegions(pb.CheckRequestByRegionsMessage(rid=rid, service=service, serverctx=fromBytes(ctx)))
-        response = stub.CheckRequestByRegions(pb.CheckRequestByRegionsMessage(rid=rid, service=service))
-        print(f"[Check Status By Regions]:")
-        for regionStatus in response.regionStatus:
-            status = rdv.RequestStatus.Name(regionStatus.status)
-            print(f"\t{regionStatus.region} : {status}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 

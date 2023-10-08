@@ -62,7 +62,7 @@ void ReplicaClient::registerRequest(const std::string& rid) {
 
 void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
-    const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
+    const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     const rendezvous::RequestContext& ctx) {
 
         struct RequestHelper req_helper;
@@ -83,7 +83,6 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
             request.set_service(service);
             request.set_tag(tag);
             request.set_monitor(monitor);
-            request.set_async(async);
             request.mutable_regions()->CopyFrom(regions);
 
             // async replication requires context propagation
@@ -104,16 +103,16 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
 
 void ReplicaClient::registerBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
-    const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
+    const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     const rendezvous::RequestContext& ctx) {
 
         if (utils::ASYNC_REPLICATION) {
-        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx]() {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx);
+        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, ctx]() {
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx);
         }).detach();
         }
         else {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, async, ctx);
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx);
         }
 }
 

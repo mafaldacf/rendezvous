@@ -43,7 +43,7 @@ namespace replicas {
             void _doRegisterRequest(const std::string& rid);
             void _doRegisterBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
-                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
+                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous::RequestContext& ctx);
             void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, 
                 const std::string& region, const rendezvous::RequestContext& ctx);
@@ -67,12 +67,11 @@ namespace replicas {
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param monitor If enabled, we publish the branch for datastore monitor subscribers
-             * @param async If enabled, we register/track the new async zone from the previously generated async_zone
              * @param ctx Additional metadata context
              */
             void registerBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
-                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor, bool async,
+                const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous::RequestContext& ctx);
 
             /**

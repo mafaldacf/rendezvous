@@ -75,18 +75,17 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   rendezvous::RegisterBranchResponse* response) {
 
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
+  rendezvous::RequestContext ctx = request->context();
   std::string rid = request->rid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
   const std::string& service_call_bid = request->service_call_bid();
-  std::string curr_async_zone = request->curr_async_zone();
+  std::string async_zone = ctx.async_zone();
   bool monitor = request->monitor();
-  bool async = request->async();
-  rendezvous::RequestContext ctx = request->context();
   int num = request->regions().size();
   const auto& regions = request->regions();
 
-  spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (async={}, monitor={})", num, rid, service, tag, async, monitor);
+  spdlog::trace("> [RB] register #{} branches for request '{}' on service '{}:{}' (monitor={})", num, rid, service, tag, monitor);
   
   if (service.empty()) {
     spdlog::error("< [RB] Error: service empty for rid '{}'", rid);
@@ -99,17 +98,8 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  if (curr_async_zone.empty()) {
-    curr_async_zone = utils::ROOT_ASYNC_ZONE_ID;
-  }
-
-  // if branch is async, we update the async zone
-  if (async) {
-    curr_async_zone = _server->addNextSubRequest(rdv_request, curr_async_zone);
-    if (curr_async_zone.empty()) {
-      spdlog::error("< [RB] Error: async zone '{}' does not exist", rid, curr_async_zone);
-      return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST_SUB_RID);
-    }
+  if (async_zone.empty()) {
+    async_zone = utils::ROOT_ASYNC_ZONE_ID;
   }
 
   const std::string& core_bid = _server->genBid(rdv_request);
@@ -135,8 +125,8 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     pending_service->num++;
     lock.unlock();
 
-    std::thread([this, rdv_request, curr_async_zone, service, regions, tag, ctx, core_bid, monitor, pending_service]() {
-      _server->registerBranch(rdv_request, curr_async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
+    std::thread([this, rdv_request, async_zone, service, regions, tag, ctx, core_bid, monitor, pending_service]() {
+      _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
       std::unique_lock<std::mutex> lock(pending_service->mutex);
       pending_service->num--;
       pending_service->condv.notify_all();
@@ -144,7 +134,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     }).detach();
   }
   else {
-    r = _server->registerBranch(rdv_request, curr_async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
+    r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
   }
 
   // could not create branch (tag already exists)
@@ -155,7 +145,6 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   response->set_rid(rid);
   response->set_bid(_server->composeFullId(core_bid, rid));
-  response->set_new_async_zone(curr_async_zone);
   ctx.set_parent_service(service);
 
   // replicate client request to remaining replicas
@@ -167,7 +156,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
       ctx.mutable_versions()->insert({sid, version});
     }
     response->mutable_context()->CopyFrom(ctx);
-    _replica_client.registerBranch(rid, curr_async_zone, core_bid, service, tag, regions, monitor, async, ctx);
+    _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx);
   }
   return grpc::Status::OK;
 }
@@ -240,6 +229,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   const std::string& region = request->region();
   bool force = request->force();
   const std::string& composed_bid = request->bid();
+  bool close_service = request->close_service();
 
   spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", composed_bid, region, force);
 
@@ -258,7 +248,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  if (ASYNC_SERVICE_REGISTER_CALLS) {
+  if (close_service && ASYNC_SERVICE_REGISTER_CALLS) {
     // wait until entry is added to the pending map
     std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
     auto it = _pending_service_branches.find(bid);
@@ -299,16 +289,18 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   rendezvous::WaitRequestResponse* response) {
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   
-  const std::string& full_rid = request->rid();
+  rendezvous::RequestContext ctx = request->context();
+  const std::string& rid = request->rid();
   const std::string& service = request->service();
   const auto& services = request->services();
   const std::string& tag = request->tag();
   const std::string& region = request->region();
   bool wait_deps = request->wait_deps();
+  std::string async_zone = ctx.async_zone();
   //bool async = request->async();
   int timeout = request->timeout();
 
-  spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", full_rid, service, region);
+  spdlog::trace("> [WR] wait call for request '{}' on service '{}' and region '{}'", rid, service, region);
 
   // validate parameters
   if (timeout < 0) {
@@ -322,17 +314,6 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TAG_USAGE);
   }
 
-  // parse full rid into <rid, async_zone_id>
-  auto ids = _server->parseFullId(full_rid);
-  std::string rid = ids.first;
-  std::string async_zone_id = ids.second;
-
-  // rid cannot be empty (but async_zone_id can when we are in the root)
-  if (rid.empty()) {
-    spdlog::error("< [RB] Error parsing full rid '{}'", full_rid);
-    return grpc::Status(grpc::StatusCode::INTERNAL, utils::ERR_PARSING_RID);
-  }
-
   // check if request exists
   metadata::Request * rdv_request = _getRequest(rid);
   if (rdv_request == nullptr) {
@@ -340,33 +321,40 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
+  if (async_zone.empty()) {
+    async_zone = utils::ROOT_ASYNC_ZONE_ID;
+  }
+
   // wait until current replica is consistent with this request
   if (utils::ASYNC_REPLICATION && _num_replicas > 1) {
-    rdv_request->getVersionsRegistry()->waitRemoteVersions(request->context());
+    rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
   }
 
   int result;
 
+  _replica_client.addWaitLog(rid, async_zone, ctx);
+
   // wait logic for multiple services
   if (services.size() > 0) {
     for (const auto& service: services) {
-      result = _server->wait(rdv_request, async_zone_id, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
+      result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
       if (result < 0) {
         break;
       }
     }
   }
   else {
-    int result = _server->wait(rdv_request, async_zone_id, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
+    int result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
     }
   }
+
+  _replica_client.removeWaitLog(rid, async_zone, ctx);
   // parse errors
   if (result == -1) {
     response->set_timed_out(true);
-  }
-  else if (result == -2) {
+  } else if (result == -2) {
     spdlog::error("< [WR] Error: invalid context (service/region)", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICE_REGION);
   } else if (result == -4) {

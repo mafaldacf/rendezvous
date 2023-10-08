@@ -17,3 +17,4 @@ metadata-server/examples/python/rendezvous/protos/**
 datastore-monitor/proto/**
 TODO.md
 .cache/**
+metadata-server/examples/python/__pycache__/rendezvous.cpython-310.pyc

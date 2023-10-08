@@ -47,8 +47,8 @@ namespace metadata {
         // public for testing purposes
         public:
             typedef struct AsyncZoneStruct {
-                int i;
                 std::string async_zone_id;
+                int i;
                 // protected by sub_requests mutex
                 int num_current_waits;
 
@@ -67,7 +67,7 @@ namespace metadata {
             // <async_zone_id, sub_request_ptr>
             oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _sub_requests;
             // <async_zone_id, num_current_waits>
-            std::unordered_set<AsyncZone*> _wait_logs;
+            std::set<AsyncZone*> _wait_logs;
 
             /* ------- */
             /* helpers */
@@ -229,6 +229,13 @@ namespace metadata {
              * @return new subrequest
             */
             std::string addNextSubRequest(const std::string& sid, const std::string& async_zone_id, bool gen_id);
+
+            /**
+             * Inserts new async zone if it does not exist yet
+             * 
+             * @param async_zone_id The identifier for th current async zone
+            */
+            void insertAsyncZone(const std::string& async_zone_id);
 
             /**
              * Register a set of branches in the request

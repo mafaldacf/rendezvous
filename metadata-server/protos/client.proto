@@ -29,6 +29,8 @@ message Empty {
 message RequestContext {
   string parent_service = 1;
   map<string, int32> versions = 2;
+  string async_zone = 3;
+  int32 num_sub_zones = 4;
 }
 
 /* Publish-Subscribe */
@@ -53,20 +55,17 @@ message RegisterRequestResponse {
 /* Registers Branches */
 message RegisterBranchMessage {
   string rid = 1;
-  string curr_async_zone = 2;
-  string service = 3;
-  string tag = 4;
-  repeated string regions = 5;
-  bool monitor = 6;
-  bool async = 7;
-  string service_call_bid = 8;
-  RequestContext context = 9;
+  string service = 2;
+  string tag = 3;
+  repeated string regions = 4;
+  bool monitor = 5;
+  string service_call_bid = 6;
+  RequestContext context = 7;
 }
 message RegisterBranchResponse {
   string rid = 1;
   string bid = 2;
-  string new_async_zone = 3;
-  RequestContext context = 4;
+  RequestContext context = 3;
 }
 
 /* Register Branches - SERVERLESS VERSION */
@@ -94,21 +93,21 @@ message CloseBranchMessage {
   string bid = 1;
   string region = 2;
   bool force = 3;
-  RequestContext context = 4;
+  bool close_service = 4;
+  RequestContext context = 5;
 }
 
 /* Wait */
 message WaitRequestMessage {
   string rid = 1;
-  string curr_async_zone = 2;
-  string service = 3;
-  repeated string services = 4;
-  string region = 5;
-  string tag = 6;
-  int32 timeout = 7;
-  bool wait_deps = 8;
+  string service = 2;
+  repeated string services = 3;
+  string region = 4;
+  string tag = 5;
+  int32 timeout = 6;
+  bool wait_deps = 7;
   //bool async = 6;
-  RequestContext context = 9;
+  RequestContext context = 8;
 }
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
