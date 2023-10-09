@@ -253,10 +253,10 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 // helper for GTests
 std::string Server::registerBranchGTest(metadata::Request * request, 
   const std::string& async_zone_id, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service) {
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service) {
     
     std::string bid = genBid(request);
-    bool r = registerBranch(request, async_zone_id, service, regions, tag, parent_service, bid, false);
+    bool r = registerBranch(request, async_zone_id, service, regions, tag, current_service, bid, false);
     if (!r) return "";
     return bid;
 }
@@ -267,10 +267,10 @@ std::string Server::registerBranchGTest(metadata::Request * request,
 
 bool Server::registerBranch(metadata::Request * request, 
   const std::string& async_zone_id, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
   const std::string& bid, bool monitor) {
 
-  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, parent_service);
+  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service);
   // unexpected error
   if (!branch) {
     return false;
@@ -305,20 +305,20 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
 
 int Server::wait(metadata::Request * request, const std::string& async_zone_id, 
   const std::string& service, const::std::string& region, 
-  std::string tag, bool async, int timeout, bool wait_deps) {
+  std::string tag, bool async, int timeout, std::string current_service, bool wait_deps) {
 
   int result;
   metadata::Subscriber * subscriber;
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitServiceRegion(service, region, tag, async, timeout, wait_deps);
+    result = request->waitServiceRegion(service, region, tag, async, timeout, current_service, wait_deps);
   else if (!service.empty())
-    result = request->waitService(service, tag, async, timeout, wait_deps);
+    result = request->waitService(service, tag, async, timeout, current_service, wait_deps);
   else if (!region.empty())
-    result = request->waitRegion(async_zone_id, region, async, timeout);
+    result = request->waitRegion(async_zone_id, region, async, timeout, current_service);
   else
-    result = request->wait(async_zone_id, async, timeout);
+    result = request->wait(async_zone_id, async, timeout, current_service);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
   if (result == 1) {

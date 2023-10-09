@@ -38,8 +38,9 @@ namespace metadata {
             typedef struct ServiceNodeStruct {
                 std::string name;
                 std::string async_zone_id;
-                int opened_global_region;
+                int opened_global_region; // FIXME: CONVERT TO ATOMIC DUE TO ThE WAIT LOGS
                 int opened_branches;
+                int num_current_waits;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, std::vector<metadata::Branch*>> tagged_branches;
                 std::list<struct ServiceNodeStruct*> children;
@@ -69,6 +70,7 @@ namespace metadata {
             oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _sub_requests;
             // <async_zone_id, num_current_waits>
             std::set<AsyncZone*> _wait_logs;
+            std::unordered_map<std::string, std::set<ServiceNode*>> _service_wait_logs;
 
             /* ------- */
             /* helpers */
@@ -98,6 +100,8 @@ namespace metadata {
             /* ------------------- */
             /* concurrency control */
             /* ------------------- */
+            // logs
+            std::shared_mutex _mutex_service_wait_logs;
             // branches
             std::mutex _mutex_branches;
             std::condition_variable _cond_new_branch;
@@ -121,6 +125,39 @@ namespace metadata {
             */
             std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
             
+            /**
+             * Add current service node to wait logs
+             * 
+             * @param service_node The current service node
+             * @param target_service The target service to be waited for
+            */
+            void _addToServiceWaitLogs(ServiceNode* service_node, const std::string& target_service);
+
+            /**
+             * Remove current service node from wait logs
+             * 
+             * @param service_node The current service node
+             * @param target_service The target service to be waited for
+            */
+            void _removeFromServiceWaitLogs(ServiceNode* service_node, const std::string& target_service);
+
+            /**
+             * Gets number of opened branches for services waiting on current service
+             * 
+             * @param current_service The current service node
+             * @return pair for number of opened branches
+            */
+            int _numOpenedBranchesServiceLogs(const std::string& current_service);
+
+            /**
+             * Gets number of opened branches for services waiting on current service
+             * 
+             * @param current_service The current service node
+             * @param service The current service
+             * @return pair for number of opened branches with format: <global region, targeted region>
+            */
+            std::pair<int, int> _numOpenedRegionsServiceLogs(const std::string& current_service, const std::string& region);
+
         // public for testing purposes
         public:
             /**
@@ -129,7 +166,7 @@ namespace metadata {
             * @param async_zone_id The sub request identifier
             * @return return pointer to AsyncZone if found and nullptr otherwise
             */
-            AsyncZone *  _validateSubRid(const std::string& async_zone_id);
+            AsyncZone * _validateSubRid(const std::string& async_zone_id);
 
             /**
              * Add current sub request to wait logs
@@ -246,12 +283,12 @@ namespace metadata {
              * @param service The service where the branches are being registered
              * @param tag The service tag
              * @param regions The regions for each branch
-             * @param parent_service The parent service
+             * @param current_service The parent service
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
             metadata::Branch * registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service, 
-                const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service);
+                const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service);
 
             /**
              * Remove a branch from the request
@@ -300,14 +337,16 @@ namespace metadata {
              * @param async_zone_id Current sub request
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param current_service Current service doing the wait call
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-3) current_service not found
              * - (-4) if async_zone_id does not exist
              */
-            int wait(const std::string& async_zone_id, bool async, int timeout);
+            int wait(const std::string& async_zone_id, bool async, int timeout, const std::string& current_service);
 
             /**
              * Wait until request is closed for a given context (region)
@@ -316,15 +355,17 @@ namespace metadata {
              * @param region The name of the region that defines the waiting context
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param current_service Current service doing the wait call
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-2) if context was not found
+             * - (-3) current_service not found
              * - (-4) if async_zone_id does not exist
              */
-            int waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout);
+            int waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout, const std::string& current_service);
 
             /**
              * Wait until request is closed for a given context (service)
@@ -333,15 +374,18 @@ namespace metadata {
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param current_service Current service doing the wait call
              * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
+             * - (-3) current_service not found
              * - (-2) if context was not found
              */
-            int waitService(const std::string& service, const std::string& tag, bool async, int timeout, bool wait_deps);
+            int waitService(const std::string& service, const std::string& tag, bool async, 
+                int timeout, const std::string& current_service, bool wait_deps);
 
 
             /**
@@ -352,6 +396,7 @@ namespace metadata {
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param current_service Current service doing the wait call
              * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
@@ -359,11 +404,11 @@ namespace metadata {
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-2) if context (service/region) was not found
-             * - (-3) if context (prev service) was not found
+             * - (-3) current_service not found
              * - (-4) if tag was not found
              */
             int waitServiceRegion(const std::string& service, const std::string& region, 
-                const std::string& tag, bool async, int timeout, bool wait_deps);
+                const std::string& tag, bool async, int timeout, const std::string& current_service, bool wait_deps);
 
             /**
              * Check status of request

@@ -48,7 +48,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   }
   
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
-  _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().parent_service(), core_bid, monitor);
+  _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor);
 
   return grpc::Status::OK;
 }

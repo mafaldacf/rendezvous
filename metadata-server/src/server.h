@@ -172,7 +172,7 @@ namespace rendezvous {
             // helper for GTest: it calls registerBranch method
             std::string registerBranchGTest(metadata::Request * request, 
                 const std::string& async_zone_id, const std::string& service, 
-                const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service);
+                const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service);
 
             /**
              * Register new branch for a given request
@@ -181,7 +181,7 @@ namespace rendezvous {
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
-             * @param parent_service The parent service in the dependency graph
+             * @param current_service The parent service in the dependency graph
              * @param monitor Monitor branch by publishing identifier to subscribers
              * @param bid The set of branches identifier: empty if request is from client
              * @return 
@@ -189,7 +189,7 @@ namespace rendezvous {
              * - Or empty if an error ocurred (branches already exist with bid)
              */
             bool registerBranch(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
-                const utils::ProtoVec& regions, const std::string& tag, const std::string& parent_service, 
+                const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
                 const std::string& bid, bool monitor);
 
             /**
@@ -217,17 +217,19 @@ namespace rendezvous {
              * @param tag The specified operation tag for this service
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
+             * @param current_service Current service doing the wait call
+             * @param wait_deps If enabled, it waits for all dependencies of the service
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-2) if context (service/region) was not found
-             * - (-3) if context (prev service) was not found
+             * - (-3) if context (curr service) was not found
              * - (-4) if tag was not found
              */
             int wait(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
                 const::std::string& region, std::string tag = "", 
-                bool async = false, int timeout = 0, bool wait_deps = false);
+                bool async = false, int timeout = 0, std::string current_service = "", bool wait_deps = false);
             
             /**
              * Check status of the request for a given context (none, service, region or service and region)

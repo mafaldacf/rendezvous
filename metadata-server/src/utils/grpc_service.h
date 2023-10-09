@@ -32,6 +32,7 @@ namespace utils {
     const std::string ERR_MSG_NUM_SERVICES_CONTEXTS_DOES_NOT_MATCH = "Number of contexts does not match the number of services";
     const std::string ERR_MSG_INVALID_CONTEXT = "Invalid rendezvous context (prev_service or rid)";
     const std::string ERR_MSG_INVALID_SERVICE_REGION = "Invalid service or region provided";
+    const std::string ERR_MSG_WAIT_CALL_NO_CURRENT_SERVICE = "Current service branch needs to be registered before any wait call";
     const std::string ERR_MSG_INVALID_TAG = "Invalid service tag";
     const std::string ERR_MSG_INVALID_SERVICES_EXCLUSIVE = "Cannot provide either 'service' or 'services' simultaneously";
     const std::string ERR_MSG_INVALID_SERVICE = "Invalid service";

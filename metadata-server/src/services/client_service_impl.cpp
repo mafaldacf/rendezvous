@@ -126,7 +126,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     lock.unlock();
 
     std::thread([this, rdv_request, async_zone, service, regions, tag, ctx, core_bid, monitor, pending_service]() {
-      _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
+      _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.current_service(), core_bid, monitor);
       std::unique_lock<std::mutex> lock(pending_service->mutex);
       pending_service->num--;
       pending_service->condv.notify_all();
@@ -134,7 +134,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     }).detach();
   }
   else {
-    r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.parent_service(), core_bid, monitor);
+    r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.current_service(), core_bid, monitor);
   }
 
   // could not create branch (tag already exists)
@@ -145,7 +145,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   response->set_rid(rid);
   response->set_bid(_server->composeFullId(core_bid, rid));
-  ctx.set_parent_service(service);
+  ctx.set_current_service(service);
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
@@ -204,7 +204,7 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
       async_zone = utils::ROOT_ASYNC_ZONE_ID;
     }
 
-    const std::string& parent_service = ctx.parent_service();
+    const std::string& current_service = ctx.current_service();
 
     const std::string& core_bid = _server->genBid(rdv_request);
 
@@ -229,8 +229,8 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
       pending_service->num++;
       lock.unlock();
 
-      std::thread([this, rdv_request, async_zone, service, regions, tag, parent_service, core_bid, pending_service]() {
-        _server->registerBranch(rdv_request, async_zone, service, regions, tag, parent_service, core_bid, false);
+      std::thread([this, rdv_request, async_zone, service, regions, tag, current_service, core_bid, pending_service]() {
+        _server->registerBranch(rdv_request, async_zone, service, regions, tag, current_service, core_bid, false);
         std::unique_lock<std::mutex> lock(pending_service->mutex);
         pending_service->num--;
         pending_service->condv.notify_all();
@@ -238,7 +238,7 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
       }).detach();
     }
     else {
-      r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, parent_service, core_bid, false);
+      r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, current_service, core_bid, false);
     }
 
     // could not create branch (tag already exists)
@@ -261,7 +261,7 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
       _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, false, ctx);
     }
 
-    ctx.set_parent_service(service);
+    ctx.set_current_service(service);
     rendezvous::RequestContext * new_ctx_ptr = response->add_contexts();
     new_ctx_ptr->CopyFrom(ctx);
   }
@@ -418,6 +418,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   const std::string& region = request->region();
   bool wait_deps = request->wait_deps();
   std::string async_zone = ctx.async_zone();
+  const std::string& current_service = ctx.current_service();
   //bool async = request->async();
   int timeout = request->timeout();
 
@@ -458,14 +459,14 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   // wait logic for multiple services
   if (services.size() > 0) {
     for (const auto& service: services) {
-      result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
+      result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
       if (result < 0) {
         break;
       }
     }
   }
   else {
-    int result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, wait_deps);
+    int result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
     }
@@ -478,6 +479,9 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   } else if (result == -2) {
     spdlog::error("< [WR] Error: invalid context (service/region)", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_SERVICE_REGION);
+  } else if (result == -3) {
+    spdlog::error("< [WR] Error: current service branch needs to be registered before any wait call", rid);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_WAIT_CALL_NO_CURRENT_SERVICE);
   } else if (result == -4) {
     spdlog::error("< [WR] Error: invalid tag", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_TAG);

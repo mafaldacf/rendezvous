@@ -14,6 +14,7 @@ Request::Request(std::string rid, replicas::VersionRegistry * versions_registry)
     _service_nodes = std::unordered_map<std::string, ServiceNode*>();
     _sub_requests = oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*>();
     _wait_logs = std::set<AsyncZone*>();
+    _service_wait_logs = std::unordered_map<std::string, std::set<ServiceNode*>>();
 
     // add root node
     _service_nodes[utils::ROOT_SERVICE_NODE_ID] = new ServiceNode{utils::ROOT_SERVICE_NODE_ID, utils::ROOT_ASYNC_ZONE_ID};
@@ -128,7 +129,7 @@ metadata::Request::AsyncZone * Request::_validateSubRid(const std::string& async
 //----------------------
 
 metadata::Branch * Request::registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service,  
-    const std::string& tag, const utils::ProtoVec& regions, const std::string& parent_service) {
+    const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service) {
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
     auto branch_it = _branches.find(bid);
@@ -156,7 +157,7 @@ metadata::Branch * Request::registerBranch(const std::string& async_zone_id, con
     insertAsyncZone(async_zone_id);
 
     // error tracking branch (tag already exists!)
-    if (!trackBranch(async_zone_id, service, regions, num, parent_service, branch)) {
+    if (!trackBranch(async_zone_id, service, regions, num, current_service, branch)) {
         lock.lock();
         delete branch;
         lock.unlock();
@@ -278,7 +279,7 @@ bool Request::untrackBranch(const std::string& async_zone_id, const std::string&
 }
 
 bool Request::trackBranch(const std::string& async_zone_id, const std::string& service, 
-    const utils::ProtoVec& regions, int num, const std::string& parent_service, metadata::Branch * branch) {
+    const utils::ProtoVec& regions, int num, const std::string& current_service, metadata::Branch * branch) {
         
     // ---------------------------
     // SERVICE NODE & DEPENDENCIES
@@ -286,7 +287,7 @@ bool Request::trackBranch(const std::string& async_zone_id, const std::string& s
     ServiceNode * service_node;
     std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
 
-    auto it = _service_nodes.find(parent_service);
+    auto it = _service_nodes.find(current_service);
     if (it == _service_nodes.end()) return false;
     ServiceNode * parent_node = it->second;
     
@@ -371,8 +372,65 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
+void Request::_addToServiceWaitLogs(ServiceNode* curr_service_node, const std::string& target_service) {
+    std::unique_lock<std::shared_mutex> lock(_mutex_service_wait_logs);
+
+    // try to insert if not yet done
+    _service_wait_logs[target_service].insert(curr_service_node);
+    curr_service_node->num_current_waits++;
+
+    // don't forget to notify for wait and waitRegion calls :)
+    _cond_subrequests.notify_all();
+}
+
+void Request::_removeFromServiceWaitLogs(ServiceNode* curr_service_node, const std::string& target_service) {
+    std::unique_lock<std::shared_mutex> lock(_mutex_service_wait_logs);
+
+    int n = --curr_service_node->num_current_waits;
+    if (n == 0) {
+        _service_wait_logs[target_service].erase(curr_service_node);
+    }
+}
+
+int Request::_numOpenedBranchesServiceLogs(const std::string& current_service) {
+    int num = 0;
+
+    std::shared_lock<std::shared_mutex> lock_logs(_mutex_service_wait_logs);
+    std::set<ServiceNode*> service_logs = _service_wait_logs[current_service];
+    lock_logs.unlock();
+
+    std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
+    for (const auto& entry: service_logs) {
+        num += entry->opened_branches;
+    }
+    lock_services.unlock();
+
+    return num;
+}
+
+std::pair<int, int> Request::_numOpenedRegionsServiceLogs(const std::string& current_service, const std::string& region) {
+    // <global region counter, current region counter>
+    std::pair<int, int> num = {0, 0};
+
+    std::unique_lock<std::shared_mutex> lock_logs(_mutex_service_wait_logs);
+    std::set<ServiceNode*> service_logs = _service_wait_logs[current_service];
+    lock_logs.unlock();
+
+    std::unique_lock<std::shared_mutex> lock_services(_mutex_service_nodes);
+    for (const auto& entry: service_logs) {
+        auto it_region = entry->opened_regions.find(region);
+        if (it_region != entry->opened_regions.end()) {
+            num.second += it_region->second;
+        }
+        num.first += entry->opened_global_region;
+    }
+    lock_services.unlock();
+    
+    return num;
+}
+
 void Request::_addToWaitLogs(AsyncZone* subrequest) {
-    // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
+    // FRIENDLY REMINDER: caller of this function already acquires a lock on subrequests mutex
 
     // try to insert if not yet done
     _wait_logs.insert(subrequest);
@@ -385,8 +443,8 @@ void Request::_addToWaitLogs(AsyncZone* subrequest) {
 }
 
 void Request::_removeFromWaitLogs(AsyncZone* subrequest) {
-    // REMINDER: the function that calls this method already acquires lock on _mutex_subrequests
-
+    // FRIENDLY REMINDER: caller of this function already acquires a lock on subrequests mutex
+    
     int n = --subrequest->num_current_waits;
     if (n == 0) {
         _wait_logs.erase(subrequest);
@@ -532,7 +590,7 @@ bool Request::_waitFirstBranch(const std::chrono::steady_clock::time_point& star
     return true;
 }
 
-int Request::wait(const std::string& async_zone_id, bool async, int timeout) {
+int Request::wait(const std::string& async_zone_id, bool async, int timeout, const std::string& current_service) {
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
 
@@ -561,8 +619,9 @@ int Request::wait(const std::string& async_zone_id, bool async, int timeout) {
         // get number of branches to ignore from preceding subrids in the wait logs
         const auto& preceding_subrids = _getPrecedingAsyncZones(subrequest);
         int offset = _numOpenedBranchesAsyncZones(preceding_subrids);
+        int offset_services = _numOpenedBranchesServiceLogs(current_service);
 
-        if (_num_opened_branches.load() - subrequest->opened_branches.load() - offset != 0) {
+        if (_num_opened_branches.load() - subrequest->opened_branches.load() - offset - offset_services != 0) {
             _cond_subrequests.wait_for(lock, std::chrono::seconds(remaining_timeout));
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -580,7 +639,7 @@ int Request::wait(const std::string& async_zone_id, bool async, int timeout) {
     return inconsistency;
 }
 
-int Request::waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout) {
+int Request::waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout, const std::string& current_service) {
         
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
@@ -637,9 +696,10 @@ int Request::waitRegion(const std::string& async_zone_id, const std::string& reg
         // get number of branches to ignore from preceding subrids in the wait logs
         const auto& preceding_subrids = _getPrecedingAsyncZones(subrequest);
         std::pair<int, int> offset = _numOpenedRegionsAsyncZones(preceding_subrids, region);
+        std::pair<int, int> offset_services = _numOpenedRegionsServiceLogs(current_service, region);
 
-        if (_opened_global_region.load() - opened_sub_request_global_region - offset.first != 0 
-            || _opened_regions[region] - opened_sub_request_region - offset.second != 0) {
+        if (_opened_global_region.load() - opened_sub_request_global_region - offset.first - offset_services.first != 0 
+            || _opened_regions[region] - opened_sub_request_region - offset.second  - offset_services.second != 0) {
 
             read_accessor_num.release();
             _cond_subrequests.wait_for(lock, std::chrono::seconds(remaining_timeout));
@@ -659,7 +719,9 @@ int Request::waitRegion(const std::string& async_zone_id, const std::string& reg
     return inconsistency;
 }
 
-int Request::waitService(const std::string& service, const std::string& tag, bool async, int timeout, bool wait_deps) {
+int Request::waitService(const std::string& service, const std::string& tag, bool async, int timeout, 
+    const std::string& current_service, bool wait_deps) {
+
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_timeout = _computeRemainingTimeout(timeout, start_time);
@@ -696,6 +758,14 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
         if (!tag.empty() && _service_nodes[service]->tagged_branches.count(tag) == 0) return -2;
     }
 
+    if (_service_nodes.count(current_service) == 0) return -3;
+    
+    auto it = _service_nodes.find(current_service);
+    if (it == _service_nodes.end()) return -3;
+    ServiceNode * service_node = it->second;
+    _addToServiceWaitLogs(service_node, service);
+    AsyncZone * async_zone = _validateSubRid(it->second->async_zone_id);
+
     // ----------
     // WAIT LOGIC
     //-----------
@@ -708,6 +778,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 _cond_service_nodes.wait_for(lock, remaining_timeout);
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
                 if (remaining_timeout <= std::chrono::seconds(0)) {
+                    _removeFromServiceWaitLogs(service_node, service);
                     return -1;
                 }
             }
@@ -721,22 +792,20 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
+                _removeFromServiceWaitLogs(service_node, service);
                 return -1;
             }
         }
     }
     // wait for all dependencies
     if (wait_deps) {
-        const std::string& async_zone_id = _service_nodes[service]->async_zone_id;
-        AsyncZone * async_zone = _validateSubRid(async_zone_id);
-
-        ServiceNode * curr_service = _service_nodes[service];
+        ServiceNode * current_service = _service_nodes[service];
         std::stack<ServiceNode*> deps;
-        std::unordered_set<ServiceNode*> visited {curr_service};
-        visited.insert(curr_service);
+        std::unordered_set<ServiceNode*> visited {current_service};
+        visited.insert(current_service);
 
         // get all depends for current service
-        for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+        for (auto it = current_service->children.begin(); it != current_service->children.end(); it++) {
             deps.push((*it));
         }
 
@@ -753,6 +822,7 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
                 inconsistency = 1;
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
                 if (remaining_timeout <= std::chrono::seconds(0)) {
+                    _removeFromServiceWaitLogs(service_node, service);
                     return -1;
                 }
             }
@@ -767,11 +837,12 @@ int Request::waitService(const std::string& service, const std::string& tag, boo
             }
         }
     }
+    _removeFromServiceWaitLogs(service_node, service);
     return inconsistency;
 }
 
 int Request::waitServiceRegion(const std::string& service, const std::string& region, 
-const::std::string& tag, bool async, int timeout, bool wait_deps) {
+    const::std::string& tag, bool async, int timeout, const std::string& current_service, bool wait_deps) {
 
     int inconsistency = 0;
     auto start_time = std::chrono::steady_clock::now();
@@ -813,6 +884,12 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
         return -4;
     }
 
+    auto it = _service_nodes.find(current_service);
+    if (it == _service_nodes.end()) return -3;
+    ServiceNode * service_node = it->second;
+    _addToServiceWaitLogs(service_node, service);
+    AsyncZone * async_zone = _validateSubRid(it->second->async_zone_id);
+
     // ----------
     // WAIT LOGIC
     //-----------
@@ -825,6 +902,7 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
                 _cond_service_nodes.wait_for(lock, remaining_timeout);
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
                 if (remaining_timeout <= std::chrono::seconds(0)) {
+                    _removeFromServiceWaitLogs(service_node, service);
                     return -1;
                 }
             }
@@ -839,6 +917,7 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
             inconsistency = 1;
             remaining_timeout = _computeRemainingTimeout(timeout, start_time);
             if (remaining_timeout <= std::chrono::seconds(0)) {
+                _removeFromServiceWaitLogs(service_node, service);
                 return -1;
             }
         }
@@ -848,13 +927,13 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
         const std::string& async_zone_id = _service_nodes[service]->async_zone_id;
         AsyncZone * async_zone = _validateSubRid(async_zone_id);
 
-        ServiceNode * curr_service = _service_nodes[service];
+        ServiceNode * current_service = _service_nodes[service];
         std::stack<ServiceNode*> deps;
-        std::unordered_set<ServiceNode*> visited {curr_service};
-        visited.insert(curr_service);
+        std::unordered_set<ServiceNode*> visited {current_service};
+        visited.insert(current_service);
 
         // get all depends for current service
-        for (auto it = curr_service->children.begin(); it != curr_service->children.end(); it++) {
+        for (auto it = current_service->children.begin(); it != current_service->children.end(); it++) {
             deps.push((*it));
         }
 
@@ -871,6 +950,7 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
                 inconsistency = 1;
                 remaining_timeout = _computeRemainingTimeout(timeout, start_time);
                 if (remaining_timeout <= std::chrono::seconds(0)) {
+                    _removeFromServiceWaitLogs(service_node, service);
                     return -1;
                 }
             }
@@ -885,6 +965,7 @@ const::std::string& tag, bool async, int timeout, bool wait_deps) {
             }
         }
     }
+    _removeFromServiceWaitLogs(service_node, service);
     return inconsistency;
 }
 
@@ -1037,27 +1118,27 @@ utils::Dependencies Request::fetchDependenciesService(const std::string& service
     std::stack<std::string> lookup_deps;
     // get direct children nodes of current service
     for (auto it = _service_nodes[service]->children.begin(); it != _service_nodes[service]->children.end(); ++it) {
-        const std::string& curr_service = (*it)->name;
-        result.deps.insert(curr_service);
+        const std::string& current_service = (*it)->name;
+        result.deps.insert(current_service);
 
         // store indirect (deph 1) dependencies
-        for (auto children_it = _service_nodes[curr_service]->children.begin(); children_it != _service_nodes[curr_service]->children.end(); children_it++) {
+        for (auto children_it = _service_nodes[current_service]->children.begin(); children_it != _service_nodes[current_service]->children.end(); children_it++) {
             lookup_deps.push((*children_it)->name);
         }
     }
 
     // get all indirect nodes
     while (lookup_deps.size() != 0) {
-        const std::string& curr_service = lookup_deps.top();
+        const std::string& current_service = lookup_deps.top();
         lookup_deps.pop();
 
         // first children lookup for this service
-        if (result.indirect_deps.count(curr_service) == 0) {
-            for (auto children_it = _service_nodes[curr_service]->children.begin(); children_it != _service_nodes[curr_service]->children.end(); children_it++) {
+        if (result.indirect_deps.count(current_service) == 0) {
+            for (auto children_it = _service_nodes[current_service]->children.begin(); children_it != _service_nodes[current_service]->children.end(); children_it++) {
                 lookup_deps.push((*children_it)->name);
             }
         }
-        result.indirect_deps.insert(curr_service);
+        result.indirect_deps.insert(current_service);
     }
 
     return result;
