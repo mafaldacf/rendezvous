@@ -33,7 +33,9 @@ using namespace utils;
 namespace metadata {
 
     class Request {
-        private:
+
+        // public for testing purposes
+        public:
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
@@ -46,8 +48,6 @@ namespace metadata {
                 std::list<struct ServiceNodeStruct*> children;
             } ServiceNode;
 
-        // public for testing purposes
-        public:
             typedef struct AsyncZoneStruct {
                 std::string async_zone_id;
                 int i;
@@ -61,6 +61,7 @@ namespace metadata {
 
             } AsyncZone;
 
+        private:
             /* ----------- */
             /* async zones */
             /* ----------- */
@@ -115,6 +116,8 @@ namespace metadata {
             // sub requests
             std::shared_mutex _mutex_subrequests;
             std::condition_variable_any _cond_subrequests;
+        
+        public:
 
 
             /**
@@ -125,6 +128,14 @@ namespace metadata {
             */
             std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
             
+            /**
+             * Validates the service node
+             * 
+             * @param service The service name
+             * @return The pointer to the service node if valid and nullptr otherwise
+            */
+            ServiceNode * validateServiceNode(const std::string& service);
+
             /**
              * Add current service node to wait logs
              * 

@@ -454,7 +454,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
 
   int result;
 
-  _replica_client.addWaitLog(rid, async_zone, ctx);
+  _replica_client.addWaitLog(rid, async_zone, service, ctx);
 
   // wait logic for multiple services
   if (services.size() > 0) {
@@ -472,7 +472,8 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
     }
   }
 
-  _replica_client.removeWaitLog(rid, async_zone, ctx);
+  // FIXME: WE NEED TO GATHER ALL RESPONSES FROM REG LOG BEFORE ASKING TO REMOVE IT!!!
+  _replica_client.removeWaitLog(rid, async_zone, service, ctx);
   // parse errors
   if (result == -1) {
     response->set_timed_out(true);

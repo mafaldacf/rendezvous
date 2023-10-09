@@ -50,12 +50,14 @@ message CloseBranchMessage {
 message AddWaitLogMessage {
   string rid = 1;
   string async_zone = 2;
-  RequestContext context = 3;
+  string target_service = 3;
+  RequestContext context = 4;
 }
 
 /* Remove Wait */
 message RemoveWaitLogMessage {
   string rid = 1;
   string async_zone = 2;
-  RequestContext context = 3;
+  string target_service = 3;
+  RequestContext context = 4;
 }

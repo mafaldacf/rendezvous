@@ -16,28 +16,19 @@ namespace replicas {
 
     class ReplicaClient {
 
-        // Helper structure for grpc requests
-        struct RequestHelper {
-            int nrpcs = 0;
-            grpc::CompletionQueue queue;
-            std::vector<std::unique_ptr<grpc::Status>> statuses;
-            std::vector<std::unique_ptr<grpc::ClientContext>> contexts;
-            std::vector<std::unique_ptr<rendezvous_server::Empty>> responses;
-            std::vector<std::unique_ptr<grpc::ClientAsyncResponseReader<rendezvous_server::Empty>>> rpcs;
-        };
+        public:
+            // Helper structure for grpc requests
+            struct RequestHelper {
+                int nrpcs = 0;
+                grpc::CompletionQueue queue;
+                std::vector<std::unique_ptr<grpc::Status>> statuses;
+                std::vector<std::unique_ptr<grpc::ClientContext>> contexts;
+                std::vector<std::unique_ptr<rendezvous_server::Empty>> responses;
+                std::vector<std::unique_ptr<grpc::ClientAsyncResponseReader<rendezvous_server::Empty>>> rpcs;
+            };
 
         private:
             std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
-
-            /**
-             * Wait for completion queue of async requests
-             * 
-             * @param request The type of request that is being handled
-             * @param cq The completion queue
-             * @param statuses Vector of status for each request
-             * @param rpcs Number of RPCs performed
-             */
-            void _waitCompletionQueue(const std::string& request, struct RequestHelper& rh);
 
             /* Helpers */
             void _doRegisterRequest(const std::string& rid);
@@ -47,10 +38,24 @@ namespace replicas {
                 const rendezvous::RequestContext& ctx);
             void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, 
                 const std::string& region, const rendezvous::RequestContext& ctx);
+            void _doAddWaitLog(const std::string& root_rid, const std::string& async_zone, 
+                const std::string& target_service, const rendezvous::RequestContext& ctx);
+            void _doRemoveWaitLog(const std::string& root_rid, const std::string& async_zone, 
+                const std::string& target_service, const rendezvous::RequestContext& ctx);
             
 
         public:
             ReplicaClient(std::vector<std::string> addrs);
+
+            /**
+             * Wait for completion queue of async requests
+             * 
+             * @param request The type of request that is being handled
+             * @param cq The completion queue
+             * @param statuses Vector of status for each request
+             * @param rpcs Number of RPCs performed
+             */
+            void waitCompletionQueue(const std::string& request, struct RequestHelper& rh);
 
             /**
              * Send register request call to all replicas
@@ -90,18 +95,22 @@ namespace replicas {
              * 
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param target_service The optional target service for the wait call
              * @param ctx Additional metadata context
              */
-            void addWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx);
+            void addWaitLog(const std::string& root_rid, const std::string& async_zone, 
+                const std::string& target_service, const rendezvous::RequestContext& ctx);
 
             /**
              * Remove wait call from log entry (asynchronous broadcast)
              * 
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param target_service The optional target service for the wait call
              * @param ctx Additional metadata context
              */
-            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, rendezvous::RequestContext& ctx);
+            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, 
+                const std::string& target_service, const rendezvous::RequestContext& ctx);
 
         };
     

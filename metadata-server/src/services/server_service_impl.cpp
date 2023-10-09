@@ -95,6 +95,7 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
 
   const std::string& rid = request->rid();
   const std::string& async_zone = request->async_zone();
+  const std::string& target_service = request->target_service();
   
   spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
 
@@ -112,7 +113,16 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
   }
 
-  rdv_request->_addToWaitLogs(subrequest);
+  if (target_service.empty()) {
+    rdv_request->_addToWaitLogs(subrequest);
+  }
+  else {
+    metadata::Request::ServiceNode * service_node = rdv_request->validateServiceNode(target_service);
+    //FIXME: we should actually wait for replication
+    if (service_node != nullptr) {
+      rdv_request->_addToServiceWaitLogs(service_node, target_service);
+    }
+  }
   return grpc::Status::OK;
 }
 
@@ -124,6 +134,8 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
 
   const std::string& rid = request->rid();
   const std::string& async_zone = request->async_zone();
+  const std::string& current_service = request->context().current_service();
+  const std::string& target_service = request->target_service();
   
   spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
 
@@ -141,6 +153,15 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
   }
 
-  rdv_request->_removeFromWaitLogs(subrequest);
+  if (target_service.empty()) {
+    rdv_request->_removeFromWaitLogs(subrequest);
+  }
+  else {
+    metadata::Request::ServiceNode * service_node = rdv_request->validateServiceNode(target_service);
+    //FIXME: we should actually wait for replication
+    if (service_node != nullptr) {
+      rdv_request->_removeFromServiceWaitLogs(service_node, target_service);
+    }
+  }
   return grpc::Status::OK;
 }

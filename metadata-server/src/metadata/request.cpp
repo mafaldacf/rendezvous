@@ -372,6 +372,13 @@ std::chrono::seconds Request::_computeRemainingTimeout(int timeout, const std::c
     return std::chrono::seconds(60);
 }
 
+metadata::Request::ServiceNode * Request::validateServiceNode(const std::string& service) {
+    std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
+    auto it = _service_nodes.find(service);
+    if (it == _service_nodes.end()) return nullptr;
+    return it->second;
+}
+
 void Request::_addToServiceWaitLogs(ServiceNode* curr_service_node, const std::string& target_service) {
     std::unique_lock<std::shared_mutex> lock(_mutex_service_wait_logs);
 
