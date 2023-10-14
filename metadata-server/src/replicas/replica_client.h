@@ -11,6 +11,8 @@
 #include <thread>
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
+#include "../services/client_service_interceptor.h"
+#include <grpcpp/grpcpp.h>
 
 namespace replicas {
 

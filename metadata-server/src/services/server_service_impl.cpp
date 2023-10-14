@@ -50,6 +50,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
   _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor);
 
+  spdlog::trace("< [REPLICATED RB] registered #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", num, service, monitor, core_bid, rid, async_zone);
   return grpc::Status::OK;
 }
 

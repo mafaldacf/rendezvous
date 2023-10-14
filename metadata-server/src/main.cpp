@@ -19,6 +19,8 @@
 #include "spdlog/fmt/ostr.h"
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include "utils/settings.h"
+#include <grpcpp/grpcpp.h>
+#include "services/server_service_interceptor.h"
 
 using json = nlohmann::json;
 
@@ -55,6 +57,11 @@ void run() {
   //builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIME_MS, 2000);
   builder.RegisterService(client_service.get());
   builder.RegisterService(server_service.get());
+
+  // Set up server-side interceptors
+  std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> creators;
+  creators.push_back(std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>(new ServerServiceInterceptorFactory()));
+  builder.experimental().SetInterceptorCreators(std::move(creators));
 
   server = std::unique_ptr<grpc::Server>(builder.BuildAndStart());
   rendezvous_server->initRequestsCleanup();

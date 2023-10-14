@@ -3,12 +3,15 @@
 using namespace replicas;
 
 ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
-
     // by default, addrs does not contain the address of the current replica
     for (const auto& addr : addrs) {
-      auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
-      auto stub = rendezvous_server::ServerService::NewStub(channel);
-      _servers.push_back(std::move(stub));
+        // Set up client-side interceptors
+        std::vector<std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>> creators;
+        creators.push_back(std::make_unique<ClientServiceInterceptorFactory>());
+        grpc::ChannelArguments args;
+        auto channel = grpc::experimental::CreateCustomChannelWithInterceptors(addr, nullptr, args, std::move(creators));
+        auto stub = rendezvous_server::ServerService::NewStub(channel);
+        _servers.push_back(std::move(stub));
     }
 }
 
