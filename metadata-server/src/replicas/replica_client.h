@@ -35,13 +35,13 @@ namespace replicas {
             void _doRegisterBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                const rendezvous::RequestContext& ctx);
-            void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, 
-                const std::string& region, const rendezvous::RequestContext& ctx);
+                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
+            void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, const std::string& region, 
+                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
             void _doAddWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service, const rendezvous::RequestContext& ctx);
+                const std::string& target_service);
             void _doRemoveWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service, const rendezvous::RequestContext& ctx);
+                const std::string& target_service);
             
 
         public:
@@ -72,12 +72,13 @@ namespace replicas {
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param monitor If enabled, we publish the branch for datastore monitor subscribers
-             * @param ctx Additional metadata context
+             * @param ctx Context propagated by the client
+             * @param ctx_replica Context targeted ot the replica
              */
             void registerBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                const rendezvous::RequestContext& ctx);
+                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
 
             /**
              * Send close branch call to all replicas
@@ -85,10 +86,11 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param core_bid bid The identifier of the set of branches generated when the branch was registered (without rid)
              * @param region The region where the branch was registered
-             * @param ctx Additional metadata context
+             * @param ctx Context propagated by the client
+             * @param ctx_replica Context targeted ot the replica
              */
-            void closeBranch(const std::string& root_rid, const std::string& core_bid, 
-                const std::string& region, const rendezvous::RequestContext& ctx);
+            void closeBranch(const std::string& root_rid, const std::string& core_bid, const std::string& region, 
+                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
 
             /**
              * Add wait call to log entry (asynchronous broadcast)
@@ -96,10 +98,8 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
-             * @param ctx Additional metadata context
              */
-            void addWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service, const rendezvous::RequestContext& ctx);
+            void addWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
 
             /**
              * Remove wait call from log entry (asynchronous broadcast)
@@ -107,10 +107,8 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
-             * @param ctx Additional metadata context
              */
-            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service, const rendezvous::RequestContext& ctx);
+            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
 
         };
     

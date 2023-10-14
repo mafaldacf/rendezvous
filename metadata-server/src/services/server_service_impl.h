@@ -22,8 +22,6 @@ namespace service {
         private:
             std::shared_ptr<rendezvous::Server> _server;
 
-            void _waitReplicaVersions(metadata::Request * rdv_request, rendezvous_server::RequestContext rdv_context);
-
         public:
             ServerServiceImpl(std::shared_ptr<rendezvous::Server> server);
 

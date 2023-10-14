@@ -29,9 +29,8 @@ message Empty {
 /* Metadata for server replication */
 message RequestContext {
   string current_service = 1;
-  map<string, int32> versions = 2;
-  string async_zone = 3;
-  int32 num_sub_zones = 4;
+  string async_zone = 2;
+  int32 num_sub_zones = 3;
 }
 
 /* Publish-Subscribe */

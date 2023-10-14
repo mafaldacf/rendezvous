@@ -36,38 +36,40 @@ namespace replicas {
             /**
              * Increment version for current server id
              * 
-             * @param id The local replica id
+             * @param sid The local replica id
              * 
              * @return The new version after the update
              * 
              */
-            int updateLocalVersion(const std::string& id);
+            int updateLocalVersion(const std::string& sid);
 
             /**
              * Get version for current server id
              * 
-             * @param id The local replica id
+             * @param sid The local replica id
              * 
              * @return The current version
              * 
              */
-            int getLocalVersion(const std::string& id);
+            int getLocalVersion(const std::string& sid);
 
             /**
              * Update version of a remote replica
              * 
-             * @param id The remote replica id
+             * @param sid The remote replica id
              * @param version The remote replica version
              * 
              */
-            void updateRemoteVersion(const std::string& id, const int& version);
+            void updateRemoteVersion(const std::string& sid, int version);
 
             /**
-             * Wait until all remote versions is available
+             * Wait until the version of the remote replica is applied
              * 
-             * @param info Map with all versions for every replica id: <replica id, version>
+             * @param sid The remote replica id
+             * @param version The remote replica version
+             * 
              */
-            void waitRemoteVersions(const rendezvous::RequestContext& info);
+            void waitRemoteVersion(const std::string& sid, int version);
         };
     
 }

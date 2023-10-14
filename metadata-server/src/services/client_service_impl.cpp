@@ -146,18 +146,20 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   response->set_rid(rid);
   response->set_bid(_server->composeFullId(core_bid, rid));
   ctx.set_current_service(service);
+  response->mutable_context()->CopyFrom(ctx);
 
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
+    rendezvous_server::RequestContext ctx_replica;
     if (utils::ASYNC_REPLICATION) {
-      // update current context
-      std::string sid = _server->getSid();
-      int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-      ctx.mutable_versions()->insert({sid, version});
+      const std::string& sid = _server->getSid();
+      int new_version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
+      ctx_replica.set_sid(sid);
+      ctx_replica.set_version(new_version);
     }
-    response->mutable_context()->CopyFrom(ctx);
-    _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx);
+    _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx, ctx_replica);
   }
+
   return grpc::Status::OK;
 }
 
@@ -252,13 +254,14 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
 
     // replicate client request to remaining replicas
     if (_num_replicas > 1) {
+      rendezvous_server::RequestContext ctx_replica;
       if (utils::ASYNC_REPLICATION) {
-        // update current context
-        std::string sid = _server->getSid();
-        int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-        ctx.mutable_versions()->insert({sid, version});
+        const std::string& sid = _server->getSid();
+        int new_version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
+        ctx_replica.set_sid(sid);
+        ctx_replica.set_version(new_version);
       }
-      _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, false, ctx);
+      _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, false, ctx, ctx_replica);
     }
 
     ctx.set_current_service(service);
@@ -400,7 +403,14 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   // replicate client request to remaining replicas
   if (_num_replicas > 1) {
     rendezvous::RequestContext ctx = request->context();
-    _replica_client.closeBranch(root_rid, bid, region, ctx);
+    rendezvous_server::RequestContext ctx_replica;
+    if (utils::ASYNC_REPLICATION) {
+      const std::string& sid = _server->getSid();
+      int version = rdv_request->getVersionsRegistry()->getLocalVersion(sid);
+      ctx_replica.set_sid(sid);
+      ctx_replica.set_version(version);
+    }
+    _replica_client.closeBranch(root_rid, bid, region, ctx, ctx_replica);
   }
   return grpc::Status::OK;
 }
@@ -447,14 +457,9 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
     async_zone = utils::ROOT_ASYNC_ZONE_ID;
   }
 
-  // wait until current replica is consistent with this request
-  if (utils::ASYNC_REPLICATION && _num_replicas > 1) {
-    rdv_request->getVersionsRegistry()->waitRemoteVersions(ctx);
-  }
-
   int result;
 
-  _replica_client.addWaitLog(rid, async_zone, service, ctx);
+  _replica_client.addWaitLog(rid, async_zone, service);
 
   // wait logic for multiple services
   if (services.size() > 0) {
@@ -473,7 +478,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   }
 
   // FIXME: WE NEED TO GATHER ALL RESPONSES FROM REG LOG BEFORE ASKING TO REMOVE IT!!!
-  _replica_client.removeWaitLog(rid, async_zone, service, ctx);
+  _replica_client.removeWaitLog(rid, async_zone, service);
   // parse errors
   if (result == -1) {
     response->set_timed_out(true);

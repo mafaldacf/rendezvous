@@ -18,7 +18,8 @@ message Empty {
 /* Metadata for server replication */
 message RequestContext {
   string current_service = 1;
-  map<string, int32> versions = 2;
+  string sid = 2;
+  int32 version = 3;
 }
 
 /* Register Request */

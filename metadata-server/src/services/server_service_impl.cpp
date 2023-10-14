@@ -6,14 +6,6 @@ ServerServiceImpl::ServerServiceImpl(std::shared_ptr<rendezvous::Server> server)
     : _server(server) {
 }
 
-void ServerServiceImpl::_waitReplicaVersions(metadata::Request * rdv_request, rendezvous_server::RequestContext rdv_context) {
-  auto versions_registry = rdv_request->getVersionsRegistry();
-  // pair: <sid, version>
-  for (const auto& v : rdv_context.versions()) {
-    versions_registry->updateRemoteVersion(v.first, v.second);
-  }
-}
-
 grpc::Status ServerServiceImpl::RegisterRequest(grpc::ServerContext* context, const rendezvous_server::RegisterRequestMessage* request, rendezvous_server::Empty* response) {
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
   spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
@@ -47,7 +39,11 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
   
-  if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
+  if (utils::ASYNC_REPLICATION) {
+    auto ctx = request->context();
+    rdv_request->getVersionsRegistry()->updateRemoteVersion(ctx.sid(), ctx.version());
+  }
+
   _server->registerBranch(rdv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor);
 
   return grpc::Status::OK;
@@ -71,7 +67,11 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
+  if (utils::ASYNC_REPLICATION) {
+    auto ctx = request->context();
+    rdv_request->getVersionsRegistry()->waitRemoteVersion(ctx.sid(), ctx.version());
+  }
+
 
   // always force close branch when dealing with replicated requests
   int res = _server->closeBranch(rdv_request, core_bid, region, true);
@@ -104,8 +104,6 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
     spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
-
-  if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
 
   metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
   if (subrequest == nullptr) {
@@ -144,8 +142,6 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
     spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid root rid {}", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
-
-  if (utils::ASYNC_REPLICATION) _waitReplicaVersions(rdv_request, request->context());
 
   metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
   if (subrequest == nullptr) {
