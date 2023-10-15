@@ -18,14 +18,14 @@ namespace replicas {
 
         public:
             // Helper structure for grpc requests
-            struct RequestHelper {
+            typedef struct AsyncRequestHelperStruct {
                 int nrpcs = 0;
                 grpc::CompletionQueue queue;
                 std::vector<std::unique_ptr<grpc::Status>> statuses;
                 std::vector<std::unique_ptr<grpc::ClientContext>> contexts;
                 std::vector<std::unique_ptr<rendezvous_server::Empty>> responses;
                 std::vector<std::unique_ptr<grpc::ClientAsyncResponseReader<rendezvous_server::Empty>>> rpcs;
-            };
+            } AsyncRequestHelper;
 
         private:
             std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
@@ -38,10 +38,6 @@ namespace replicas {
                 const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
             void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, const std::string& region, 
                 const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
-            void _doAddWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service);
-            void _doRemoveWaitLog(const std::string& root_rid, const std::string& async_zone, 
-                const std::string& target_service);
             
 
         public:
@@ -55,7 +51,7 @@ namespace replicas {
              * @param statuses Vector of status for each request
              * @param rpcs Number of RPCs performed
              */
-            void waitCompletionQueue(const std::string& request, struct RequestHelper& rh);
+            void waitCompletionQueue(const std::string& request, AsyncRequestHelper& rh);
 
             /**
              * Send register request call to all replicas
@@ -98,8 +94,9 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
+             * @return async request helper structure with all the context of the requests
              */
-            void addWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
+            AsyncRequestHelper * addWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
 
             /**
              * Remove wait call from log entry (asynchronous broadcast)
@@ -107,8 +104,10 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param async_zone The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
+             * @param add_wait_log_async_request_helper Async request helper from addWaitLog used to wait now to prevent removing before adding
              */
-            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
+            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, 
+                const std::string& target_service, AsyncRequestHelper * add_wait_log_async_request_helper);
 
         };
     

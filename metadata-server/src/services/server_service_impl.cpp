@@ -74,7 +74,7 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
 
 
   // always force close branch when dealing with replicated requests
-  int res = _server->closeBranch(rdv_request, core_bid, region, true);
+  int res = _server->closeBranch(rdv_request, core_bid, region);
 
   if (res == 0) {
     spdlog::critical("< [REPLICATED CB] Error: branch not found for ids {}:{}", core_bid, rid);
@@ -94,10 +94,10 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
-  const std::string& async_zone = request->async_zone();
+  const std::string& async_zone_id = request->async_zone();
   const std::string& target_service = request->target_service();
   
-  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
+  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
 
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
@@ -105,14 +105,14 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
-  if (subrequest == nullptr) {
-    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone);
+  metadata::Request::AsyncZone * async_zone = rdv_request->_validateAsyncZone(async_zone_id);
+  if (async_zone == nullptr) {
+    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone_id);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
   }
 
   if (target_service.empty()) {
-    rdv_request->_addToWaitLogs(subrequest);
+    rdv_request->_addToWaitLogs(async_zone);
   }
   else {
     metadata::Request::ServiceNode * service_node = rdv_request->validateServiceNode(target_service);
@@ -131,11 +131,11 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
-  const std::string& async_zone = request->async_zone();
+  const std::string& async_zone_id = request->async_zone();
   const std::string& current_service = request->context().current_service();
   const std::string& target_service = request->target_service();
   
-  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone);
+  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
 
   metadata::Request * rdv_request = _server->getOrRegisterRequest(rid);
   if (rdv_request == nullptr) {
@@ -143,14 +143,14 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  metadata::Request::AsyncZone * subrequest = rdv_request->_validateSubRid(async_zone);
-  if (subrequest == nullptr) {
-    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone);
+  metadata::Request::AsyncZone * async_zone = rdv_request->_validateAsyncZone(async_zone_id);
+  if (async_zone == nullptr) {
+    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone_id);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
   }
 
   if (target_service.empty()) {
-    rdv_request->_removeFromWaitLogs(subrequest);
+    rdv_request->_removeFromWaitLogs(async_zone);
   }
   else {
     metadata::Request::ServiceNode * service_node = rdv_request->validateServiceNode(target_service);

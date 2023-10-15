@@ -8,6 +8,8 @@
 #include "../utils/grpc_service.h"
 #include "../utils/metadata.h"
 #include "../utils/settings.h"
+#include "mutex"
+#include "atomic"
 
 using namespace utils;
 
@@ -24,7 +26,8 @@ namespace metadata {
             // region status with key: <region>, value: <status>
             std::unordered_map<std::string, int> _regions;
 
-            int _num_opened_regions;
+            std::atomic<int> _num_opened_regions;
+            std::mutex _mutex_regions;
 
 
 
@@ -38,7 +41,7 @@ namespace metadata {
              * 
              * @return async_zone_id
              */
-            std::string getSubRid();
+            std::string getAsyncZoneId();
 
             /**
              * Get the branch's tag
@@ -66,7 +69,7 @@ namespace metadata {
              * 
              * @param region if empty, status is checked globally
             */
-            bool isClosed(std::string region = "");
+            bool isGloballyClosed(std::string region = "");
 
             /**
              * Return branch status for a given region or globally
@@ -83,6 +86,13 @@ namespace metadata {
              * @returns -1 if region does not exist, 1 if if was successfully closed and 0 if it was already closed
              */
             int close(const std::string &region);
+
+            /**
+             * Set status to open for a given region: helper to re-open in case of error when closing
+             * 
+             * @param region The region context
+             */
+            void open(const std::string &region);
         };
     
 }

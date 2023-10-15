@@ -53,31 +53,31 @@ TEST(WaitLogsTest, PrecedingDetection) {
   ASSERT_EQ("r:a1:b2", r_a1_b2);
 
   // get root async zone
-  metadata::Request::AsyncZone * subrequest_r = request->_validateSubRid(ROOT_SUB_RID);
+  metadata::Request::AsyncZone * subrequest_r = request->_validateAsyncZone(ROOT_SUB_RID);
   ASSERT_TRUE(subrequest_r != nullptr);
 
   // add to wait logs: async zone r:a1
-  metadata::Request::AsyncZone * subrequest_r_a1 = request->_validateSubRid(r_a1);
+  metadata::Request::AsyncZone * subrequest_r_a1 = request->_validateAsyncZone(r_a1);
   ASSERT_TRUE(subrequest_r_a1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1);
 
   // add to wait logs: async zone r:c1
-  metadata::Request::AsyncZone * subrequest_r_c1 = request->_validateSubRid(r_c1);
+  metadata::Request::AsyncZone * subrequest_r_c1 = request->_validateAsyncZone(r_c1);
   ASSERT_TRUE(subrequest_r_c1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1);
 
   // add to wait logs: async zone r:c1:d1
-  metadata::Request::AsyncZone * subrequest_r_c1_d1 = request->_validateSubRid(r_c1_d1);
+  metadata::Request::AsyncZone * subrequest_r_c1_d1 = request->_validateAsyncZone(r_c1_d1);
   ASSERT_TRUE(subrequest_r_c1_d1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1_d1);
 
   // add to wait logs: async zone r:a1:b1
-  metadata::Request::AsyncZone * subrequest_r_a1_b1 = request->_validateSubRid(r_a1_b1);
+  metadata::Request::AsyncZone * subrequest_r_a1_b1 = request->_validateAsyncZone(r_a1_b1);
   ASSERT_TRUE(subrequest_r_a1_b1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b1);
 
   // add to wait logs: async zone r:a1:b2
-  metadata::Request::AsyncZone * subrequest_r_a1_b2 = request->_validateSubRid(r_a1_b2);
+  metadata::Request::AsyncZone * subrequest_r_a1_b2 = request->_validateAsyncZone(r_a1_b2);
   ASSERT_TRUE(subrequest_r_a1_b2 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b2);
 

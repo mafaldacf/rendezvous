@@ -1,5 +1,6 @@
 #include "server.h"
 #include "utils/metadata.h"
+#include "utils/settings.h"
 
 using namespace rendezvous;
 
@@ -13,6 +14,8 @@ Server::Server(std::string sid, json settings)
     _wait_replica_timeout_s(settings["wait_replica_timeout_s"].get<int>()) {
 
     utils::SIZE_SIDS = sid.size();
+
+    utils::WAIT_REPLICA_TIMEOUT_S = _wait_replica_timeout_s;
     
     spdlog::info("----------------------- SETTINGS ---------------------\n");
     spdlog::info("> SIDs' size: {} chars", utils::SIZE_SIDS);
@@ -283,24 +286,8 @@ bool Server::registerBranch(metadata::Request * request,
   return true;
 }
 
-int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force) {
-    
-  int r = request->closeBranch(bid, region);
-  
-  // close branch in the background
-  if (r != 1 && force) {
-    std::thread([this, request, bid, region]() {
-      int retries = 0;
-      while (retries++ <= _wait_replica_timeout_s) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        if (request->closeBranch(bid, region) == 1) {
-          break;
-        }
-      }
-    }).detach();
-    return 1;
-  }
-  return r;
+int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
+  return request->closeBranch(bid, region);
 }
 
 int Server::wait(metadata::Request * request, const std::string& async_zone_id, 

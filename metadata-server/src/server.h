@@ -199,13 +199,12 @@ namespace rendezvous {
              * @param bid The identifier of the set of branches where the current branch was registered
              * @param region Region where branch was registered
              * @param service Service where branch was registered
-             * @param force Force waiting until branch is registered
              * @return one of three values:
              * - 1 if branch was closed
              * - 0 if branch was already closed before
              * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
              */
-            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region, bool force = false);
+            int closeBranch(metadata::Request * request, const std::string& bid, const std::string& region);
 
             /**
              * Wait until request is closed for a given context (none, service, region or service and region)
@@ -214,7 +213,7 @@ namespace rendezvous {
              * @param async_zone_id Current subrequest
              * @param service The service context
              * @param region The region we are waiting for the service on
-             * @param tag The specified operation tag for this service
+             * @param tag  The specified operation tag for this service
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
              * @param current_service Current service doing the wait call

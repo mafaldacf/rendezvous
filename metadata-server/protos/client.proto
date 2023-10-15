@@ -9,7 +9,6 @@ service ClientService {
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
   rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
-  rpc RegisterBranchesDatastores(RegisterBranchesDatastoresMessage) returns (RegisterBranchesDatastoresResponse);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
   rpc CheckStatus(CheckStatusMessage) returns (CheckStatusResponse);
@@ -89,27 +88,13 @@ message DatastoreBranching {
   string tag = 2;
   repeated string regions = 3;
 }
-message RegisterBranchesDatastoresMessage {
-  string rid = 1;
-  repeated string datastores = 2;
-  repeated string regions = 3;
-  repeated string tags = 4;
-  repeated DatastoreBranching branches = 5;
-  RequestContext context = 6;
-}
-message RegisterBranchesDatastoresResponse {
-  string rid = 1;
-  repeated string bids = 2;
-  RequestContext context = 3;
-}
 
 /* Close Branch */
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
-  bool force = 3;
-  bool close_service = 4;
-  RequestContext context = 5;
+  bool close_service = 3;
+  RequestContext context = 4;
 }
 
 /* Wait */

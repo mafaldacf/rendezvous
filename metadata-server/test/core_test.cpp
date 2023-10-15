@@ -202,7 +202,7 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   res = server.checkStatus(request, ROOT_SUB_RID, "s1", "");
   ASSERT_EQ(CLOSED, res.status);
 
-  // ASYNC ZONE CORNER CASE: we ignore everything in the current subrequest (num > 1)
+  // ASYNC ZONE CORNER CASE: we ignore everything in the current async_zone (num > 1)
   // but in fact, regions are still opened!
   res = server.checkStatus(request, ROOT_SUB_RID, "", "");
   ASSERT_EQ(CLOSED, res.status);
@@ -291,7 +291,7 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   res = server.checkStatus(request, ROOT_SUB_RID, "post-notifications", "");
   ASSERT_EQ(UNKNOWN, res.status);
 
-  // ASYNC ZONE CORNER CASE: we ignore everything in the current subrequest (num > 1)
+  // ASYNC ZONE CORNER CASE: we ignore everything in the current async_zone (num > 1)
   // but in fact, these regions are opened!
   res = server.checkStatus(request, ROOT_SUB_RID, "", "EU");
   ASSERT_EQ(CLOSED, res.status);

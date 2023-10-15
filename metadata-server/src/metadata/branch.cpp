@@ -3,12 +3,11 @@
 using namespace metadata;
 
 Branch::Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions)
-    : _service(service), _tag(tag), _sub_rid(async_zone_id) {
+    : _service(service), _tag(tag), _sub_rid(async_zone_id), _num_opened_regions(vector_regions.size()) {
         _regions = std::unordered_map<std::string, int>();
         for (const auto& region : vector_regions) {
             _regions[region] = OPENED;
         }
-        _num_opened_regions = vector_regions.size();
     }
 
 Branch::Branch(std::string service, std::string tag, std::string async_zone_id)
@@ -19,7 +18,7 @@ Branch::Branch(std::string service, std::string tag, std::string async_zone_id)
         _num_opened_regions = 1;
     }
 
-std::string Branch::getSubRid() {
+std::string Branch::getAsyncZoneId() {
     return _sub_rid;
 }
 
@@ -35,20 +34,22 @@ std::string Branch::getService() {
     return _service;
 }
 
-bool Branch::isClosed(std::string region) {
+bool Branch::isGloballyClosed(std::string region) {
     if (region.empty()) {
-        return _num_opened_regions == 0;
+        return _num_opened_regions.load() == 0;
     }
+    std::unique_lock<std::mutex> lock(_mutex_regions);
     return _regions[region] == CLOSED;
 }
 
 int Branch::getStatus(std::string region) {
     if (region.empty()) {
-        if (_num_opened_regions == 0) {
+        if (_num_opened_regions.load() == 0) {
             return CLOSED;
         }
         return OPENED;
     }
+    std::unique_lock<std::mutex> lock(_mutex_regions);
     auto region_it = _regions.find(region);
     if (region_it == _regions.end()) {
         return UNKNOWN;
@@ -57,6 +58,7 @@ int Branch::getStatus(std::string region) {
 }
 
 int Branch::close(const std::string &region) {
+    std::unique_lock<std::mutex> lock(_mutex_regions);
     auto region_it = _regions.find(region);
     if (region_it == _regions.end()) {
         return -1;
@@ -65,6 +67,12 @@ int Branch::close(const std::string &region) {
         return 0;
     }
     _regions[region] = CLOSED;
-    _num_opened_regions -= 1;
+    _num_opened_regions.fetch_add(-1);
     return 1;
+}
+
+void Branch::open(const std::string &region) {
+    std::unique_lock<std::mutex> lock(_mutex_regions);
+    _regions[region] = OPENED;
+    _num_opened_regions.fetch_add(1);
 }

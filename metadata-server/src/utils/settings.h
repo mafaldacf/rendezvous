@@ -22,6 +22,8 @@ namespace utils {
     static bool ASYNC_REPLICATION = false;
     static bool CONTEXT_VERSIONING = false;
     static bool ASYNC_SERVICE_REGISTER_CALLS = true;
+
+    static int WAIT_REPLICA_TIMEOUT_S = 60;
     
     /* --------------------------- */
     /* parsed values from env vars */

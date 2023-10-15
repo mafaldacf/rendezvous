@@ -51,7 +51,7 @@ namespace metadata {
             typedef struct AsyncZoneStruct {
                 std::string async_zone_id;
                 int i;
-                // protected by sub_requests mutex
+                // protected by async_zones mutex
                 int num_current_waits;
 
                 std::atomic<int> next_async_zone_index;
@@ -65,10 +65,10 @@ namespace metadata {
             /* ----------- */
             /* async zones */
             /* ----------- */
-            // index for sub_requests
-            std::atomic<int> sub_requests_i;
-            // <async_zone_id, sub_request_ptr>
-            oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _sub_requests;
+            // index for async_zones
+            std::atomic<int> async_zones_i;
+            // <async_zone_id, async_zone_ptr>
+            oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _async_zones;
             // <async_zone_id, num_current_waits>
             std::set<AsyncZone*> _wait_logs;
             std::unordered_map<std::string, std::set<ServiceNode*>> _service_wait_logs;
@@ -113,9 +113,17 @@ namespace metadata {
             std::condition_variable_any _cond_service_nodes;
             // service nodes -- wait with async option
             std::condition_variable_any _cond_new_service_nodes;
-            // sub requests
-            std::shared_mutex _mutex_subrequests;
-            std::condition_variable_any _cond_subrequests;
+            // async zones
+            std::shared_mutex _mutex_async_zones;
+            std::condition_variable_any _cond_async_zones;
+
+            /**
+             * Wait for the branch's registration
+             * 
+             * @param bid The branch identifier
+             * @return pointer to the branch if found and nullptr otherwise
+            */
+            metadata::Branch * _waitBranchRegistration(const std::string& bid);
         
         public:
 
@@ -177,19 +185,19 @@ namespace metadata {
             * @param async_zone_id The sub request identifier
             * @return return pointer to AsyncZone if found and nullptr otherwise
             */
-            AsyncZone * _validateSubRid(const std::string& async_zone_id);
+            AsyncZone * _validateAsyncZone(const std::string& async_zone_id);
 
             /**
-             * Add current sub request to wait logs
+             * Add current async zone to wait logs
              * 
-             * @param subrequest The current sub request
+             * @param async_zone The current async zone
             */
-            void _addToWaitLogs(AsyncZone* subrequest);
+            void _addToWaitLogs(AsyncZone* async_zone);
 
             /**
-             * Remove current sub request from wait logs
+             * Remove current async zone from wait logs
              * 
-             * @param subrequest The current sub request
+             * @param async_zone The current async zone
             */
             void _removeFromWaitLogs(AsyncZone* subrequest);
 
@@ -310,7 +318,7 @@ namespace metadata {
              * @return one of three values:
              * - 1 if branch was closed
              * - 0 if branch was already closed before
-             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in sub_requests tbb map
+             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in async_zones tbb map
              */
             int closeBranch(const std::string& bid, const std::string& region);
 

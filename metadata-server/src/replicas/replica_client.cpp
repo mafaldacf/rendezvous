@@ -12,7 +12,7 @@ ReplicaClient::ReplicaClient(std::vector<std::string> addrs) {
     }
 }
 
-void ReplicaClient::waitCompletionQueue(const std::string& request, struct RequestHelper& req_helper) {
+void ReplicaClient::waitCompletionQueue(const std::string& request, AsyncRequestHelper& req_helper) {
     for(int i = 0; i < req_helper.nrpcs; i++) {
         void * tagPtr;
         bool ok = false;
@@ -28,7 +28,7 @@ void ReplicaClient::waitCompletionQueue(const std::string& request, struct Reque
 }
 
 void ReplicaClient::_doRegisterRequest(const std::string& rid) {
-    struct RequestHelper req_helper;
+    AsyncRequestHelper req_helper;
     for (const auto& server : _servers) {
         grpc::ClientContext * context = new grpc::ClientContext();
         req_helper.contexts.emplace_back(context);
@@ -65,7 +65,7 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
 
-        struct RequestHelper req_helper;
+        AsyncRequestHelper req_helper;
         for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
             req_helper.contexts.emplace_back(context);
@@ -115,7 +115,7 @@ void ReplicaClient::registerBranch(const std::string& rid, const std::string& as
 void ReplicaClient::_doCloseBranch(const std::string& rid, const std::string& core_bid, const std::string& region, 
     const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
 
-        struct RequestHelper req_helper;
+        AsyncRequestHelper req_helper;
         for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
             req_helper.contexts.emplace_back(context);
@@ -156,70 +156,62 @@ const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& 
     }
 }
 
-void ReplicaClient::_doAddWaitLog(const std::string& rid, const std::string& async_zone, 
-    const std::string& target_service) {
-    
-    struct RequestHelper req_helper;
+replicas::ReplicaClient::AsyncRequestHelper * ReplicaClient::addWaitLog(const std::string& rid, 
+    const std::string& async_zone, const std::string& target_service) {
+
+    AsyncRequestHelper * req_helper = new AsyncRequestHelper{};
+
     for (const auto& server : _servers) {
         grpc::ClientContext * context = new grpc::ClientContext();
-        req_helper.contexts.emplace_back(context);
+        req_helper->contexts.emplace_back(context);
 
         grpc::Status * status = new grpc::Status();
-        req_helper.statuses.emplace_back(status);
+        req_helper->statuses.emplace_back(status);
 
         rendezvous_server::Empty * response = new rendezvous_server::Empty();
-        req_helper.responses.emplace_back(response);
+        req_helper->responses.emplace_back(response);
 
         rendezvous_server::AddWaitLogMessage request;
         request.set_rid(rid);
         request.set_async_zone(async_zone);
         request.set_target_service(target_service);
 
-        req_helper.rpcs.emplace_back(server->AsyncAddWaitLog(context, request, &req_helper.queue));
-        req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
-        req_helper.nrpcs++;
+        req_helper->rpcs.emplace_back(server->AsyncAddWaitLog(context, request, &req_helper->queue));
+        req_helper->rpcs[req_helper->nrpcs]->Finish(response, status, (void*)1);
+        req_helper->nrpcs++;
     }
-    waitCompletionQueue("AWL", req_helper);
-}
 
-void ReplicaClient::addWaitLog(const std::string& rid, const std::string& async_zone, 
-    const std::string& target_service) {
-
-    std::thread([this, rid, async_zone, target_service]() {
-        _doAddWaitLog(rid, async_zone, target_service);
-    }).detach();
-}
-
-void ReplicaClient::_doRemoveWaitLog(const std::string& rid, const std::string& async_zone, 
-    const std::string& target_service) {
-
-    struct RequestHelper req_helper;
-    for (const auto& server : _servers) {
-        grpc::ClientContext * context = new grpc::ClientContext();
-        req_helper.contexts.emplace_back(context);
-
-        grpc::Status * status = new grpc::Status();
-        req_helper.statuses.emplace_back(status);
-
-        rendezvous_server::Empty * response = new rendezvous_server::Empty();
-        req_helper.responses.emplace_back(response);
-
-        rendezvous_server::RemoveWaitLogMessage request;
-        request.set_rid(rid);
-        request.set_async_zone(async_zone);
-        request.set_target_service(target_service);
-
-        req_helper.rpcs.emplace_back(server->AsyncRemoveWaitLog(context, request, &req_helper.queue));
-        req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
-        req_helper.nrpcs++;
-    }
-    waitCompletionQueue("AWL", req_helper);
+    return req_helper;
 }
 
 void ReplicaClient::removeWaitLog(const std::string& rid, const std::string& async_zone, 
-    const std::string& target_service) {
+    const std::string& target_service, 
+    replicas::ReplicaClient::AsyncRequestHelper * add_wait_log_async_request_helper) {
 
-    std::thread([this, rid, async_zone, target_service]() {
-        _doRemoveWaitLog(rid, async_zone, target_service);
+    std::thread([this, rid, async_zone, target_service, add_wait_log_async_request_helper]() {
+        // wait for previous requests for adding to wait log
+        waitCompletionQueue("AWL", *add_wait_log_async_request_helper);
+
+        AsyncRequestHelper req_helper;
+        for (const auto& server : _servers) {
+            grpc::ClientContext * context = new grpc::ClientContext();
+            req_helper.contexts.emplace_back(context);
+
+            grpc::Status * status = new grpc::Status();
+            req_helper.statuses.emplace_back(status);
+
+            rendezvous_server::Empty * response = new rendezvous_server::Empty();
+            req_helper.responses.emplace_back(response);
+
+            rendezvous_server::RemoveWaitLogMessage request;
+            request.set_rid(rid);
+            request.set_async_zone(async_zone);
+            request.set_target_service(target_service);
+
+            req_helper.rpcs.emplace_back(server->AsyncRemoveWaitLog(context, request, &req_helper.queue));
+            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
+            req_helper.nrpcs++;
+        }
+        waitCompletionQueue("RWL", req_helper);
     }).detach();
 }

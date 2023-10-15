@@ -197,7 +197,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  // we cannot wait for branches within the same subrid
+  // we cannot wait for branches within the same async_zone_id
   threads.emplace_back([&server, request] {
     int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);

@@ -286,64 +286,6 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
 }
 
 
-grpc::Status ClientServiceImpl::RegisterBranchesDatastores(grpc::ServerContext* context, 
-  const rendezvous::RegisterBranchesDatastoresMessage* request, 
-  rendezvous::RegisterBranchesDatastoresResponse* response) {
-
-  if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
-  const std::string& rid = request->rid();
-  metadata::Request * rdv_request = _getRequest(rid);
-  if (rdv_request == nullptr) {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
-  }
-
-  // client specifies different regions for each datastores using the DatastoreBranching type
-  if (request->branches().size() > 0){
-    for (const auto& branches : request->branches()) {
-      const std::string& bid = _server->genBid(rdv_request);
-      bool r = _server->registerBranch(rdv_request, "", branches.datastore(), branches.regions(), branches.tag(), "", bid, true);
-      if (!r) {
-        return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
-      }
-      response->add_bids(bid);
-    }
-  }
-
-  // client uses same set of regions for all datastores and each datastore has a specific tag
-  else if (request->datastores().size() > 0 && request->regions().size() > 0) {
-    const auto& regions = request->regions();
-    auto tags = request->tags();
-    int i = 0;
-    for (const auto& datastore: request->datastores()) {
-      const std::string& bid = _server->genBid(rdv_request);
-      bool r = _server->registerBranch(rdv_request, "", datastore, regions, tags[i], "", bid, true);
-      if (bid.empty()) {
-        return grpc::Status(grpc::StatusCode::ALREADY_EXISTS, utils::ERR_MSG_BRANCH_ALREADY_EXISTS);
-      }
-      response->add_bids(bid);
-      i++;
-    }
-  }
-
-  else {
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_REGISTER_BRANCHES_INVALID_DATASTORES);
-  }
-
-  response->set_rid(rdv_request->getRid());
-
-  // replicate client request to remaining replicas
-  if (_num_replicas > 1) {
-    // FIXME: adapt to register branches for datastores (SERVERLESS VERSION)
-    /* rendezvous::RequestContext ctx = request->context();
-    int version = rdv_request->getVersionsRegistry()->updateLocalVersion(sid);
-    ctx.mutable_versions()->insert({sid, version});
-    response->mutable_context()->CopyFrom(ctx);
-    _replica_client.registerBranchesDatastores(rdv_request->getRid(), bid, service, region, sid, version); */
-  }
-
-  return grpc::Status::OK;
-}
-
 grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context, 
   const rendezvous::CloseBranchMessage* request, 
   rendezvous::Empty* response) {
@@ -351,11 +293,10 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
   const std::string& region = request->region();
-  bool force = request->force();
   const std::string& composed_bid = request->bid();
   bool close_service = request->close_service();
 
-  spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}' (force={})", composed_bid, region, force);
+  spdlog::trace("> [CB] closing branch with full bid '{}' on region '{}'", composed_bid, region);
 
   // parse composed id into <bid, root_rid>
   auto ids = _server->parseFullId(composed_bid);
@@ -391,7 +332,7 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
     lock.unlock();
   }
 
-  int res = _server->closeBranch(rdv_request, bid, region, force);
+  int res = _server->closeBranch(rdv_request, bid, region);
   if (res == 0) {
     spdlog::error("< [CB] Error: branch not found for provided bid (composed_bid): {}", composed_bid);
     return grpc::Status(grpc::StatusCode::NOT_FOUND, utils::ERR_MSG_BRANCH_NOT_FOUND);
@@ -459,10 +400,17 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
 
   int result;
 
-  _replica_client.addWaitLog(rid, async_zone, service);
+  replicas::ReplicaClient::AsyncRequestHelper * async_request_helper = _replica_client.addWaitLog(rid, async_zone, service);
 
-  // wait logic for multiple services
-  if (services.size() > 0) {
+  // perform wait on a single service
+  if (services.size() == 0) {
+    int result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
+    if (result == 1) {
+      response->set_prevented_inconsistency(true);
+    }
+  }
+  // otherwise, perform wait on multiple provided services
+  else {
     for (const auto& service: services) {
       result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
       if (result < 0) {
@@ -470,15 +418,9 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
       }
     }
   }
-  else {
-    int result = _server->wait(rdv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
-    if (result == 1) {
-      response->set_prevented_inconsistency(true);
-    }
-  }
 
-  // FIXME: WE NEED TO GATHER ALL RESPONSES FROM REG LOG BEFORE ASKING TO REMOVE IT!!!
-  _replica_client.removeWaitLog(rid, async_zone, service);
+  _replica_client.removeWaitLog(rid, async_zone, service, async_request_helper);
+  
   // parse errors
   if (result == -1) {
     response->set_timed_out(true);
