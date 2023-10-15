@@ -252,12 +252,14 @@ namespace rendezvous {
              * 
              * @param request Request where the branch is registered
              * @param service The service context
+             * @param async_zone_id Current subrequest
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
              * - (-2) if service was not found
              * - (-3) if context was not found
              */
-            utils::Dependencies fetchDependencies(metadata::Request * request, const std::string& service);
+            utils::Dependencies fetchDependencies(metadata::Request * request, const std::string& service,
+                const std::string& async_zone_id);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

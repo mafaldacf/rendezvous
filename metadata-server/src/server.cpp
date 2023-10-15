@@ -299,9 +299,9 @@ int Server::wait(metadata::Request * request, const std::string& async_zone_id,
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitServiceRegion(service, region, tag, async, timeout, current_service, wait_deps);
+    result = request->waitServiceRegion(async_zone_id, service, region, tag, async, timeout, current_service, wait_deps);
   else if (!service.empty())
-    result = request->waitService(service, tag, async, timeout, current_service, wait_deps);
+    result = request->waitService(async_zone_id, service, tag, async, timeout, current_service, wait_deps);
   else if (!region.empty())
     result = request->waitRegion(async_zone_id, region, async, timeout, current_service);
   else
@@ -328,9 +328,11 @@ utils::Status Server::checkStatus(metadata::Request * request, const std::string
   return request->checkStatus(async_zone_id);
 }
 
-utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service) {
+utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, 
+  const std::string& async_zone_id) {
+    
   if (service.empty()) {
-    return request->fetchDependencies();
+    return request->fetchDependencies(async_zone_id);
   }
-  return request->fetchDependenciesService(service);
+  return request->fetchDependenciesService(service, async_zone_id);
 }

@@ -39,7 +39,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
-                std::string async_zone_id;
+                std::unordered_map<std::string, int> async_zone_ids_opened_branches;
                 int opened_global_region; // FIXME: CONVERT TO ATOMIC DUE TO ThE WAIT LOGS
                 int opened_branches;
                 int num_current_waits;
@@ -124,6 +124,61 @@ namespace metadata {
              * @return pointer to the branch if found and nullptr otherwise
             */
             metadata::Branch * _waitBranchRegistration(const std::string& bid);
+
+            /**
+             * Get all the following dependencies for the current service node
+             * 
+             * @param service_node Pointer for the current service node
+             * @param async_zone_id Current async zone id
+             * @return return vector of all following dependencies
+            */
+            std::vector<ServiceNode*> _getAllFollowingDependencies(ServiceNode * service_node, 
+                const std::string& async_zone_id);
+
+            /**
+             * Helper for wait logic in service
+             * 
+             * @param service_node Pointer for the current service node
+             * @param async_zone_id Current async zone id
+             * @param timeout Timeout set by client
+             * @param start_time Start time
+             * @param remaining_timeout Remaining timeout
+             * @return if inconsistency was prevented or not
+            */
+            int _doWaitService(ServiceNode * service_node, const std::string& async_zone_id,
+                int timeout, const std::chrono::steady_clock::time_point& start_time, 
+                std::chrono::seconds remaining_timeout);
+
+            /**
+             * Helper for wait logic in service and region
+             * 
+             * @param service_node Pointer for the current service node
+             * @param region Region to be waited for
+             * @param async_zone_id Current async zone id
+             * @param timeout Timeout set by client
+             * @param start_time Start time
+             * @param remaining_timeout Remaining timeout
+             * @return if inconsistency was prevented or not
+            */
+            int _doWaitServiceRegion(ServiceNode * service_node, const std::string& region, const std::string& async_zone_id,
+                int timeout, const std::chrono::steady_clock::time_point& start_time, 
+                std::chrono::seconds remaining_timeout);
+
+            /**
+             * Helper for wait logic in tag for service and service and region
+             * 
+             * @param service_node Pointer for the current service node
+             * @param tag Tag to be waited for
+             * @param region Region to be waited for (can be empty)
+             * @param async_zone_id Current async zone id
+             * @param timeout Timeout set by client
+             * @param start_time Start time
+             * @param remaining_timeout Remaining timeout
+             * @return if inconsistency was prevented or not
+            */
+            int _doWaitTag(ServiceNode * service_node, const std::string& tag, const std::string& region, 
+                int timeout, const std::chrono::steady_clock::time_point& start_time, 
+                std::chrono::seconds remaining_timeout);
         
         public:
 
@@ -182,7 +237,7 @@ namespace metadata {
             /**
             * Verify that given async_zone_id exists
             * 
-            * @param async_zone_id The sub request identifier
+            * @param async_zone_id The async zone id identifier
             * @return return pointer to AsyncZone if found and nullptr otherwise
             */
             AsyncZone * _validateAsyncZone(const std::string& async_zone_id);
@@ -214,23 +269,23 @@ namespace metadata {
              * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
              * (used to be ignored in the wait call)
              * 
-             * @param subrequest The current sub request
+             * @param subrequest The current async zone id
              * @return vector of all preceding sub rids
             */
             std::vector<std::string> _getPrecedingAsyncZones(AsyncZone* subrequest);
 
             /**
-             * Get number of opened branches for all preceding sub requests
+             * Get number of opened branches for all preceding async zone ids
              * 
-             * @param sub_rids Vector of all preceding sub requests identifiers
+             * @param sub_rids Vector of all preceding async zone ids identifiers
              * @return number of opened branches
             */
             int _numOpenedBranchesAsyncZones(const std::vector<std::string>& sub_rids);
 
             /**
-             * Get number of opened branches for all preceding sub requests in current region and global region
+             * Get number of opened branches for all preceding async zone ids in current region and global region
              * 
-             * @param sub_rids Vector of all preceding sub requests identifiers
+             * @param sub_rids Vector of all preceding async zone ids identifiers
              * @param region Targeted region
              * @return pair for number of opened branches with format: <global region, targeted region>
             */
@@ -277,7 +332,7 @@ namespace metadata {
             std::string genId();
 
             /**
-             * Register a new sub request originating from an async branch within the current subrequest with
+             * Register a new async zone id originating from an async branch within the current subrequest with
              * the folllowing format: <async_zone_id>:<sid>-<new_sub_rid>
              * 
              * @param sid The current server (replica) id
@@ -353,10 +408,10 @@ namespace metadata {
             /**
              * Wait until request is closed
              * 
-             * @param async_zone_id Current sub request
+             * @param async_zone_id Current async zone id
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param current_service Current service doing the wait call
+             * @param async_zone_id Current asynchronous zone
              *
              * @return Possible return values:
              * - 0 if call did not block, 
@@ -374,7 +429,7 @@ namespace metadata {
              * @param region The name of the region that defines the waiting context
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param current_service Current service doing the wait call
+             * @param async_zone_id Current asynchronous zone
              *
              * @return Possible return values:
              * - 0 if call did not block, 
@@ -389,11 +444,12 @@ namespace metadata {
             /**
              * Wait until request is closed for a given context (service)
              *
+             * @param async_zone_id Current asynchronous zone
              * @param service The name of the service that defines the waiting context
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param current_service Current service doing the wait call
+             * @param current_service The current service name
              * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
@@ -403,19 +459,21 @@ namespace metadata {
              * - (-3) current_service not found
              * - (-2) if context was not found
              */
-            int waitService(const std::string& service, const std::string& tag, bool async, 
+            int waitService(const std::string& async_zone_id, 
+                const std::string& service, const std::string& tag, bool async, 
                 int timeout, const std::string& current_service, bool wait_deps);
 
 
             /**
              * Wait until request is closed for a given context (service and region)
              *
+             * @param async_zone_id Current asynchronous zone
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param current_service Current service doing the wait call
+             * @param current_service The current service name
              * @param wait_deps If enabled, it waits for all dependencies of the service
              *
              * @return Possible return values:
@@ -426,29 +484,33 @@ namespace metadata {
              * - (-3) current_service not found
              * - (-4) if tag was not found
              */
-            int waitServiceRegion(const std::string& service, const std::string& region, 
-                const std::string& tag, bool async, int timeout, const std::string& current_service, bool wait_deps);
+            int waitServiceRegion(const std::string& async_zone_id, 
+                const std::string& service, const std::string& region, 
+                const std::string& tag, bool async, int timeout,
+                const std::string& current_service, bool wait_deps);
 
             /**
              * Check status of request
-             * @param async_zone_id Current sub request
+             * @param async_zone_id Current async zone id
              * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
+             * - (-3) if async_zone_id does not exist
              */
             Status checkStatus(const std::string& async_zone_id);
 
             /**
              * Check status of request for a given context (region)
              *
-             * @param async_zone_id Current sub request
+             * @param async_zone_id Current async zone id
              * @param region The name of the region that defines the waiting context
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
+             * - (-3) if async_zone_id does not exist
              */
             Status checkStatusRegion(const std::string& async_zone_id, const std::string& region);
 
@@ -482,25 +544,24 @@ namespace metadata {
             /**
              * Fetch dependencies in the call graph
              * 
-             * @param request Request where the branch is registered
+             * @param async_zone_id Current async zone id
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
-             * - (-2) if service was not found
-             * - (-3) if context was not found
+             * - (-3) if async_zone_id does not exist
              */
-            utils::Dependencies fetchDependencies();
+            utils::Dependencies fetchDependencies(const std::string& async_zone_id);
 
             /**
              * Fetch dependencies in the call graph
              * 
-             * @param request Request where the branch is registered
+             * @param async_zone_id Current async zone id
              * @param service The service context
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
              * - (-2) if service was not found
-             * - (-3) if context was not found
+             * - (-3) if async_zone_id does not exist
              */
-            utils::Dependencies fetchDependenciesService(const std::string& service);
+            utils::Dependencies fetchDependenciesService(const std::string& service, const std::string& async_zone_id);
         };
     
 }

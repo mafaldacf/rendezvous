@@ -33,6 +33,7 @@ namespace service {
             std::atomic<int> _num_wait_calls;
             int _num_replicas;
 
+            //FIXME: to remove if not used
             typedef struct ServiceNodeStruct {
                 int num;
                 std::mutex mutex;

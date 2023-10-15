@@ -104,38 +104,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
 
   const std::string& core_bid = _server->genBid(rdv_request);
 
-  bool r = true;
-  if (ASYNC_SERVICE_REGISTER_CALLS) {
-    // add as a pending register to be completed later
-    PendingServiceBranch * pending_service;
-
-    std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
-    auto it = _pending_service_branches.find(service_call_bid);
-    if (it == _pending_service_branches.end()) {
-      pending_service = new PendingServiceBranch {};
-      _pending_service_branches[service_call_bid] = pending_service;
-      _cond_pending_service_branch.notify_all();
-    }
-    else {
-      pending_service = it->second;
-    }
-    lock_map.release();
-
-    std::unique_lock<std::mutex> lock(pending_service->mutex);
-    pending_service->num++;
-    lock.unlock();
-
-    std::thread([this, rdv_request, async_zone, service, regions, tag, ctx, core_bid, monitor, pending_service]() {
-      _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.current_service(), core_bid, monitor);
-      std::unique_lock<std::mutex> lock(pending_service->mutex);
-      pending_service->num--;
-      pending_service->condv.notify_all();
-      lock.unlock();
-    }).detach();
-  }
-  else {
-    r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.current_service(), core_bid, monitor);
-  }
+  bool r = _server->registerBranch(rdv_request, async_zone, service, regions, tag, ctx.current_service(), core_bid, monitor);
 
   // could not create branch (tag already exists)
   if (!r) {
@@ -313,25 +282,6 @@ grpc::Status ClientServiceImpl::CloseBranch(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  if (close_service && ASYNC_SERVICE_REGISTER_CALLS) {
-    // wait until entry is added to the pending map
-    std::unique_lock<std::mutex> lock_map(_mutex_pending_service_branches);
-    auto it = _pending_service_branches.find(bid);
-    while (it == _pending_service_branches.end()) {
-      _cond_pending_service_branch.wait(lock_map);
-      it = _pending_service_branches.find(bid);
-    }
-    PendingServiceBranch * pending_service = it->second;
-    lock_map.release();
-
-    // wait until all pending registrations are finished
-    std::unique_lock<std::mutex> lock(pending_service->mutex);
-    while (pending_service->num == 0) {
-      pending_service->condv.wait(lock);
-    }
-    lock.unlock();
-  }
-
   int res = _server->closeBranch(rdv_request, bid, region);
   if (res == 0) {
     spdlog::error("< [CB] Error: branch not found for provided bid (composed_bid): {}", composed_bid);
@@ -420,7 +370,7 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   }
 
   _replica_client.removeWaitLog(rid, async_zone, service, async_request_helper);
-  
+
   // parse errors
   if (result == -1) {
     response->set_timed_out(true);
@@ -443,23 +393,18 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
   rendezvous::CheckStatusResponse* response) {
   if (!utils::CONSISTENCY_CHECKS) return grpc::Status::OK;
 
-  const std::string& composed_rid = request->rid();
+  const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& region = request->region();
+  const std::string& async_zone_id = request->context().async_zone();
   bool detailed = request->detailed();
 
-  spdlog::trace("> [CS] query for request '{}' on service '{}' and region '{}' (detailed={})", composed_rid, service, region, detailed);
-
-  // parse full rid into <rid, async_zone_id>
-  auto ids = _server->parseFullId(composed_rid);
-  const std::string& root_rid = ids.first;
-  std::string async_zone_id = ids.second;
-
+  spdlog::trace("> [CS] query for request '{}' on service '{}' and region '{}' (async_zone={}, detailed={})", rid, service, region, async_zone_id, detailed);
 
   // check if request exists
-  metadata::Request * rdv_request = _getRequest(root_rid);
+  metadata::Request * rdv_request = _getRequest(rid);
   if (rdv_request == nullptr) {
-    spdlog::error("< [CS] Error: invalid request for composed rid '{}'", composed_rid);
+    spdlog::error("< [CS] Error: invalid request for composed rid '{}'", rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
@@ -495,6 +440,7 @@ grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context,
 
   const std::string& rid = request->rid();
   const std::string& service = request->service();
+  const std::string& async_zone_id = request->context().async_zone();
 
   spdlog::trace("> [FD] query for request '{}' on service '{}'", rid, service);
   
@@ -505,7 +451,7 @@ grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  const auto& result = _server->fetchDependencies(rdv_request, service);
+  const auto& result = _server->fetchDependencies(rdv_request, service, async_zone_id);
 
   if (result.res == INVALID_SERVICE) {
     spdlog::error("< [FD] Error: invalid service", rid);
