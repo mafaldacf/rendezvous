@@ -517,6 +517,7 @@ namespace metadata {
             /**
              * Check status of request for a given context (service)
              *
+             * @param async_zone_id Current async zone id
              * @param service The name of the service that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
              *
@@ -525,11 +526,13 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusService(const std::string& service, bool detailed = false);
+            Status checkStatusService(const std::string& async_zone_id, 
+                const std::string& service, bool detailed = false);
 
             /**
              * Check status of request for a given context (service and region)
              *
+             * @param async_zone_id Current async zone id
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
@@ -539,17 +542,8 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed = false);
-
-            /**
-             * Fetch dependencies in the call graph
-             * 
-             * @param async_zone_id Current async zone id
-             * @return Possible return values of Dependencies.res:
-             * - 0 if OK
-             * - (-3) if async_zone_id does not exist
-             */
-            utils::Dependencies fetchDependencies(const std::string& async_zone_id);
+            Status checkStatusServiceRegion(const std::string& async_zone_id, 
+                const std::string& service, const std::string& region, bool detailed = false);
 
             /**
              * Fetch dependencies in the call graph
@@ -561,7 +555,7 @@ namespace metadata {
              * - (-2) if service was not found
              * - (-3) if async_zone_id does not exist
              */
-            utils::Dependencies fetchDependenciesService(const std::string& service, const std::string& async_zone_id);
+            utils::Dependencies fetchDependencies(const std::string& service, const std::string& async_zone_id);
         };
     
 }

@@ -1022,7 +1022,7 @@ utils::Status Request::checkStatus(const std::string& async_zone_id) {
     if (async_zone == nullptr) return utils::Status {INVALID_CONTEXT};
 
     std::unique_lock<std::mutex> lock(_mutex_branches);
-    if (_num_opened_branches.load() > async_zone->opened_branches.load()) {
+    if (_num_opened_branches.load() - async_zone->opened_branches.load() != 0) {
         return utils::Status {OPENED};
     }
     return utils::Status {CLOSED};
@@ -1044,7 +1044,7 @@ utils::Status Request::checkStatusRegion(const std::string& async_zone_id, const
     bool found = async_zone->opened_regions.find(read_accessor_num, region);
     int async_zone_region = found ? read_accessor_num->second : 0;
 
-    if (_opened_regions[region] != async_zone_region || _opened_global_region.load() != async_zone_global_region) {
+    if (_opened_regions[region] - async_zone_region != 0 || _opened_global_region.load() - async_zone_global_region != 0) {
         res.status = OPENED;
     }
     else {
@@ -1054,7 +1054,7 @@ utils::Status Request::checkStatusRegion(const std::string& async_zone_id, const
     return res;
 }
 
-utils::Status Request::checkStatusService(const std::string& service, bool detailed) {
+utils::Status Request::checkStatusService(const std::string& async_zone_id, const std::string& service, bool detailed) {
     utils::Status res;
     std::shared_lock<std::shared_mutex>lock(_mutex_service_nodes);
 
@@ -1063,9 +1063,14 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
         res.status = UNKNOWN;
         return res;
     }
+
+    ServiceNode * service_node = _service_nodes[service];
     
     // get overall status of request
-    if (_service_nodes[service]->opened_branches == 0) {
+    // if there are more than 0 opened branches we ignore if they belong to the same region
+    if (service_node->opened_branches == 0 
+        || service_node->opened_branches == service_node->async_zone_ids_opened_branches[async_zone_id]) {
+
         res.status = CLOSED;
     } else {
         res.status = OPENED;
@@ -1095,7 +1100,9 @@ utils::Status Request::checkStatusService(const std::string& service, bool detai
     return res;
 }
 
-utils::Status Request::checkStatusServiceRegion(const std::string& service, const std::string& region, bool detailed) {
+utils::Status Request::checkStatusServiceRegion(const std::string& async_zone_id, 
+    const std::string& service, const std::string& region, bool detailed) {
+
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
     utils::Status res;
 
@@ -1110,9 +1117,14 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
         res.status = UNKNOWN;
         return res;
     }
+
+    ServiceNode * service_node = _service_nodes[service];
     
     // get overall status of request
-    if (_service_nodes[service]->opened_regions[region] == 0) {
+    // get tagged branches within the same service
+    if (service_node->opened_regions[region] == 0
+        || service_node->opened_branches == service_node->async_zone_ids_opened_branches[async_zone_id]) {
+            
         res.status = CLOSED;
     } else {
         res.status = OPENED;
@@ -1137,52 +1149,25 @@ utils::Status Request::checkStatusServiceRegion(const std::string& service, cons
     return res;
 }
 
-utils::Dependencies Request::fetchDependencies(const std::string& async_zone_id) {
+utils::Dependencies Request::fetchDependencies(const std::string& async_zone_id, const std::string& service) {
     utils::Dependencies result {OK};
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
 
     AsyncZone * async_zone = _validateAsyncZone(async_zone_id);
     if (async_zone == nullptr) return utils::Dependencies {INVALID_CONTEXT};
 
-    for (auto it = _service_nodes.begin(); it != _service_nodes.end(); it++) {
-        if (it->second->opened_branches > 0) {
-            result.deps.insert(it->first);
+    // service can also be the root
+    auto service_node_it = _service_nodes.find(service);
+    if (service_node_it == _service_nodes.end()) {
+        return utils::Dependencies {INVALID_SERVICE};
+    }
+    ServiceNode * service_node = service_node_it->second;
+
+    const auto& deps = _getAllFollowingDependencies(service_node, async_zone_id);
+    for (auto & dep : deps) {
+        if (dep->opened_branches > 0) {
+            result.deps.insert(dep->name);
         }
     }
-    return result;
-}
-
-utils::Dependencies Request::fetchDependenciesService(const std::string& service, const std::string& async_zone_id) {
-    std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
-
-    if (_service_nodes.count(service) == 0) return utils::Dependencies {INVALID_SERVICE};
-
-    utils::Dependencies result {0};
-    std::stack<std::string> lookup_deps;
-    // get direct children nodes of current service
-    for (auto it = _service_nodes[service]->children.begin(); it != _service_nodes[service]->children.end(); ++it) {
-        const std::string& current_service = (*it)->name;
-        result.deps.insert(current_service);
-
-        // store indirect (deph 1) dependencies
-        for (auto children_it = _service_nodes[current_service]->children.begin(); children_it != _service_nodes[current_service]->children.end(); children_it++) {
-            lookup_deps.push((*children_it)->name);
-        }
-    }
-
-    // get all indirect nodes
-    while (lookup_deps.size() != 0) {
-        const std::string& current_service = lookup_deps.top();
-        lookup_deps.pop();
-
-        // first children lookup for this service
-        if (result.indirect_deps.count(current_service) == 0) {
-            for (auto children_it = _service_nodes[current_service]->children.begin(); children_it != _service_nodes[current_service]->children.end(); children_it++) {
-                lookup_deps.push((*children_it)->name);
-            }
-        }
-        result.indirect_deps.insert(current_service);
-    }
-
     return result;
 }

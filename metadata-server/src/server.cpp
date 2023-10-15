@@ -319,9 +319,9 @@ utils::Status Server::checkStatus(metadata::Request * request, const std::string
   const std::string& service, const std::string& region, bool detailed) {
 
   if (!service.empty() && !region.empty())
-    return request->checkStatusServiceRegion(service, region, detailed);
+    return request->checkStatusServiceRegion(async_zone_id, service, region, detailed);
   else if (!service.empty())
-    return request->checkStatusService(service, detailed);
+    return request->checkStatusService(async_zone_id, service, detailed);
   else if (!region.empty())
     return request->checkStatusRegion(async_zone_id, region);
 
@@ -330,9 +330,10 @@ utils::Status Server::checkStatus(metadata::Request * request, const std::string
 
 utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, 
   const std::string& async_zone_id) {
-    
+
   if (service.empty()) {
-    return request->fetchDependencies(async_zone_id);
+    return request->fetchDependencies(utils::ROOT_SERVICE_NODE_ID, async_zone_id);
   }
-  return request->fetchDependenciesService(service, async_zone_id);
+    
+  return request->fetchDependencies(service, async_zone_id);
 }
