@@ -75,10 +75,12 @@ TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  status = server.wait(request, ROOT_SUB_RID, "service", "region", EMPTY_TAG, "", 1);
+  request->insertAsyncZone(DUMMY_ASYNC_ZONE);
+
+  status = server.wait(request, DUMMY_ASYNC_ZONE, "service", "region", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.wait(request, ROOT_SUB_RID, "service2", "", EMPTY_TAG, "", 1);
+  status = server.wait(request, DUMMY_ASYNC_ZONE, "service2", "", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 

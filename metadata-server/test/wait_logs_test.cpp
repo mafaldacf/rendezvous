@@ -102,7 +102,6 @@ TEST(WaitLogsTest, PrecedingDetection) {
   // r is always preceding of any other
   is_preceding = request->_isPrecedingAsyncZone(subrequest_r, subrequest_r_c1);
   ASSERT_TRUE(is_preceding);
-
 }
 // --------------
 
@@ -150,7 +149,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   std::string bid_3 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_empty, "", "");
   ASSERT_EQ(getBid(3), bid_3);
 
-  // register post-storage (NOT ASYNC) branch for write post operation
+  // register notifier (NOT ASYNC) branch for write notification operation
   utils::ProtoVec regions_notifier;
   regions_notifier.Add("US");
   std::string bid_4 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_notifier, "", "");
@@ -161,14 +160,14 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   // and then disregards the post-storage wait call
   sleep(0.2);
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
   // do wait call on post-storage
   sleep(0.5);
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_0, "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_0, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -177,7 +176,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   // so it cannot prevent any inconsistency from the post-storage, as expected :)
   // but compose-post is still opened!!
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
   });
 
@@ -187,16 +186,24 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   found_region = server.closeBranch(request, getBid(0), "");
   ASSERT_EQ(1, found_region);
 
-  sleep(0.5);
+  sleep(1);
 
-  // now that compose-post is closed and we are able to detect wait cycle
-  // this wait does not block
+  // now that compose-post is closed we only care about post-storage
   threads.emplace_back([&server, request] {
-    int status = server.wait(request, SUB_RID_1, "", "", "", false, 5);
+    int status = server.wait(request, SUB_RID_1, "", "", "", false, 7);
+    ASSERT_EQ(INCONSISTENCY_PREVENTED, status);
+  });
+  
+  sleep(1);
+
+  // now that compose-post is closed we only care about notifier
+  // BUT notifier is already waiting, so this call discards and returns
+  threads.emplace_back([&server, request] {
+    int status = server.wait(request, SUB_RID_0, "", "", "", false, 7);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.5);
+  sleep(1);
 
   // close all branches for post-storage
   found_region = server.closeBranch(request, getBid(1), "");

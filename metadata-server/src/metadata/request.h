@@ -39,7 +39,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
-                std::unordered_map<std::string, int> async_zone_ids_opened_branches;
+                std::unordered_map<std::string, int> async_zone_opened_branches;
                 int opened_global_region; // FIXME: CONVERT TO ATOMIC DUE TO ThE WAIT LOGS
                 int opened_branches;
                 int num_current_waits;
@@ -48,7 +48,7 @@ namespace metadata {
                 std::vector<struct ServiceNodeStruct*> children;
 
                 // concurrency control
-                std::mutex mutex;
+                std::shared_mutex mutex;
 
             } ServiceNode;
 
@@ -73,9 +73,9 @@ namespace metadata {
             std::atomic<int> async_zones_i;
             // <async_zone_id, async_zone_ptr>
             oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _async_zones;
-            // <async_zone_id, num_current_waits>
-            std::set<AsyncZone*> _wait_logs;
-            std::unordered_map<std::string, std::set<ServiceNode*>> _service_wait_logs;
+            // <async_zone_id>
+            std::set<std::string> _wait_logs;
+            std::unordered_map<std::string, std::unordered_set<ServiceNode*>> _service_wait_logs;
 
             /* ------- */
             /* helpers */
@@ -146,12 +146,12 @@ namespace metadata {
              * @param async_zone_id Current async zone id
              * @param timeout Timeout set by client
              * @param start_time Start time
-             * @param remaining_timeout Remaining timeout
+             * @param remaining_time Remaining timeout
              * @return if inconsistency was prevented or not
             */
             int _doWaitService(ServiceNode * service_node, const std::string& async_zone_id,
                 int timeout, const std::chrono::steady_clock::time_point& start_time, 
-                std::chrono::seconds remaining_timeout);
+                std::chrono::seconds remaining_time);
 
             /**
              * Helper for wait logic in service and region
@@ -161,12 +161,12 @@ namespace metadata {
              * @param async_zone_id Current async zone id
              * @param timeout Timeout set by client
              * @param start_time Start time
-             * @param remaining_timeout Remaining timeout
+             * @param remaining_time Remaining timeout
              * @return if inconsistency was prevented or not
             */
             int _doWaitServiceRegion(ServiceNode * service_node, const std::string& region, const std::string& async_zone_id,
                 int timeout, const std::chrono::steady_clock::time_point& start_time, 
-                std::chrono::seconds remaining_timeout);
+                std::chrono::seconds remaining_time);
 
             /**
              * Helper for wait logic in tag for service and service and region
@@ -177,12 +177,26 @@ namespace metadata {
              * @param async_zone_id Current async zone id
              * @param timeout Timeout set by client
              * @param start_time Start time
-             * @param remaining_timeout Remaining timeout
+             * @param remaining_time Remaining timeout
              * @return if inconsistency was prevented or not
             */
             int _doWaitTag(ServiceNode * service_node, const std::string& tag, const std::string& region, 
                 int timeout, const std::chrono::steady_clock::time_point& start_time, 
-                std::chrono::seconds remaining_timeout);
+                std::chrono::seconds remaining_time);
+
+            /**
+             * Helper to wait for asynchronous registration of service and its optional tag
+             * 
+             * @param service The targeted service name
+             * @param tag Optional service tag
+             * @param region Region (can be empty if we are dealing with only WaitService)
+             * @param timeout Timeout set by client
+             * @param start_time Start time
+             * @param remaining_time Remaining timeout
+             * @return if inconsistency was prevented or not
+            */
+            bool _doWaitAsyncServiceNodeRegistration(const std::string& service, const std::string& tag, const std::string& region,
+                int timeout, const std::chrono::steady_clock::time_point& start_time, std::chrono::seconds remaining_time);
         
         public:
 
@@ -193,7 +207,7 @@ namespace metadata {
              * @param timeout Timeout, in seconds, provided by the user
              * @param start_time The starting time of the call
             */
-            std::chrono::seconds _computeRemainingTimeout(int timeout, const std::chrono::steady_clock::time_point& start_time);
+            std::chrono::seconds _computeRemainingTime(int timeout, const std::chrono::steady_clock::time_point& start_time);
             
             /**
              * Validates the service node
@@ -276,7 +290,7 @@ namespace metadata {
              * @param subrequest The current async zone id
              * @return vector of all preceding sub rids
             */
-            std::vector<std::string> _getPrecedingAsyncZones(AsyncZone* subrequest);
+            std::vector<std::string> _getHighestAsyncZones(AsyncZone* subrequest);
 
             /**
              * Get number of opened branches for all preceding async zone ids

@@ -57,7 +57,7 @@ int Branch::getStatus(std::string region) {
 }
 
 int Branch::close(const std::string &region) {
-    _mutex_regions.lock();
+    std::unique_lock<std::mutex> lock(_mutex_regions);
     auto region_it = _regions.find(region);
     if (region_it == _regions.end()) {
         return -1;
@@ -66,7 +66,6 @@ int Branch::close(const std::string &region) {
         return 0;
     }
     _regions[region] = CLOSED;
-    _mutex_regions.unlock();
     _num_opened_regions.fetch_add(-1);
     return 1;
 }

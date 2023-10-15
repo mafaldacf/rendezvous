@@ -45,6 +45,7 @@ Server::Server(std::string sid)
     utils::SIZE_SIDS = sid.size();
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
+    spdlog::set_level(spdlog::level::trace);
 }
 
 

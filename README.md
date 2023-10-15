@@ -64,16 +64,17 @@ Make sure you have installed all the necessary local dependencies for Python and
 
 ### Metadata Server Deployment (1/2)
 
+Clean generated files
+
+    ./rendezvous.sh local clean
+
 Build and run project for the following available parameters:
 - region: `eu`, `us`
 - connections_filename: `docker.json`, `local.json`, `remote.json`, `single.json`
 
     ./rendezvous.sh local build
+
     ./rendezvous.sh local run server <region> <connections_filename>
-
-Clean generated files
-
-    ./rendezvous.sh local clean
 
 Test metadata server with GoogleTests framework
   
@@ -99,7 +100,7 @@ Generate Python Protobuf files
 
     ./rendezvous.sh local build-py-proto
 
-Run the metadata server:
+Run the metadata server, e.g:
 
     ./rendezvous.sh local run server eu single.json
 

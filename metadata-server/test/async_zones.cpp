@@ -62,11 +62,11 @@ TEST(AsyncZonesTest, RegisterWrongBranchId) {
   bool r = server.registerBranch(request, ROOT_SUB_RID, "post-storage", regions, "", "", bid_0, false);
   ASSERT_TRUE(r);
 
-  // attempt to close but bid does not exist
+   // attempt to close but bid does not exist
   closed = server.closeBranch(request, getBid(1), "EU");
   ASSERT_EQ(-1, closed);
 
-  /* // attempt to close but region does not exist
+  // attempt to close but region does not exist
   closed = server.closeBranch(request, getBid(0), "wrong-region");
   ASSERT_EQ(-1, closed);
 
@@ -76,7 +76,7 @@ TEST(AsyncZonesTest, RegisterWrongBranchId) {
 
   // attempt to close branch again
   closed = server.closeBranch(request, getBid(0), "EU");
-  ASSERT_EQ(0, closed); */
+  ASSERT_EQ(0, closed);
 }
 
 TEST(AsyncZonesTest, AddNextSubRids) { 
