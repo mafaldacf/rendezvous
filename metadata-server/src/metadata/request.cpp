@@ -992,10 +992,12 @@ std::vector<metadata::Request::ServiceNode*> Request::_getAllFollowingDependenci
     std::unordered_set<ServiceNode*> visited {service_node};
     visited.insert(service_node);
 
+    service_node->mutex.lock();
     // get all depends for current service
-    for (auto it = service_node->children.begin(); it != service_node->children.end(); it++) {
-        deps.emplace_back((*it));
+    for (const auto& child: service_node->children) {
+        deps.emplace_back(child);
     }
+    service_node->mutex.unlock();
 
     while (i < deps.size()) {
         auto dep = deps.at(i++);
@@ -1003,16 +1005,18 @@ std::vector<metadata::Request::ServiceNode*> Request::_getAllFollowingDependenci
         // get all following dependencies for fetched service
         // - cannot be already visited
         // - cannot be in the same async zone
-        for (auto it = service_node->children.begin(); it != service_node->children.end(); it++) {
-            if (visited.count((*it)) == 0) {
-                auto async_zone_ids_map = (*it)->async_zone_ids_opened_branches;
+        dep->mutex.lock();
+        for (const auto& child: service_node->children) {
+            if (visited.count(child) == 0) {
+                auto async_zone_ids_map = child->async_zone_ids_opened_branches;
 
                 // if the service has only one async zone which is the current one we just ignore it
                 if(async_zone_ids_map.size() == 1 && async_zone_ids_map.count(async_zone_id) == 1) {
-                    deps.emplace_back((*it));
+                    deps.emplace_back(child);
                 }
             }
         }
+        dep->mutex.unlock();
     }
     return deps;
 }
@@ -1152,7 +1156,6 @@ utils::Status Request::checkStatusServiceRegion(const std::string& async_zone_id
 utils::Dependencies Request::fetchDependencies(const std::string& async_zone_id, const std::string& service) {
     utils::Dependencies result {OK};
     std::shared_lock<std::shared_mutex> lock(_mutex_service_nodes);
-
     AsyncZone * async_zone = _validateAsyncZone(async_zone_id);
     if (async_zone == nullptr) return utils::Dependencies {INVALID_CONTEXT};
 
@@ -1161,8 +1164,9 @@ utils::Dependencies Request::fetchDependencies(const std::string& async_zone_id,
     if (service_node_it == _service_nodes.end()) {
         return utils::Dependencies {INVALID_SERVICE};
     }
-    ServiceNode * service_node = service_node_it->second;
+    lock.unlock();
 
+    ServiceNode * service_node = service_node_it->second;
     const auto& deps = _getAllFollowingDependencies(service_node, async_zone_id);
     for (auto & dep : deps) {
         if (dep->opened_branches > 0) {

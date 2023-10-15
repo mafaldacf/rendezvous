@@ -45,7 +45,11 @@ namespace metadata {
                 int num_current_waits;
                 std::unordered_map<std::string, int> opened_regions;
                 std::unordered_map<std::string, std::vector<metadata::Branch*>> tagged_branches;
-                std::list<struct ServiceNodeStruct*> children;
+                std::vector<struct ServiceNodeStruct*> children;
+
+                // concurrency control
+                std::mutex mutex;
+
             } ServiceNode;
 
             typedef struct AsyncZoneStruct {

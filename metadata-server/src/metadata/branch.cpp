@@ -11,11 +11,10 @@ Branch::Branch(std::string service, std::string tag, std::string async_zone_id, 
     }
 
 Branch::Branch(std::string service, std::string tag, std::string async_zone_id)
-    : _service(service), _tag(tag), _sub_rid(async_zone_id) {
+    : _service(service), _tag(tag), _sub_rid(async_zone_id), _num_opened_regions(1) {
         _regions = std::unordered_map<std::string, int>();
 
         _regions[GLOBAL_REGION] = OPENED;
-        _num_opened_regions = 1;
     }
 
 std::string Branch::getAsyncZoneId() {
