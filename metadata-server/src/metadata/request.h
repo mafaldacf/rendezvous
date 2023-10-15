@@ -344,7 +344,7 @@ namespace metadata {
              * @param gen_id If disabled, the next async_zone_id is not generated
              * @return new subrequest
             */
-            std::string addNextSubRequest(const std::string& sid, const std::string& async_zone_id, bool gen_id);
+            std::string addNextAsyncZone(const std::string& sid, const std::string& async_zone_id, bool gen_id);
 
             /**
              * Inserts new async zone if it does not exist yet

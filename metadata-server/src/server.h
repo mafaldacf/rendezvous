@@ -145,7 +145,7 @@ namespace rendezvous {
              * @param gen_id If disabled, the next async_zone_id is not generated
              * @return new subrequest
             */
-            std::string addNextSubRequest(metadata::Request * request, const std::string& async_zone_id, bool gen_id = true);
+            std::string addNextAsyncZone(metadata::Request * request, const std::string& async_zone_id, bool gen_id = true);
 
             /**
              * Returns the number of inconsistencies prevented so far

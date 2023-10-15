@@ -120,7 +120,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   }
 
   // now we do the same for for an async branch
-  std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec regions_empty;
   std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", regions_empty, "", "");
@@ -209,7 +209,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   // ASYNC ZONE
   // -----------------------------------------------------
   // but we can wait if we are in an async zone
-  std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   // this branch is ignored 
@@ -252,7 +252,7 @@ TEST(ConcurrencyTest, WaitRequest) {
   ASSERT_EQ(RID, request->getRid());
 
   // ASYNC ZONES:
-  std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");

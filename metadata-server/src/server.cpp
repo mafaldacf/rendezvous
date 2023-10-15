@@ -213,8 +213,8 @@ std::string Server::composeFullId(const std::string& primary_id, const std::stri
 // Helpers
 //------------
 
-std::string Server::addNextSubRequest(metadata::Request * request, const std::string& async_zone_id, bool gen_id) {
-  return request->addNextSubRequest(_sid, async_zone_id, gen_id);
+std::string Server::addNextAsyncZone(metadata::Request * request, const std::string& async_zone_id, bool gen_id) {
+  return request->addNextAsyncZone(_sid, async_zone_id, gen_id);
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {

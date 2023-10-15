@@ -41,15 +41,15 @@ TEST(WaitLogsTest, PrecedingDetection) {
   ASSERT_EQ(RID, request->getRid());
 
   // register all async zones
-  std::string r_a1 = server.addNextSubRequest(request, "r:a1", false);
+  std::string r_a1 = server.addNextAsyncZone(request, "r:a1", false);
   ASSERT_EQ("r:a1", r_a1);
-  std::string r_c1 = server.addNextSubRequest(request, "r:c1", false);
+  std::string r_c1 = server.addNextAsyncZone(request, "r:c1", false);
   ASSERT_EQ("r:c1", r_c1);
-  std::string r_c1_d1 = server.addNextSubRequest(request, "r:c1:d1", false);
+  std::string r_c1_d1 = server.addNextAsyncZone(request, "r:c1:d1", false);
   ASSERT_EQ("r:c1:d1", r_c1_d1);
-  std::string r_a1_b1 = server.addNextSubRequest(request, "r:a1:b1", false);
+  std::string r_a1_b1 = server.addNextAsyncZone(request, "r:a1:b1", false);
   ASSERT_EQ("r:a1:b1", r_a1_b1);
-  std::string r_a1_b2 = server.addNextSubRequest(request, "r:a1:b2", false);
+  std::string r_a1_b2 = server.addNextAsyncZone(request, "r:a1:b2", false);
   ASSERT_EQ("r:a1:b2", r_a1_b2);
 
   // get root async zone
@@ -132,7 +132,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(getBid(0), bid_0);
 
   // register post-storage async branch from compose-post
-  std::string next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   std::string bid_1 = server.registerBranchGTest(request, SUB_RID_0, "post-storage", regions_empty, "", "");
   ASSERT_EQ(getBid(1), bid_1);
@@ -145,7 +145,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(getBid(2), bid_2);
 
   // register notifier async branch from compose-post
-  next_sub_rid = server.addNextSubRequest(request, ROOT_SUB_RID);
+  next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, next_sub_rid);
   std::string bid_3 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_empty, "", "");
   ASSERT_EQ(getBid(3), bid_3);

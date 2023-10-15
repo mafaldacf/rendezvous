@@ -2,6 +2,14 @@ from rendezvous.protos import rendezvous_pb2 as pb
 from typing import List
 
 # -------------------
+# branch identifiers 
+# -------------------
+
+# format: <unique_service_prefix>_<index>:<rid>
+def gen_bid(rid: str, unique_service_prefix: str, index: int) -> str:
+  return unique_service_prefix + '_' + str(index) + ':' + rid;
+
+# -------------------
 # context propagation 
 # -------------------
 
@@ -25,9 +33,11 @@ def context_string_to_msg(context: pb.RequestContext):
 # async zones
 # -----------
 
+ROOT_ASYNC_ZONE = "r"
+
 def next_async_context(context: pb.RequestContext) -> pb.RequestContext:
     if context.async_zone == "":
-      context.async_zone = "r"
+      context.async_zone = ROOT_ASYNC_ZONE
     
     new_context = pb.RequestContext()
     new_context.CopyFrom(context)
@@ -40,7 +50,7 @@ def next_async_contexts(context: pb.RequestContext, num: int) -> List[pb.Request
     lst = []
 
     if context.async_zone == "":
-      context.async_zone = "r"
+      context.async_zone = ROOT_ASYNC_ZONE
 
     for i in range (context.num_sub_zones, context.num_sub_zones + num):
         new_context = pb.RequestContext()
@@ -51,3 +61,7 @@ def next_async_contexts(context: pb.RequestContext, num: int) -> List[pb.Request
 
     context.num_sub_zones += num
     return lst
+
+def update_async_context(current_context: pb.RequestContext, new_context: pb.RequestContext) -> pb.RequestContext:
+   current_context.num_sub_zones = new_context.num_sub_zones
+   return current_context

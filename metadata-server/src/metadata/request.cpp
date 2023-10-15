@@ -1,4 +1,5 @@
 #include "request.h"
+#include <cstddef>
 #include <mutex>
 #include <shared_mutex>
 
@@ -63,7 +64,7 @@ replicas::VersionRegistry * Request::getVersionsRegistry() {
     return _versions_registry;
 }
 
-std::string Request::addNextSubRequest(const std::string& sid, const std::string& async_zone_id, bool gen_id) {
+std::string Request::addNextAsyncZone(const std::string& sid, const std::string& async_zone_id, bool gen_id) {
     int next_async_zone_index;
     std::string next_sub_rid;
 
@@ -178,7 +179,7 @@ metadata::Branch * Request::_waitBranchRegistration(const std::string& bid) {
     auto branch_it = _branches.find(bid);
 
     // if we are dealing with async replication we wait until branch is registered
-    if (utils::ASYNC_REPLICATION) {
+    if (branch_it == _branches.end() && utils::ASYNC_REPLICATION) {
         auto start_time = std::chrono::steady_clock::now();
         auto remaining_timeout = _computeRemainingTimeout(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
         while (branch_it == _branches.end()) {
@@ -191,6 +192,7 @@ metadata::Branch * Request::_waitBranchRegistration(const std::string& bid) {
         return branch_it->second;
     }
     if (branch_it == _branches.end()) {
+        spdlog::debug("branch with bid {} does not exist", bid);
         return nullptr;
     }
     return branch_it->second;
@@ -198,6 +200,9 @@ metadata::Branch * Request::_waitBranchRegistration(const std::string& bid) {
 
 int Request::closeBranch(const std::string& bid, const std::string& region) {
     metadata::Branch * branch = _waitBranchRegistration(bid);
+    if (branch == nullptr) {
+        return -1;
+    }
     int closed = branch->close(region);
     if (closed == 1) {
         const std::string& service = branch->getService();
@@ -288,7 +293,6 @@ bool Request::untrackBranch(const std::string& async_zone_id, const std::string&
         _num_opened_branches.fetch_add(-1);
     }
     _cond_async_zones.notify_all();
-
     return true;
 }
 
