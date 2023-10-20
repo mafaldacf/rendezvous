@@ -1,6 +1,6 @@
 import grpc
 from rendezvous.protos import rendezvous_pb2 as pb
-from rendezvous.protos import rendezvous_pb2_grpc as rdv
+from rendezvous.protos import rendezvous_pb2_grpc as rv
 
 def subscribe(stub, service, region):
     try:
@@ -38,10 +38,10 @@ def main():
     print("***** RENDEZVOUS MONITOR *****")
     stubs = []
     channel = grpc.insecure_channel('localhost:8001')
-    stub = rdv.ClientServiceStub(channel)
+    stub = rv.ClientServiceStub(channel)
     stubs.append(stub)
     channel = grpc.insecure_channel('localhost:8002')
-    stub = rdv.ClientServiceStub(channel)
+    stub = rv.ClientServiceStub(channel)
     stubs.append(stub)
     showOptions()
     readInput(stubs)

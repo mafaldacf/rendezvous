@@ -40,15 +40,23 @@ namespace service {
                 std::condition_variable condv;
             } PendingServiceBranch;
 
+            bool _consistency_checks;
+
             // <service, PendingServiceBranch>
             std::unordered_map<std::string, PendingServiceBranch*> _pending_service_branches;
             std::mutex _mutex_pending_service_branches;
             std::condition_variable _cond_pending_service_branch;
 
+            /**
+            * Return request pointer. If we are using async replication, we create a new request
+            * but first we verify if it the request was moved to the closed ones
+            *
+            * @param rid The request identifier
+            */
             metadata::Request * _getRequest(const std::string& rid);
 
         public:
-            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs);
+            ClientServiceImpl(std::shared_ptr<rendezvous::Server> server, std::vector<std::string> addrs, bool consistency_checks);
 
             grpc::Status Subscribe(grpc::ServerContext * context,
                 const rendezvous::SubscribeMessage * request,

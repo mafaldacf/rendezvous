@@ -11,7 +11,7 @@ with open('configs/master.yml', 'r') as f:
     WORDS23 = bool(config['words23'])
     PARAMS = config['params'] 
 
-eval_client = local["./client.py"] 
+eval_client = local["./eval.py"] 
 eval_client['deploy-clients'] & FG
 for i, types in enumerate(PARAMS):
     clients, metadata = types

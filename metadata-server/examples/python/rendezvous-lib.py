@@ -33,11 +33,7 @@ def context_string_to_msg(context: pb.RequestContext):
 # async zones
 # -----------
 
-ROOT_ASYNC_ZONE = "r"
-
 def next_async_context(context: pb.RequestContext) -> pb.RequestContext:
-    if context.async_zone == "":
-      context.async_zone = ROOT_ASYNC_ZONE
     
     new_context = pb.RequestContext()
     new_context.CopyFrom(context)
@@ -48,9 +44,6 @@ def next_async_context(context: pb.RequestContext) -> pb.RequestContext:
 
 def next_async_contexts(context: pb.RequestContext, num: int) -> List[pb.RequestContext]:
     lst = []
-
-    if context.async_zone == "":
-      context.async_zone = ROOT_ASYNC_ZONE
 
     for i in range (context.num_sub_zones, context.num_sub_zones + num):
         new_context = pb.RequestContext()

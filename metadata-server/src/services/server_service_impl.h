@@ -21,9 +21,10 @@ namespace service {
 
         private:
             std::shared_ptr<rendezvous::Server> _server;
+            bool _consistency_checks;
 
         public:
-            ServerServiceImpl(std::shared_ptr<rendezvous::Server> server);
+            ServerServiceImpl(std::shared_ptr<rendezvous::Server> server, bool consistency_checks);
 
             /* gRPC generated methods*/
             grpc::Status RegisterRequest(grpc::ServerContext * context, 

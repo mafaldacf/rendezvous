@@ -27,6 +27,7 @@ static std::string _connections_filename;
 static std::string _replica_addr;
 static std::vector<std::string> _replicas_addrs;
 static json _settings;
+static bool _consistency_checks;
 static bool _async_replication;
 
 std::unique_ptr<grpc::Server> server;
@@ -47,8 +48,8 @@ void shutdown() {
 
 void run() {
   auto rendezvous_server = std::make_shared<rendezvous::Server> (_replica_id, _settings);
-  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs);
-  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server);
+  client_service = std::make_unique<service::ClientServiceImpl>(rendezvous_server, _replicas_addrs, _consistency_checks);
+  server_service = std::make_unique<service::ServerServiceImpl>(rendezvous_server, _consistency_checks);
 
   grpc::ServerBuilder builder;
   builder.AddListeningPort(_replica_addr, grpc::InsecureServerCredentials());
@@ -71,10 +72,12 @@ void loadConfig() {
   // load consistency checks flag from environment variable
   auto consistency_checks_env = std::getenv("CONSISTENCY_CHECKS");
   if (consistency_checks_env) {
-    utils::CONSISTENCY_CHECKS = (atoi(consistency_checks_env) == 1);
+    _consistency_checks = (atoi(consistency_checks_env) == 1);
   } else { // true by default
-    utils::CONSISTENCY_CHECKS = true;
+    _consistency_checks = true;
   }
+
+  utils::CONSISTENCY_CHECKS = _consistency_checks;
 
   /* Parse settings config */
   std::ifstream settings_file("../config/settings.json");
@@ -89,7 +92,6 @@ void loadConfig() {
     _settings = root;
     utils::ASYNC_REPLICATION = _settings["async_replication"].get<bool>();
     utils::CONTEXT_VERSIONING = _settings["context_versioning"].get<bool>();
-    utils::ASYNC_SERVICE_REGISTER_CALLS = _settings["async_service_register_calls"].get<bool>();
   }
   catch (json::exception &e) {
     spdlog::error("Error parsing 'settings.json'");

@@ -13,22 +13,20 @@ namespace utils {
     /* ------------------------ */
     static int SIZE_SIDS = 1;
     static const char FULL_ID_DELIMITER = ':';
-    static std::string ROOT_ASYNC_ZONE_ID = "r";
+    static std::string ROOT_ASYNC_ZONE_ID = "";
     static std::string ROOT_SERVICE_NODE_ID = "";
 
     /* -------------------------------- */
     /* parsed values from settings.json */
     /* -------------------------------- */
-    static bool ASYNC_REPLICATION = false;
+    static bool ASYNC_REPLICATION = true;
     static bool CONTEXT_VERSIONING = false;
-    static bool ASYNC_SERVICE_REGISTER_CALLS = true;
-
-    static int WAIT_REPLICA_TIMEOUT_S = 60;
+    static int WAIT_REPLICA_TIMEOUT_S = 15;
     
     /* --------------------------- */
     /* parsed values from env vars */
     /* --------------------------- */
-    static bool CONSISTENCY_CHECKS = true;
+    static bool CONSISTENCY_CHECKS;
 }
 
 #endif

@@ -4,7 +4,26 @@ import time
 import threading
 import grpc
 from rendezvous.protos import rendezvous_pb2 as pb
-from rendezvous.protos import rendezvous_pb2_grpc as rdv
+from rendezvous.protos import rendezvous_pb2_grpc as rv
+
+channel = grpc.insecure_channel('localhost:8001')
+stub = rv.ClientServiceStub(channel)
+
+def f(stub, rid, bid, service, regions, async_zone, current_service_bid):
+    response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, bid=bid, service=service, regions=regions, async_zone=async_zone, current_service_bid=current_service_bid))
+    print(f"[Register Branches] {response}")
+
+response = stub.RegisterRequest(pb.RegisterRequestMessage(rid="rid"))
+print(f"[Register Request] {response}")
+
+t = threading.Thread(target=f, args=(stub, "rid", "bid2", "svc", [], "", "bid1"))
+t.start()
+time.sleep(5)
+
+t = threading.Thread(target=f, args=(stub, "rid", "bid1", "svc", ["EU", "US"], "", ""))
+t.start()
+time.sleep(5)
+
 
 def toBytes(ctx):
     return ctx.SerializeToString()
@@ -18,16 +37,13 @@ def registerRequest(stub, rid):
     try:
         response = stub.RegisterRequest(pb.RegisterRequestMessage(rid=rid))
         print(f"[Register Request] {response}")
-        return toBytes(response.context)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def registerBranch(stub, rid, service, regions, tag="", prev_service=""):
+def registerBranch(stub, rid, service, regions, tag="", async_zone=""):
     try:
-        context = pb.RequestContext(prev_service=prev_service)
-        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, context=context, monitor=True))
+        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, monitor=True, async_zone=async_zone))
         print(f"[Register Branches] {response}")
-        return toBytes(response.context)
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
@@ -41,9 +57,8 @@ def closeBranch(stub, bid, region):
 def wait(stub, rid, service, region, ctx=None):
     try:
         request = pb.WaitRequestMessage(rid=rid, region=region, service=service)
-        #request.context.CopyFrom(fromBytes(ctx))
         print(f"[Wait Request] > waiting: {request}")
-        response = stub.Wait(request)
+        response = stub.WaitRequest(request)
         print(f"[Wait Request] < returning: {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
@@ -77,11 +92,11 @@ EXIT = "exit";
 
 def showOptions():
     print(f"- Register Request: \t \t \t {REGISTER_REQUEST} <rid>")
-    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <regions>")
+    print(f"- Register Branch: \t \t \t {REGISTER_BRANCH} <rid> <service> <regions> async zone")
     print(f"- Register Branch w/ tag: \t \t {REGISTER_BRANCH_WITH_TAG} <rid> <service> <regions> <tag> ")
-    print(f"- Register Branch child: \t \t {REGISTER_BRANCH_CHILD} <rid> <service> <regions> <prev_service> ")
+    print(f"- Register Branch child: \t \t {REGISTER_BRANCH_CHILD} <rid> <service> <regions> <current_service> ")
     print(f"- Close Branch: \t \t \t {CLOSE_BRANCH} <bid> <region>")
-    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region>")
+    print(f"- Wait Request: \t \t \t {WAIT_REQUEST} <rid> <service> <region> async zone")
     print(f"- Check Status: \t \t \t {CHECK_STATUS} <rid> <service> <region>")
     print(f"- Check Detailed Status: \t \t {CHECK_DETAILED_STATUS} <rid> <service> <region>")
     print(f"- Sleep: \t \t \t \t {SLEEP} <time in seconds>")
@@ -107,9 +122,13 @@ def readInput(stubs):
             service = args[1] if len(args) >= 2 else None
 
             regions = []
-            for region in args[2:]:
+            for region in args[2:-1]:
                 regions.append(region)
-            ctx = registerBranch(stub, rid, service, regions)
+
+                
+            async_zone = args[-1]
+            print("ASYNC ZONE: ", async_zone)
+            ctx = registerBranch(stub, rid, service, regions, "", async_zone)
 
         elif command == REGISTER_BRANCH_WITH_TAG and len(args) >= 3:
             rid = args[0]
@@ -130,8 +149,8 @@ def readInput(stubs):
             for region in args[2:]:
                 regions.append(region)
 
-            prev_service = regions.pop()
-            ctx = registerBranch(stub, rid, service, regions, prev_service=prev_service)
+            current_service = regions.pop()
+            ctx = registerBranch(stub, rid, service, regions, current_service=current_service)
 
         elif command == CLOSE_BRANCH and len(args) >= 1 and len(args) <= 2:
             bid = args[0]
@@ -139,11 +158,12 @@ def readInput(stubs):
             t = threading.Thread(target=closeBranch, args=(stub, bid, region))
             t.start()
             
-        elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 3:
+        elif command == WAIT_REQUEST and len(args) >= 1 and len(args) <= 4:
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            t = threading.Thread(target=wait, args=(stub, rid, service, region, ctx))
+            async_zone = args[3] if len(args) >= 4 else None
+            t = threading.Thread(target=wait, args=(stub, rid, service, region, async_zone))
             t.start()
 
         elif command == CHECK_STATUS and len(args) >= 1 and len(args) <= 3:
@@ -180,10 +200,10 @@ def main():
     print("***** RENDEZVOUS CLIENT *****")
     stubs = []
     channel = grpc.insecure_channel('localhost:8001')
-    stub = rdv.ClientServiceStub(channel)
+    stub = rv.ClientServiceStub(channel)
     stubs.append(stub)
     channel = grpc.insecure_channel('localhost:8002')
-    stub = rdv.ClientServiceStub(channel)
+    stub = rv.ClientServiceStub(channel)
     stubs.append(stub)
     showOptions()
     readInput(stubs)

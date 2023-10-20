@@ -60,23 +60,26 @@ void ReplicaClient::registerRequest(const std::string& rid) {
     }
 }
 
+void ReplicaClient::saveAsyncCall(AsyncRequestHelper &req_helper, grpc::ClientContext * context, grpc::Status * status, rendezvous_server::Empty * response) {
+    req_helper.contexts.emplace_back(context);
+    req_helper.statuses.emplace_back(status);
+    req_helper.responses.emplace_back(response);
+    req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
+    req_helper.nrpcs++;
+}
+
 void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-    const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
+    const rendezvous_server::RequestContext& ctx_replica) {
 
         AsyncRequestHelper req_helper;
         for (const auto& server : _servers) {
             grpc::ClientContext * context = new grpc::ClientContext();
-            req_helper.contexts.emplace_back(context);
-
             grpc::Status * status = new grpc::Status();
-            req_helper.statuses.emplace_back(status);
-
             rendezvous_server::Empty * response = new rendezvous_server::Empty();
-            req_helper.responses.emplace_back(response);
-
             rendezvous_server::RegisterBranchMessage request;
+
             request.set_rid(rid);
             request.set_async_zone(async_zone);
             request.set_core_bid(core_bid);
@@ -91,8 +94,7 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
             }
 
             req_helper.rpcs.emplace_back(server->AsyncRegisterBranch(context, request, &req_helper.queue));
-            req_helper.rpcs[req_helper.nrpcs]->Finish(response, status, (void*)1);
-            req_helper.nrpcs++;
+            saveAsyncCall(req_helper, context, status, response);
         }
         waitCompletionQueue("RB", req_helper);
     }
@@ -100,20 +102,20 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
 void ReplicaClient::registerBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-    const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
+    const rendezvous_server::RequestContext& ctx_replica) {
 
         if (utils::ASYNC_REPLICATION) {
-        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, ctx, ctx_replica]() {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx, ctx_replica);
+        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica]() {
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica);
         }).detach();
         }
         else {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx, ctx_replica);
+            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica);
         }
 }
 
 void ReplicaClient::_doCloseBranch(const std::string& rid, const std::string& core_bid, const std::string& region, 
-    const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
+    const rendezvous_server::RequestContext& ctx_replica) {
 
         AsyncRequestHelper req_helper;
         for (const auto& server : _servers) {
@@ -144,15 +146,15 @@ void ReplicaClient::_doCloseBranch(const std::string& rid, const std::string& co
     }
 
 void ReplicaClient::closeBranch(const std::string& rid, const std::string& core_bid, const std::string& region, 
-const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica) {
+const rendezvous_server::RequestContext& ctx_replica) {
 
     if (utils::ASYNC_REPLICATION) {
-        std::thread([this, rid, core_bid, region, ctx, ctx_replica]() {
-            _doCloseBranch(rid, core_bid, region, ctx, ctx_replica);
+        std::thread([this, rid, core_bid, region, ctx_replica]() {
+            _doCloseBranch(rid, core_bid, region, ctx_replica);
         }).detach();
     }
     else {
-        _doCloseBranch(rid, core_bid, region, ctx, ctx_replica);
+        _doCloseBranch(rid, core_bid, region, ctx_replica);
     }
 }
 

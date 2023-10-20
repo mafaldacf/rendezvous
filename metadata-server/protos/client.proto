@@ -48,38 +48,43 @@ message RegisterRequestMessage {
 }
 message RegisterRequestResponse {
   string rid = 1;
-  RequestContext context = 2;
 }
 
 /* Registers Branch */
 message RegisterBranchMessage {
   string rid = 1;
-  string service = 2;
-  string tag = 3;
-  repeated string regions = 4;
-  bool monitor = 5;
-  string service_call_bid = 6;
-  RequestContext context = 7;
+  string bid = 2;
+  string service = 3;
+  string tag = 4;
+  repeated string regions = 5;
+  bool monitor = 6;
+  string async_zone = 7;
+  string current_service_bid = 8;
 }
 message RegisterBranchResponse {
   string rid = 1;
   string bid = 2;
-  RequestContext context = 3;
 }
 
 /* Registers Branches */
+
+message Branch {
+  string service = 1;
+  string tag = 2;
+  repeated string regions = 3;
+  string async_zone = 4;
+  string current_service_bid = 5;
+}
+
 message RegisterBranchesMessage {
   string rid = 1;
-  repeated string services = 2;
-  repeated string tags = 3;
-  string region = 4;
-  string service_call_bid = 6;
-  repeated RequestContext contexts = 7;
+  repeated Branch branches = 2;
+  string current_service = 3;
 }
+
 message RegisterBranchesResponse {
   string rid = 1;
   repeated string bids = 2;
-  repeated RequestContext contexts = 3;
 }
 
 /* Register Branches - SERVERLESS VERSION */
@@ -93,8 +98,6 @@ message DatastoreBranching {
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
-  bool close_service = 3;
-  RequestContext context = 4;
 }
 
 /* Wait */
@@ -106,8 +109,8 @@ message WaitRequestMessage {
   string tag = 5;
   int32 timeout = 6;
   bool wait_deps = 7;
-  //bool async = 6;
-  RequestContext context = 8;
+  string current_service = 8;
+  string async_zone = 9;
 }
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
@@ -120,7 +123,7 @@ message CheckStatusMessage {
   string service = 2;
   string region = 3;
   bool detailed = 4;
-  RequestContext context = 5;
+  string async_zone = 5;
 }
 
 message CheckStatusResponse {
@@ -133,7 +136,7 @@ message CheckStatusResponse {
 message FetchDependenciesMessage {
   string rid = 1;
   string service = 2;
-  RequestContext context = 4;
+  string async_zone = 3;
 }
 
 message FetchDependenciesResponse {

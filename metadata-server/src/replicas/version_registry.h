@@ -60,6 +60,15 @@ namespace replicas {
              * @param version The remote replica version
              * 
              */
+            void waitUpdateRemoteVersion(const std::string& sid, int version);
+
+            /**
+             * Update version of a remote replica
+             * 
+             * @param sid The remote replica id
+             * @param version The remote replica version
+             * 
+             */
             void updateRemoteVersion(const std::string& sid, int version);
 
             /**

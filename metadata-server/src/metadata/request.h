@@ -66,6 +66,7 @@ namespace metadata {
             } AsyncZone;
 
         private:
+            bool _closed;
             /* ----------- */
             /* async zones */
             /* ----------- */
@@ -322,6 +323,30 @@ namespace metadata {
 
             Request(std::string rid, replicas::VersionRegistry * versions_registry);
             ~Request();
+            
+            /**
+            * Set current request as closed
+            */
+            void setClosed();
+
+            /**
+            * Checks if request is closed
+            * @return true if closed and false otherwise
+            */
+            bool isClosed();
+
+            /**
+             * Partially delete request -- delete everything dynamically allocated except _service_nodes
+             */
+            void partialDelete();   
+            
+            /**
+             * Check if bids are already visible
+             * 
+             * @param visible_bids Branch identifiers to be verified to be registered
+             * @return true if all bids are visible and false otherwise
+             */
+            bool visibleBids(const utils::ProtoVec visible_bids);
 
             /**
              * Return timestamp of last modification
@@ -389,6 +414,7 @@ namespace metadata {
              * @param region The region where the branch was registered
 
              * @return one of three values:
+             * - 2 if all branches are closed for the request
              * - 1 if branch was closed
              * - 0 if branch was already closed before
              * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in async_zones tbb map

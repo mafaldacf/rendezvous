@@ -36,6 +36,7 @@ namespace utils {
     const std::string ERR_MSG_INVALID_TAG = "Invalid service tag";
     const std::string ERR_MSG_INVALID_SERVICES_EXCLUSIVE = "Cannot provide either 'service' or 'services' simultaneously";
     const std::string ERR_MSG_INVALID_SERVICE = "Invalid service";
+    const std::string ERR_MSG_VISIBLE_BIDS_TIMEOUT = "Timedout while waiting for bids to be visible";
     
     /* common gRPC custom error messages */
     const std::string ERR_MSG_INVALID_REQUEST = "Invalid request identifier";

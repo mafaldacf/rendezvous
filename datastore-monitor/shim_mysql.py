@@ -15,7 +15,7 @@ class ShimMysql:
 
   def find_metadata(self, bid):
     with self.conn.cursor() as cursor:
-      sql = f"SELECT COUNT(*) FROM `{self.client_table}` WHERE `rdv_bid` = %s"
+      sql = f"SELECT COUNT(*) FROM `{self.client_table}` WHERE `rv_bid` = %s"
       cursor.execute(sql, (bid,))
       count = cursor.fetchone()[0]
       return count > 0

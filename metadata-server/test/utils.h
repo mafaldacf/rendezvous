@@ -22,7 +22,7 @@ static const std::string EMPTY_TAG = "";
 
 static const std::string DUMMY_ASYNC_ZONE = "dummy_zone";
 
-static const std::string ROOT_SUB_RID = "r";
+static const std::string ROOT_SUB_RID = "";
 static const std::string SUB_RID_0 = "r:eu0";
 static const std::string SUB_RID_1 = "r:eu1";
 static const std::string SUB_RID_2 = "r:eu2";

@@ -29,6 +29,7 @@ Server::Server(std::string sid, json settings)
     spdlog::info("\n------------------------------------------------------");
     
     _requests = std::unordered_map<std::string, metadata::Request*>();
+    _closed_requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
 }
 
@@ -43,6 +44,10 @@ Server::Server(std::string sid)
     _wait_replica_timeout_s(60) {
     
     utils::SIZE_SIDS = sid.size();
+    utils::WAIT_REPLICA_TIMEOUT_S = 60;
+    utils::ASYNC_REPLICATION = false;
+    utils::CONSISTENCY_CHECKS = true;
+    utils::CONSISTENCY_CHECKS = false;
     _requests = std::unordered_map<std::string, metadata::Request*>();
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
     spdlog::set_level(spdlog::level::trace);
@@ -148,11 +153,12 @@ void Server::initRequestsCleanup() {
   std::thread([this]() {
     while (true) {
       std::this_thread::sleep_for(std::chrono::minutes(_cleanup_requests_interval_m));
-      auto now = std::chrono::system_clock::now();
-      std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
+
+      // cleanup current requests
+      std::unique_lock<std::shared_mutex> write_lock_requests(_mutex_requests);
       std::size_t initial_size = _requests.size();
       spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
-
+      auto now = std::chrono::system_clock::now();
       for (auto it = _requests.cbegin(); it != _requests.cend(); /* no increment */) {
         if (now - it->second->getLastTs() > std::chrono::minutes(_cleanup_requests_validity_m)) {
           delete it->second;
@@ -162,7 +168,27 @@ void Server::initRequestsCleanup() {
           ++it;
         }
       }
+      write_lock_requests.unlock();
       spdlog::info("[GC REQUESTS] done! collected {} requests", initial_size - _requests.size());
+
+      // cleanup closed requests
+      std::unique_lock<std::shared_mutex> write_lock_closed_requests(_mutex_closed_requests);
+      initial_size = _closed_requests.size();
+      spdlog::info("[GC CLOSED REQUESTS] initializing garbage collector for {} requests...", initial_size);
+      now = std::chrono::system_clock::now();
+      spdlog::info("[GC REQUESTS] initializing garbage collector for {} requests...", initial_size);
+
+      for (auto it = _closed_requests.cbegin(); it != _closed_requests.cend(); /* no increment */) {
+        if (now - it->second->getLastTs() > std::chrono::minutes(_cleanup_requests_validity_m)) {
+          delete it->second;
+          _closed_requests.erase(it++);
+        }
+        else {
+          ++it;
+        }
+      }
+      write_lock_closed_requests.unlock();
+      spdlog::info("[GC CLOSED REQUESTS] done! collected {} requests", initial_size - _closed_requests.size());
     }
     
   }).detach();
@@ -177,11 +203,11 @@ std::string Server::getSid() {
 }
 
 std::string Server::genRid() {
-  return _sid + '_' + std::to_string(_next_rid.fetch_add(1));
+  return "rv_" + _sid + '_' + std::to_string(_next_rid.fetch_add(1));
 }
 
 std::string Server::genBid(metadata::Request * request) {
-  return _sid + '_' + request->genId();
+  return "rv_" + _sid + "_" + request->genId();
 }
 
 std::pair<std::string, std::string> Server::parseFullId(const std::string& full_id) {
@@ -225,6 +251,16 @@ metadata::Request * Server::getRequest(const std::string& rid) {
   if (pair != _requests.end()) {
       return pair->second;
   }
+
+  // check if request is closed already
+  std::shared_lock<std::shared_mutex> read_lock_closed_requests(_mutex_closed_requests);
+  auto it = _closed_requests.find(rid);
+  // found closed request
+  if (it != _closed_requests.end()) {
+    return it->second;
+  }
+  read_lock_closed_requests.unlock();
+
   return nullptr;
 }
 
@@ -246,8 +282,22 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
     rid = genRid();
   }
 
-  // register request 
+  // check if request is closed already
+  /* std::shared_lock<std::shared_mutex> read_lock_closed_requests(_mutex_closed_requests);
+  auto it = _closed_requests.find(rid);
+  // found closed request
+  if (it != _closed_requests.end()) {
+    return it->second;
+  }
+  read_lock_closed_requests.unlock(); */
+
+  // otherwise, register request for the first time
   std::unique_lock<std::shared_mutex> write_lock(_mutex_requests);
+  // sanity check for race conditions between unlocking read lock and locking write lock
+  auto it = _requests.find(rid);
+  if (it != _requests.end()) {
+    return it->second;
+  }
   replicas::VersionRegistry * versionsRegistry = new replicas::VersionRegistry(_wait_replica_timeout_s);
   metadata::Request * request = new metadata::Request(rid, versionsRegistry);
   _requests.insert({rid, request});
@@ -269,26 +319,50 @@ std::string Server::registerBranchGTest(metadata::Request * request,
 // Core Rendezvous Logic
 //----------------------
 
-bool Server::registerBranch(metadata::Request * request, 
+metadata::Branch * Server::registerBranch(metadata::Request * request, 
   const std::string& async_zone_id, const std::string& service, 
-  const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
+  const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service_bid, 
   const std::string& bid, bool monitor) {
 
-  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service);
+  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service_bid);
   // unexpected error
   if (!branch) {
-    return false;
+    return branch;
   }
 
   const std::string& composed_bid = composeFullId(bid, request->getRid());
   if (monitor) {
     publishBranches(service, tag, composed_bid);
   }
-  return true;
+  return branch;
 }
 
 int Server::closeBranch(metadata::Request * request, const std::string& bid, const std::string& region) {
-  return request->closeBranch(bid, region);
+  int closed = request->closeBranch(bid, region);
+
+  // if all branches are closed we move the request to the closed structure
+  //FIXME
+  /* if (closed == 2) {
+    std::unique_lock<std::shared_mutex> write_lock_requests(_mutex_requests);
+    const std::string& rid = request->getRid();
+    _requests.erase(rid);
+    write_lock_requests.unlock();
+
+    // sanity check
+    std::unique_lock<std::shared_mutex> write_lock_closed_requests(_mutex_closed_requests);
+    if (_closed_requests.count(rid) != 0) {
+      delete _closed_requests[rid];
+    }
+
+    // move request to the closed 
+    _closed_requests[rid] = request;
+    request->partialDelete();
+    request->setClosed();
+    write_lock_closed_requests.unlock();
+  } */
+  if (closed == 2) return 1;
+
+  return closed;
 }
 
 int Server::wait(metadata::Request * request, const std::string& async_zone_id, 
@@ -309,10 +383,10 @@ int Server::wait(metadata::Request * request, const std::string& async_zone_id,
     result = request->wait(async_zone_id, async, timeout, current_service);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
+  spdlog::debug("PREVENTED INCONSISTENCY? RESULT = {}", result);
   if (result == 1) {
     _prevented_inconsistencies.fetch_add(1);
   }
-
   return result;
 }
 

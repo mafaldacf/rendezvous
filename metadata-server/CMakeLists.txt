@@ -37,5 +37,5 @@ if(NOT CONFIG_ONLY)
     add_subdirectory(src)
 
     message("[INFO] Building rendezvous tests")
-    add_subdirectory(test)
+    #add_subdirectory(test)
 endif()

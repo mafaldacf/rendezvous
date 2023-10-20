@@ -13,12 +13,8 @@ class ShimS3:
   def _find_object(self, bid, obj_key, metadata_created_at):
     try:
       response = self.s3_client.head_object(Bucket=self.bucket, Key=obj_key)
-      # found the object version we were looking for with the correct bid
-      if response.get('Metadata') and response['Metadata'].get('rdv_bid') == bid:
-        return True
-      # current object corresponds to a newer version
-      if response['LastModified'] >= metadata_created_at:
-        return True
+      print(f"[DEBUG] Found object: {response}", flush=True)
+      return True
       
     except botocore.exceptions.ClientError as e:
       if e.response['Error']['Code'] in ['NoSuchKey','404']:

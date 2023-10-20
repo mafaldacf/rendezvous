@@ -3,7 +3,7 @@
 KEYPAIR_NAME=rendezvous-eu
 HOSTNAME=ec2-3-68-80-248.eu-central-1.compute.amazonaws.com
 
-scp -i "~/.ssh/${KEYPAIR_NAME}.pem" -r ~/.aws ubuntu@${HOSTNAME}:/home/ubuntu/.aws
+#scp -i "~/.ssh/${KEYPAIR_NAME}.pem" -r ~/.aws ubuntu@${HOSTNAME}:/home/ubuntu/.aws
 
 # if necessary, export these variables in command line before running the script
 export MY_INSTALL_DIR=$HOME/.local
@@ -45,6 +45,7 @@ cd cmake/build
 sudo cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR ../..
 sudo make -j 4
 sudo make install
+sudo rm -rf ~/rendezvous_deps/grpc
 
 # Install GTest
 # https://github.com/google/googletest/blob/main/googletest/README.md#standalone-cmake-project
@@ -62,14 +63,16 @@ sudo rm -r ~/rendezvous_deps/googletest
 # Install JSON for C++
 echo '(5) Installing JSON for C++...'
 cd ~/rendezvous_deps
-git clone -b v3.11.2 --depth 1 https://github.com/nlohmann/json.git
+sudo git clone -b v3.11.2 --depth 1 https://github.com/nlohmann/json.git
 cd json
-mkdir build
+sudo mkdir build
 cd build
 sudo cmake ..
 sudo cmake --install .
+sudo rm -rf ~/rendezvous_deps/json
 
 # Install spdlog
+# https://github.com/oneapi-src/oneTBB/blob/v2021.10.0/INSTALL.md
 echo '(6) Installing spdlog...'
 cd ~/rendezvous_deps
 sudo git clone -b v1.11.0 https://github.com/gabime/spdlog.git
@@ -78,5 +81,17 @@ sudo mkdir build
 cd build
 sudo cmake ..
 sudo make -j
-sudo rm -r ~/rendezvous_deps/spdlog
+sudo rm -rf ~/rendezvous_deps/spdlog
 sudo apt-get install libspdlog-dev # idk why i need this but it only works like this
+
+# Install oneAPI
+echo '(7) oneAPI...'
+cd ~/rendezvous_deps
+sudo git clone -b v2021.11.0-rc1 https://github.com/oneapi-src/oneTBB
+cd oneTBB
+sudo mkdir build
+cd build
+sudo cmake -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR -DTBB_TEST=OFF ..
+sudo cmake --build .
+sudo cmake --install .
+sudo rm -rf ~/rendezvous_deps/oneTBB

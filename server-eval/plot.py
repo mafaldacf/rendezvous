@@ -13,7 +13,7 @@ import sys
 import yaml
 
 # start off by loading the configuration file
-with open('config.yaml', 'r') as file:
+with open('configs/settings.yml', 'r') as file:
     config = yaml.safe_load(file)
     RESULTS_DIR = str(config['results_dir'])
 
@@ -96,11 +96,12 @@ def _get_datapoints_csv(subdir_name=None, prefix=''):
         pattern = f"{RESULTS_DIR}/{subdir_name}/{prefix}*"
     else:
         pattern = f"{RESULTS_DIR}/{prefix}*"
-    for file_path in glob.glob(f'{pattern}.csv'):
+
+    for file_path in sorted(glob.glob(f'{pattern}.csv')):
         df = pd.read_csv(file_path, sep=';', index_col=0, low_memory=False)
         df_latencies_list.append(df)
 
-    for file_path in glob.glob(f'{pattern}.info'):
+    for file_path in sorted(glob.glob(f'{pattern}.info')):
         with open(file_path, "r") as file:
                 # each file represents a different number of clients (1 to 5)
                 for line in file:
@@ -110,8 +111,8 @@ def _get_datapoints_csv(subdir_name=None, prefix=''):
 
     for df in df_latencies_list:
         df['latency'] = pd.to_numeric(df['latency'], errors='coerce')
-        latency_median = df['latency'].mean()
-        latencies.append(int(float(latency_median)))
+        latency_avg = df['latency'].mean()
+        latencies.append(int(float(latency_avg)))
     return sorted(zip(throughputs, latencies))
 
 def plot_words23(annotate):
@@ -193,9 +194,9 @@ def plot_thesis():
     plt.rcParams['axes.labelsize'] = 'small'
 
     results = {
-        '1 region': _get_datapoints_info(prefix='regions_1_'),
-        '10 regions': _get_datapoints_info(prefix='regions_10_'),
-        '100 regions': _get_datapoints_info(prefix='regions_100_')
+        '1 region': _get_datapoints_csv(prefix='regions_1_'),
+        '10 regions': _get_datapoints_csv(prefix='regions_10_'),
+        '100 regions': _get_datapoints_csv(prefix='regions_100_')
     }
 
     data = [
@@ -216,7 +217,7 @@ def plot_thesis():
     ax.legend_.set_title('metadata')
 
     plot_name = f'plots/throughput_latency_thesis_{time.time()}.png'
-    plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
+    #plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
     print(f"Successfuly saved plot figure in {plot_name}!")
 
 def plot_thesis_clients(annotate):

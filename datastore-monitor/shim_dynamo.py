@@ -9,11 +9,11 @@ class ShimDynamo:
 
   def find_metadata(self, bid):
     response = self.client_table.query(            
-      IndexName='rdv_bid-index',
-      KeyConditionExpression=Key('rdv_bid').eq(bid),     
+      IndexName='rv_bid-index',
+      KeyConditionExpression=Key('rv_bid').eq(bid),     
     )
     if 'Items' in response and len(response['Items']) > 0:
       return True
     
-    #print("[DEBUG] [DynamoDB] Item not found :(", response)
+    print("[DEBUG] [DynamoDB] Item not found :(", response)
     return False

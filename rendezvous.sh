@@ -10,8 +10,8 @@ SERVER_PORT_US=8002
 SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
 SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 # dynamic for each instance
-HOSTNAME_EU="3.121.222.110"
-HOSTNAME_US="34.227.172.92"
+HOSTNAME_EU="18.156.136.71"
+HOSTNAME_US="3.88.174.92"
 
 # -----------------
 # Docker deployment
@@ -21,7 +21,7 @@ AWS_ACCOUNT_ID=851889773113
 
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rdv-lib, monitor}"
+    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rv-lib, monitor}"
     echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
@@ -94,10 +94,16 @@ local_build_py() {
   # UNCOMMENT to build from proto file in /examples/python/rendezvous/protos
   cp metadata-server/protos/client.proto metadata-server/examples/python/rendezvous/protos/rendezvous.proto
   cp metadata-server/protos/client.proto datastore-monitor/proto/rendezvous.proto
+  cp metadata-server/protos/client.proto server-eval/proto/rendezvous.proto
   cd metadata-server
+  # example client
   python3 -m grpc_tools.protoc -I rendezvous/protos=examples/python/rendezvous/protos --python_out=examples/python --pyi_out=examples/python --grpc_python_out=examples/python examples/python/rendezvous/protos/rendezvous.proto
   cd ..
+  # datastore monitor
   python3 -m grpc_tools.protoc -I=datastore-monitor --python_out=datastore-monitor --pyi_out=datastore-monitor --grpc_python_out=datastore-monitor datastore-monitor/proto/rendezvous.proto
+  # server eval
+  python3 -m grpc_tools.protoc -I=server-eval --python_out=server-eval --pyi_out=server-eval --grpc_python_out=server-eval server-eval/proto/rendezvous.proto
+  # clean
   rm metadata-server/examples/python/rendezvous/protos/rendezvous.proto
   rm datastore-monitor/proto/rendezvous.proto
   echo done!
@@ -113,7 +119,7 @@ local_run_client() {
   python3 client.py
 }
 
-local_run_rdv_lib() {
+local_run_rv_lib() {
   cd metadata-server/examples/python
   python3 rendezvous-lib.py
 }
@@ -146,18 +152,28 @@ remote_deploy() {
     scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "${EC2_USERNAME}@$hostname:rendezvous"
     echo "(3/6) Copied project"
 
-    cmd="sudo chmod 700 *.sh"
+    cmd="cd rendezvous && sudo chmod 777 *.sh"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "(4/6) Granted access to rendezvous scripts"
 
-    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname"
-    sudo ./deps.sh
-    echo "(5/6) Installed dependencies"
+    cmd="cd rendezvous && ./deps.sh"
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
+    echo "(5/6) Installed Rendezvous dependencies"
 
-    ssh -i "$ssh_key" "${EC2_USERNAME}@$hostname"
-    sudo ./rendezvous.sh local build
-    exit
-    echo "(6/6) Built metadata server"
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname"
+    # -------------------------
+    # RUN THIS COMMAND MANUALLY
+    # cd rendezvous && ./rendezvous.sh local build
+    # -------------------------
+    echo "(6/6) Built Rendezvous project"
+
+    cmd="sudo apt-get update -y && sudo apt install docker.io docker-compose awscli -y"
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
+    echo "Installed AWS CLI"
+
+    cmd="sudo apt-get update -y && sudo apt install docker.io docker-compose awscli -y"
+    scp -i $ssh_key -r ~/.aws ${EC2_USERNAME}@${hostname}:.aws
+    echo "Copied AWS credentials"
 
     echo ""
     echo done!
@@ -168,37 +184,51 @@ remote_update() {
     ssh_key=$2
     region=$3
 
-    scp -i "$ssh_key" metadata-server/config.json "${EC2_USERNAME}@$hostname:rendezvous/metadata-server"
-    echo "Copied config files to '$region' instance"
+    ./rendezvous.sh local clean
+    echo "Cleaned local cmake files"
+
+    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "${EC2_USERNAME}@$hostname:rendezvous"
+    echo "Copied project to '$region' instance @ $hostname"
+
+    scp -i "$ssh_key" metadata-server/config/connections/remote.json "${EC2_USERNAME}@$hostname:rendezvous/metadata-server/config/connections/remote.json"
+    echo "Copied Rendezvous config to '$region' instance @ $hostname"
+
+    cmd="cd rendezvous && ./rendezvous.sh local build"
+    ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
+    echo "Built Rendezvous config! in '$region' instance @ $hostname"
 
     if [ $region != "eu" ]; then
-        scp -i "$ssh_key" datastore-monitor/config/* "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor/config"
-        echo "Copied connections-$region.yaml file to '$region' instance"
+        scp -i "$ssh_key" datastore-monitor/config/connections.yaml "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor/config/connections.yaml"
+        echo "Copied connections-$region.yaml file to '$region' @ $hostname"
 
         scp -i "$ssh_key" -r datastore-monitor/*.py "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor"
-        echo "Copied python code to '$region' instance"
+        echo "Copied python code to '$region' instance @ $hostname"
     fi
 }
 
+# Useful Commands to verify manually
+# fuser -v -n tcp 8001
+# fuser -k 8002/tcp
+# python3 main.py -r us -d dynamo
 remote_start() {
     hostname=$1
     ssh_key=$2
     region=$3
     datastore=$4
 
-    cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build"
+    cmd="cd rendezvous && ./rendezvous.sh local build"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
     echo "Built project"
 
-    cmd="cd rendezvous/metadata-server && ./rendezvous.sh local build && ./rendezvous.sh local run server $region remote.json"
+    cmd="cd rendezvous && ./rendezvous.sh local build && ./rendezvous.sh local run server $region remote.json"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
-    echo "Started rendezvous server in '$region' instance"
+    echo "Started rendezvous server in '$region' instance @ $hostname"
 
     # datastore monitor only runs in the secondary region
     if [ $region != "eu" ]; then
         cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
         ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
-        echo "Started client process in '$region' instance"
+        echo "Started datastore monitor process in '$region' instance @ $hostname"
     fi
 }
 
@@ -333,8 +363,8 @@ elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "build" ] && [ $3 = "--py" ]; 
   local_build_py
 elif [ "$#" -eq 5 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "server" ]; then
   local_run_server $4 $5
-elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "rdv-lib" ]; then
-  local_run_rdv_lib
+elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "rv-lib" ]; then
+  local_run_rv_lib
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "client" ]; then
   local_run_client
 elif [ "$#" -eq 3 ] && [ $1 = "local" ] && [ $2 = "run" ] && [ $3 = "monitor" ]; then
@@ -348,7 +378,7 @@ elif [ "$#" -eq 2 ] && [ $1 = "remote" ] && [ $2 = "deploy" ]; then
   remote_deploy $HOSTNAME_EU $SSH_KEY_EU
 elif [ "$#" -eq 2 ] && [ $1 = "remote" ]  && [ $2 = "update" ]; then
   remote_update $HOSTNAME_EU $SSH_KEY_EU eu
-  remote_update $HOSTNAME_EU $SSH_KEY_EU us
+  remote_update $HOSTNAME_US $SSH_KEY_US us
 elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ "$2" = "start" ]; then
   remote_start $HOSTNAME_EU $SSH_KEY_EU eu
   case "$3" in 

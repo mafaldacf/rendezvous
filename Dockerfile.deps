@@ -34,6 +34,23 @@ RUN cd /tmp/ ;\
     cd /tmp/ ;\
     rm -rf grpc
 
+# Install python3 and pip3
+RUN apt update ;\
+    apt install -y python3 python3-pip python3-dev
+
+# Install GTest
+ARG GTEST_VERSION=1.13.0
+RUN cd /tmp/ ;\
+    git clone https://github.com/google/googletest.git -b v${GTEST_VERSION} ;\
+    cd googletest ;\
+    mkdir build ;\
+    cd build ;\
+    cmake .. -DBUILD_GMOCK=OFF ;\
+    make ;\
+    make install ;\
+    cd /tmp/ ;\
+    rm -rf googletest
+
 # Install JSON for C++
 ARG JSON_VERSION=3.11.2
 RUN cd /tmp/ ;\
@@ -45,20 +62,6 @@ RUN cd /tmp/ ;\
     cmake --install .;\
     cd /tmp/ ;\
     rm -rf json
-
-ARG GTEST_VERSION=1.13.0
-
-# Install GTest
-RUN cd /tmp/ ;\
-    git clone https://github.com/google/googletest.git -b v${GTEST_VERSION} ;\
-    cd googletest ;\
-    mkdir build ;\
-    cd build ;\
-    cmake .. -DBUILD_GMOCK=OFF ;\
-    make ;\
-    make install ;\
-    cd /tmp/ ;\
-    rm -rf googletest
 
 # Install spdlog
 ARG SPDLOG_VERSION=1.11.0
@@ -72,6 +75,16 @@ RUN cd /tmp/ ;\
     cd /tmp/ ;\
     rm -rf spdlog
 
-# Install python3 and pip3
-RUN apt update ;\
-    apt install -y python3 python3-pip python3-dev
+# Install oneAPI
+ARG ONEAPI_VERSION=2021.11.0-rc1
+RUN cd /tmp/ ;\
+    git clone -b v${ONEAPI_VERSION} https://github.com/oneapi-src/oneTBB ;\
+    cd oneTBB ;\
+    mkdir build ;\
+    cd build ;\
+    cmake -DCMAKE_INSTALL_PREFIX=$MY_INSTALL_DIR -DTBB_TEST=OFF .. ;\
+    cmake --build . ;\
+    cmake --install . ;\
+    rm -rf oneTBB
+
+RUN pip install pyyaml boto3 grpcio grpcio-tools pymysql redis

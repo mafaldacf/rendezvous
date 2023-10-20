@@ -5,145 +5,141 @@ package rendezvous;
 service ClientService {
   /* Streaming */
   rpc Subscribe(SubscribeMessage) returns (stream SubscribeResponse);
-
   /* Unary RPCs */
   rpc RegisterRequest(RegisterRequestMessage) returns (RegisterRequestResponse);
   rpc RegisterBranch(RegisterBranchMessage) returns (RegisterBranchResponse);
-  rpc RegisterBranchesDatastores(RegisterBranchesDatastoresMessage) returns (RegisterBranchesDatastoresResponse);
+  rpc RegisterBranches(RegisterBranchesMessage) returns (RegisterBranchesResponse);
   rpc CloseBranch(CloseBranchMessage) returns (Empty);
   rpc WaitRequest(WaitRequestMessage) returns (WaitRequestResponse);
-  rpc CheckRequest(CheckRequestMessage) returns (CheckRequestResponse);
-  rpc CheckRequestByRegions(CheckRequestByRegionsMessage) returns (CheckRequestByRegionsResponse);
+  rpc CheckStatus(CheckStatusMessage) returns (CheckStatusResponse);
+  rpc FetchDependencies(FetchDependenciesMessage) returns (FetchDependenciesResponse);
 }
 
 /* Helpers */
-
 enum RequestStatus {
-  OPENED = 0;
-  CLOSED = 1;
+  CLOSED = 0;
+  OPENED = 1;
   UNKNOWN = 2;
 }
-
 message Empty {
 
 }
 
 /* Metadata for server replication */
-
 message RequestContext {
-  map<string, int32> versions = 1;
+  string current_service = 1;
+  string async_zone = 2;
+  int32 num_sub_zones = 3;
 }
 
 /* Publish-Subscribe */
-
 message SubscribeMessage {
   string service = 1;
   string region = 2;
 }
-
 message SubscribeResponse {
   string bid = 1;
   string tag = 2;
 }
 
 /* Register Request */
-
 message RegisterRequestMessage {
   string rid = 1;
 }
-
 message RegisterRequestResponse {
   string rid = 1;
-  RequestContext context = 2;
+}
+
+/* Registers Branch */
+message RegisterBranchMessage {
+  string rid = 1;
+  string bid = 2;
+  string service = 3;
+  string tag = 4;
+  repeated string regions = 5;
+  bool monitor = 6;
+  string async_zone = 7;
+  string current_service_bid = 8;
+}
+message RegisterBranchResponse {
+  string rid = 1;
+  string bid = 2;
 }
 
 /* Registers Branches */
 
-message RegisterBranchMessage {
-  string rid = 1;
-  string service = 2;
-  string tag = 3;
-  repeated string regions = 4;
-  RequestContext context = 5;
+message Branch {
+  string service = 1;
+  string tag = 2;
+  repeated string regions = 3;
+  string async_zone = 4;
+  string current_service_bid = 5;
 }
 
-message RegisterBranchResponse {
+message RegisterBranchesMessage {
   string rid = 1;
-  string bid = 2;
-  RequestContext context = 3;
+  repeated Branch branches = 2;
+  string current_service = 3;
+}
+
+message RegisterBranchesResponse {
+  string rid = 1;
+  repeated string bids = 2;
 }
 
 /* Register Branches - SERVERLESS VERSION */
-
 message DatastoreBranching {
   string datastore = 1;
   string tag = 2;
   repeated string regions = 3;
 }
 
-message RegisterBranchesDatastoresMessage {
-  string rid = 1;
-  repeated string datastores = 2;
-  repeated string regions = 3;
-  repeated string tags = 4;
-  repeated DatastoreBranching branches = 5;
-  RequestContext context = 6;
-}
-
-message RegisterBranchesDatastoresResponse {
-  string rid = 1;
-  repeated string bids = 2;
-  RequestContext context = 3;
-}
-
 /* Close Branch */
-
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
-  RequestContext context = 3;
 }
 
-/* Wait Request */
-
+/* Wait */
 message WaitRequestMessage {
   string rid = 1;
   string service = 2;
-  string region = 3;
-  string tag = 4;
-  int32 timeout = 5;
-  //bool async = 6;
-  RequestContext context = 7;
+  repeated string services = 3;
+  string region = 4;
+  string tag = 5;
+  int32 timeout = 6;
+  bool wait_deps = 7;
+  string current_service = 8;
+  string async_zone = 9;
 }
-
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
   bool timed_out = 2;
 }
 
-/* Check Request */
-
-message CheckRequestMessage {
+/* Check Status */
+message CheckStatusMessage {
   string rid = 1;
   string service = 2;
   string region = 3;
   bool detailed = 4;
-  RequestContext context = 5;
+  string async_zone = 5;
 }
 
-message CheckRequestResponse {
+message CheckStatusResponse {
   RequestStatus status = 1;
+  map<string, RequestStatus> tagged = 2;
+  map<string, RequestStatus> regions = 3;
 }
 
-/* Check Request by Regions */
-
-message CheckRequestByRegionsMessage {
+/* Check Dependencies */
+message FetchDependenciesMessage {
   string rid = 1;
   string service = 2;
-  bool detailed = 3;
-  RequestContext context = 4;
+  string async_zone = 3;
 }
 
-message CheckRequestByRegionsResponse {
-  map<string, RequestStatus> statuses = 1;
+message FetchDependenciesResponse {
+  repeated string deps = 1;
+  repeated string indirect_deps = 2;
 }

@@ -25,19 +25,21 @@ namespace replicas {
                 std::vector<std::unique_ptr<grpc::ClientContext>> contexts;
                 std::vector<std::unique_ptr<rendezvous_server::Empty>> responses;
                 std::vector<std::unique_ptr<grpc::ClientAsyncResponseReader<rendezvous_server::Empty>>> rpcs;
+                std::mutex mutex;
             } AsyncRequestHelper;
 
         private:
             std::vector<std::shared_ptr<rendezvous_server::ServerService::Stub>> _servers;
+            void saveAsyncCall(AsyncRequestHelper &req_helper, grpc::ClientContext * context, grpc::Status * status, rendezvous_server::Empty * response);
 
             /* Helpers */
             void _doRegisterRequest(const std::string& rid);
             void _doRegisterBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
+                const rendezvous_server::RequestContext& ctx_replica);
             void _doCloseBranch(const std::string& root_rid, const std::string& core_bid, const std::string& region, 
-                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
+                const rendezvous_server::RequestContext& ctx_replica);
             
 
         public:
@@ -68,13 +70,12 @@ namespace replicas {
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param monitor If enabled, we publish the branch for datastore monitor subscribers
-             * @param ctx Context propagated by the client
              * @param ctx_replica Context targeted ot the replica
              */
             void registerBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
-                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
+                const rendezvous_server::RequestContext& ctx_replica);
 
             /**
              * Send close branch call to all replicas
@@ -82,11 +83,10 @@ namespace replicas {
              * @param root_rid The identifier of the root request
              * @param core_bid bid The identifier of the set of branches generated when the branch was registered (without rid)
              * @param region The region where the branch was registered
-             * @param ctx Context propagated by the client
              * @param ctx_replica Context targeted ot the replica
              */
             void closeBranch(const std::string& root_rid, const std::string& core_bid, const std::string& region, 
-                const rendezvous::RequestContext& ctx, const rendezvous_server::RequestContext& ctx_replica);
+                const rendezvous_server::RequestContext& ctx_replica);
 
             /**
              * Add wait call to log entry (asynchronous broadcast)

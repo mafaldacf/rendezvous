@@ -33,6 +33,7 @@ namespace metadata {
 
 
         public:
+            std::atomic<bool> replicated;
             Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions);
             Branch(std::string service, std::string tag, std::string async_zone_id);
 

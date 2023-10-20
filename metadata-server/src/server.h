@@ -51,7 +51,9 @@ namespace rendezvous {
             
             // <rid, request_ptr>
             std::shared_mutex _mutex_requests;
+            std::shared_mutex _mutex_closed_requests;
             std::unordered_map<std::string, metadata::Request*> _requests;
+            std::unordered_map<std::string, metadata::Request*> _closed_requests;
 
             // <service w/ tag, <region, subscriber_ptr>>
             std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>> _subscribers;
@@ -162,6 +164,14 @@ namespace rendezvous {
             metadata::Request * getRequest(const std::string& rid);
 
             /**
+             * Tr
+             * 
+             * @param rid Request identifier
+             * @return Request if found, otherwise return nullptr
+             */
+            metadata::Request * tryGetClosedRequest(const std::string& rid);
+
+            /**
              * Get request according to the provided identifier or register request if not registered yet
              * 
              * @param rid Request identifier
@@ -172,7 +182,7 @@ namespace rendezvous {
             // helper for GTest: it calls registerBranch method
             std::string registerBranchGTest(metadata::Request * request, 
                 const std::string& async_zone_id, const std::string& service, 
-                const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service);
+                const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service_bid);
 
             /**
              * Register new branch for a given request
@@ -181,14 +191,14 @@ namespace rendezvous {
              * @param service The service context
              * @param regions The regions context
              * @param tag The service tag
-             * @param current_service The parent service in the dependency graph
+             * @param current_service_bid The parent service in the dependency graph
              * @param monitor Monitor branch by publishing identifier to subscribers
              * @param bid The set of branches identifier: empty if request is from client
              * @return 
              * - The new identifier (core_bid) of the set of branches 
              * - Or empty if an error ocurred (branches already exist with bid)
              */
-            bool registerBranch(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
+            metadata::Branch * registerBranch(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
                 const std::string& bid, bool monitor);
 
