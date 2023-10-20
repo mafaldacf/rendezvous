@@ -1,6 +1,7 @@
 import boto3
 from boto3.dynamodb.conditions import Key
 import botocore.exceptions
+import time
 
 class ShimDynamo:
   def __init__(self, region, client_table):
@@ -10,10 +11,11 @@ class ShimDynamo:
   def find_metadata(self, bid):
     response = self.client_table.query(            
       IndexName='rv_bid-index',
-      KeyConditionExpression=Key('rv_bid').eq(bid),     
+      KeyConditionExpression=Key('rv_bid').eq(bid),
+      
     )
     if 'Items' in response and len(response['Items']) > 0:
       return True
     
-    print("[DEBUG] [DynamoDB] Item not found :(", response)
+    #print(f"[DEBUG] [DynamoDB] Item not found: {response}", response)
     return False

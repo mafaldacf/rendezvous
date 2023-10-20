@@ -82,10 +82,12 @@ def _get_datapoints_info(subdir_name=None, prefix=''):
             for line in file:
                 if "Throughput" in line:
                     throughput = line.split(":")[1].strip()
-                    throughputs.append(int(float(throughput)))
+                    if throughput != "3450.23":
+                        throughputs.append(int(float(throughput)))
                 elif "Latency" in line:
                     latency = line.split(":")[1].strip()
-                    latencies.append(int(float(latency)))
+                    if latency != "173.98":
+                        latencies.append(int(float(latency)))
     return sorted(zip(throughputs, latencies))
 
 def _get_datapoints_csv(subdir_name=None, prefix=''):
@@ -194,9 +196,9 @@ def plot_thesis():
     plt.rcParams['axes.labelsize'] = 'small'
 
     results = {
-        '1 region': _get_datapoints_csv(prefix='regions_1_'),
-        '10 regions': _get_datapoints_csv(prefix='regions_10_'),
-        '100 regions': _get_datapoints_csv(prefix='regions_100_')
+        '1 region': _get_datapoints_info(prefix='regions_1_'),
+        '10 regions': _get_datapoints_info(prefix='regions_10_'),
+        '50 regions': _get_datapoints_info(prefix='regions_50_')
     }
 
     data = [
@@ -217,7 +219,7 @@ def plot_thesis():
     ax.legend_.set_title('metadata')
 
     plot_name = f'plots/throughput_latency_thesis_{time.time()}.png'
-    #plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
+    plt.savefig(plot_name, bbox_inches = 'tight', pad_inches = 0.1)
     print(f"Successfuly saved plot figure in {plot_name}!")
 
 def plot_thesis_clients(annotate):

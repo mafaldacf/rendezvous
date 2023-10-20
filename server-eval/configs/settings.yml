@@ -9,10 +9,10 @@
 # --------------------------------------------------------------------------------------------
 
 # recommended to have a dedicated subfolder inside 'results'
-results_dir: "results/thesis-final"
+results_dir: "results/thesis"
 # make sure key has at least 500 permissions and we have the full path
 ssh_key_path: "/home/mafaldacf/.ssh/rendezvous-eu.pem"
 
-clients_ip: ["35.157.70.56"]
-server_ip: "18.184.13.144"
+clients_ip: ["3.72.254.32", "3.70.217.238", "3.70.250.51", "3.72.11.231", "18.194.33.59"]
+server_ip: "18.156.136.126"
 server_port: 8001

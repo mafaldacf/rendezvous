@@ -1,9 +1,0 @@
-Client 0 @ 3.67.100.216: {'requests': 719529, 'responses': 719529, 'throughput': 4796.86, 'avg_latency': 41.72}
-----------------------------
-Duration: 150
-Clients: 1
-Threads per Client: 200
-Requests: 719529
-Responses: 719529 (100.0%)
-Throughput (req/s): 4796.86
-Latency (ms): 41.72

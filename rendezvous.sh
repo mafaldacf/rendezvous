@@ -10,8 +10,8 @@ SERVER_PORT_US=8002
 SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
 SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 # dynamic for each instance
-HOSTNAME_EU="18.156.136.71"
-HOSTNAME_US="3.88.174.92"
+HOSTNAME_EU="18.185.131.39"
+HOSTNAME_US="34.238.85.154"
 
 # -----------------
 # Docker deployment
@@ -187,7 +187,7 @@ remote_update() {
     ./rendezvous.sh local clean
     echo "Cleaned local cmake files"
 
-    scp -i "$ssh_key" -r metadata-server/ datastore-monitor/ server-eval/ rendezvous.sh deps.sh  "${EC2_USERNAME}@$hostname:rendezvous"
+    scp -i "$ssh_key" -r metadata-server/ rendezvous.sh deps.sh  "${EC2_USERNAME}@$hostname:rendezvous"
     echo "Copied project to '$region' instance @ $hostname"
 
     scp -i "$ssh_key" metadata-server/config/connections/remote.json "${EC2_USERNAME}@$hostname:rendezvous/metadata-server/config/connections/remote.json"
@@ -198,17 +198,15 @@ remote_update() {
     echo "Built Rendezvous config! in '$region' instance @ $hostname"
 
     if [ $region != "eu" ]; then
-        scp -i "$ssh_key" datastore-monitor/config/connections.yaml "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor/config/connections.yaml"
-        echo "Copied connections-$region.yaml file to '$region' @ $hostname"
-
-        scp -i "$ssh_key" -r datastore-monitor/*.py "${EC2_USERNAME}@$hostname:rendezvous/datastore-monitor"
-        echo "Copied python code to '$region' instance @ $hostname"
+        scp -i "$ssh_key" -r datastore-monitor/ "${EC2_USERNAME}@$hostname:rendezvous"
+        echo "Copied datastore-monitor folder to '$region' @ $hostname"
     fi
 }
 
 # Useful Commands to verify manually
 # fuser -v -n tcp 8001
 # fuser -k 8002/tcp
+# ./rendezvous.sh local run server eu remote.json
 # python3 main.py -r us -d dynamo
 remote_start() {
     hostname=$1
@@ -224,11 +222,11 @@ remote_start() {
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
     echo "Started rendezvous server in '$region' instance @ $hostname"
 
-    # datastore monitor only runs in the secondary region
+    #datastore monitor only runs in the secondary region
     if [ $region != "eu" ]; then
-        cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
-        ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
-        echo "Started datastore monitor process in '$region' instance @ $hostname"
+      cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
+      ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
+      echo "Started datastore monitor process in '$region' instance @ $hostname"
     fi
 }
 
@@ -391,7 +389,7 @@ elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ "$2" = "start" ]; then
   esac
 elif [ "$#" -eq 2 ] && [ $1 = "remote" ]  && [ $2 = "stop" ]; then
   remote_stop $HOSTNAME_EU $SSH_KEY_EU eu $SERVER_PORT_EU
-  remote_stop $HOSTNAME_EU $SSH_KEY_EU us $SERVER_PORT_US
+  remote_stop $HOSTNAME_US $SSH_KEY_US us $SERVER_PORT_US
 # ------
 # DOCKER
 # ------

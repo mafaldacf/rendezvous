@@ -299,6 +299,14 @@ def deploy_clients():
             exit(-1)
     print("done!")
 
+def stop_clients():
+    for client_id, client_hostname in enumerate(CLIENTS_IP):
+        client = _ssh_connect(client_hostname)
+        print(f"[STOP] Stopping client {client_id} @ {client_hostname}")
+        # kill existing python programs from previous interrupted executions
+        client.exec_command("pkill -9 python")
+    print("done!")
+
 def _restart_server_native(client):
     # if we want to manually debug the server output
     # connect to the tmux session with:
@@ -392,6 +400,8 @@ if __name__ == '__main__':
     restart_server_parser = command_parser.add_parser('restart-server', help="Restart server")
     restart_server_parser.add_argument('-d', '--docker', action='store_true', help="Run server on docker container")
 
+    stop_clients_parser = command_parser.add_parser('stop-clients', help="Stop clients")
+
     deploy_server_parser = command_parser.add_parser('deploy-server', help="Deploy remote server")
     deploy_server_parser.add_argument('-d', '--docker', action='store_true', help="Run server on docker container")
 
@@ -411,7 +421,7 @@ if __name__ == '__main__':
             exit(-1)        
 
     function_name = command.replace('-', '_')
-    if command in ['restart-server', 'deploy-clients', 'deploy-server']:
+    if command in ['restart-server', 'deploy-clients', 'deploy-server', 'stop-clients']:
         evalClient = EvalClient()
         getattr(sys.modules[__name__], function_name)(**args)
     else:

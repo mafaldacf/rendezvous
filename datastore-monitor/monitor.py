@@ -58,7 +58,7 @@ class DatastoreMonitor:
         for response in reader:
           bid = response.bid
           tag = response.tag
-          print(f"[DEBUG] Subcription: received bid: {bid}", flush=True)
+          #print(f"[DEBUG] Subcription: received bid: {bid}", flush=True)
           with lock:
             bids.add((bid, tag))
             cond.notify_all()
@@ -75,21 +75,20 @@ class DatastoreMonitor:
     while self.running:
       with lock:
         while len(bids) == 0 and self.running:
-          print(f"[DEBUG] Closure: waiting for bids...", flush=True)
+         #print(f"[DEBUG] Closure: waiting for bids...", flush=True)
           cond.wait()
-        print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
+       #print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
         copy = bids.copy()
 
       closed = []
       for bid, tag in copy:
         try:
           if self.shim_layers[tag].find_metadata(bid):
-            print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
+           #print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
             self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
             closed.append((bid, tag))
-          else:
-            time.sleep(2)
-
+          #else:
+           #print(f"[DEBUG] Bid not found {bid}")
         except grpc.RpcError as e:
           print(f"[ERROR] Failure closing branches: {e.details()}", flush=True)
           if not self._handle_grpc_error(e.code(), e.details()):

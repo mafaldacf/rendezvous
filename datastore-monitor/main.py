@@ -59,7 +59,7 @@ def init_monitor(datastore, region):
         '': SHIM_LAYERS[datastore](**info_datastore) # empty tag for testing purposes
     }
     monitor = DatastoreMonitor(shim_layers, rendezvous_address, client_config['service'], region)
-    print(f'> Starting datastore monitor for {datastore}')
+    print(f'> Starting datastore monitor for {datastore} @ {region}')
     monitor.monitor_branches()
 
 if __name__ == '__main__':

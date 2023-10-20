@@ -6,14 +6,15 @@ class ShimS3:
     self.bucket = bucket
     self.s3_client = boto3.client('s3')
     self.rendezvous_path = rendezvous_path
+    print(f"Starting S3 Shim for bucket {self.bucket} and rendezvous path {self.rendezvous_path}")
 
   def _bucket_key_rendezvous(self, bid):
     return f"{self.rendezvous_path}/{bid}"
 
   def _find_object(self, bid, obj_key, metadata_created_at):
     try:
-      response = self.s3_client.head_object(Bucket=self.bucket, Key=obj_key)
-      print(f"[DEBUG] Found object: {response}", flush=True)
+      self.s3_client.head_object(Bucket=self.bucket, Key=obj_key)
+      #print(f"[DEBUG] Found object: {response}", flush=True)
       return True
       
     except botocore.exceptions.ClientError as e:

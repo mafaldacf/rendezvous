@@ -11,14 +11,14 @@ mysql:
   db: antipode
   client_table: blobs-rendezvous
 dynamo:
-  region: eu-central-1
+  region: us-east-1
   client_table: blobs-rendezvous
 s3:
   bucket_region_eu-central-1: antipode-lambda-posts-eu-rendezvous
   bucket_region_us-east-1: antipode-lambda-posts-us-rendezvous
   rendezvous_path: rendezvous
 cache:
-  host_region_eu-central-1: antipode-lambda-writer-001.gwkjt4.0001.euc1.cache.amazonaws.com
-  host_region_us-east-1: antipode-lambda-reader-001.7jax8t.0001.use1.cache.amazonaws.com
+  host_region_eu-central-1: antipode-lambda-eu.gwkjt4.ng.0001.euc1.cache.amazonaws.com
+  host_region_us-east-1: antipode-lambda-us.7jax8t.ng.0001.use1.cache.amazonaws.com
   port: 6379
   rendezvous_prefix: rendezvous
