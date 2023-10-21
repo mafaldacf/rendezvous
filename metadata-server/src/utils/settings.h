@@ -21,7 +21,7 @@ namespace utils {
     /* -------------------------------- */
     static bool ASYNC_REPLICATION = true;
     static bool CONTEXT_VERSIONING = false;
-    static int WAIT_REPLICA_TIMEOUT_S = 15;
+    static int WAIT_REPLICA_TIMEOUT_S = 60;
     
     /* --------------------------- */
     /* parsed values from env vars */

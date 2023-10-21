@@ -102,7 +102,7 @@ void Server::publishBranches(const std::string& service, const std::string& tag,
   // found subscriber in certain regions
   if (it_regions != _subscribers.end()) {
     for (const auto& subscriber : it_regions->second) {
-      //spdlog::debug("publishing branch '{}' for service '{}' in region '{}'", bid.c_str(), service.c_str(), it_regions->first);
+      ////spdlog::debug("publishing branch '{}' for service '{}' in region '{}'", bid.c_str(), service.c_str(), it_regions->first);
       subscriber.second->push(bid, tag);
     }
   }
@@ -322,9 +322,9 @@ std::string Server::registerBranchGTest(metadata::Request * request,
 metadata::Branch * Server::registerBranch(metadata::Request * request, 
   const std::string& async_zone_id, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service_bid, 
-  const std::string& bid, bool monitor) {
+  const std::string& bid, bool monitor, bool replicated) {
 
-  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service_bid);
+  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service_bid, replicated);
   // unexpected error
   if (!branch) {
     return branch;
@@ -383,7 +383,7 @@ int Server::wait(metadata::Request * request, const std::string& async_zone_id,
     result = request->wait(async_zone_id, async, timeout, current_service);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
-  spdlog::debug("PREVENTED INCONSISTENCY? RESULT = {}", result);
+  //spdlog::debug("PREVENTED INCONSISTENCY? RESULT = {}", result);
   if (result == 1) {
     _prevented_inconsistencies.fetch_add(1);
   }

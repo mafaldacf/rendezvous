@@ -200,7 +200,7 @@ namespace rendezvous {
              */
             metadata::Branch * registerBranch(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
-                const std::string& bid, bool monitor);
+                const std::string& bid, bool monitor, bool replicated = false);
 
             /**
              * Close a branch according to its identifier

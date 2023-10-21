@@ -8,8 +8,8 @@ ServerServiceImpl::ServerServiceImpl(std::shared_ptr<rendezvous::Server> server,
 }
 
 grpc::Status ServerServiceImpl::RegisterRequest(grpc::ServerContext* context, const rendezvous_server::RegisterRequestMessage* request, rendezvous_server::Empty* response) {
-  if (!_consistency_checks) return grpc::Status::OK;
-  spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
+  //if (!_consistency_checks) return grpc::Status::OK;
+  //spdlog::trace("> [REPLICATED RR] register request '{}'", request->rid());
 
   metadata::Request * rv_request;
   std::string rid = request->rid();
@@ -21,7 +21,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const rendezvous_server::RegisterBranchMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& service = request->service();
   const std::string& tag = request->tag();
@@ -32,7 +32,7 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   bool monitor = request->monitor();
   int num = request->regions().size();
 
-  spdlog::trace("> [REPLICATED RB: {}] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
+  //spdlog::trace("> [REPLICATED RB: {}] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
@@ -53,10 +53,10 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     //spdlog::debug("> [APPLIED REPL RB: {}:{}:{}] sid: {}, version {}", rid, service, tag, replica_ctx.sid(), replica_ctx.version());
   }
   else {
-    _server->registerBranch(rv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor);
+    _server->registerBranch(rv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor, true);
   }
 
-  spdlog::trace("< [REPLICATED RB: {}] registered #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
+  //spdlog::trace("< [REPLICATED RB: {}] registered #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
 
   return grpc::Status::OK;
 }
@@ -65,13 +65,13 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
   const rendezvous_server::CloseBranchMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
   const std::string& core_bid = request->core_bid();
   const std::string& region = request->region();
   
-  spdlog::trace("> [REPLICATED CB: {}] closing branch on region '{}' for ids {}:{}", rid, region, core_bid, rid);
+  //spdlog::trace("> [REPLICATED CB: {}] closing branch on region '{}' for ids {}:{}", rid, region, core_bid, rid);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
@@ -95,7 +95,7 @@ grpc::Status ServerServiceImpl::CloseBranch(grpc::ServerContext* context,
     spdlog::critical("< [REPLICATED CB: {}] Error: region '{}' not found for branch for ids {}:{}", rid, region, core_bid, rid);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REGION);
   }
-  spdlog::trace("< [REPLICATED CB: {}] closed branch on region '{}' for ids {}:{}", rid, region, core_bid, rid);
+  //spdlog::trace("< [REPLICATED CB: {}] closed branch on region '{}' for ids {}:{}", rid, region, core_bid, rid);
   return grpc::Status::OK;
 }
 
@@ -103,13 +103,13 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
   const rendezvous_server::AddWaitLogMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
   const std::string& async_zone_id = request->async_zone();
   const std::string& target_service = request->target_service();
   
-  spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
+  //spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
@@ -140,14 +140,14 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
   const rendezvous_server::RemoveWaitLogMessage* request, 
   rendezvous_server::Empty* response) {
 
-  if (!_consistency_checks) return grpc::Status::OK;
+  //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
   const std::string& async_zone_id = request->async_zone();
   const std::string& current_service = request->context().current_service();
   const std::string& target_service = request->target_service();
   
-  spdlog::trace("> [BROADCASTED REMOVE WAIT] remove wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
+  //spdlog::trace("> [BROADCASTED REMOVE WAIT] remove wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {

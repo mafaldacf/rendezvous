@@ -73,13 +73,13 @@ message Branch {
   string tag = 2;
   repeated string regions = 3;
   string async_zone = 4;
-  string current_service_bid = 5;
+  bool monitor = 5;
 }
 
 message RegisterBranchesMessage {
   string rid = 1;
   repeated Branch branches = 2;
-  string current_service = 3;
+  string current_service_bid = 3;
 }
 
 message RegisterBranchesResponse {
@@ -98,6 +98,7 @@ message DatastoreBranching {
 message CloseBranchMessage {
   string bid = 1;
   string region = 2;
+  repeated string visible_bids = 3;
 }
 
 /* Wait */

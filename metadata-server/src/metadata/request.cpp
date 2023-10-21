@@ -1,4 +1,5 @@
 #include "request.h"
+#include "branch.h"
 #include <cstddef>
 #include <mutex>
 #include <shared_mutex>
@@ -79,18 +80,78 @@ std::string Request::genId() {
 // Helpers
 //------------
 
-bool Request::visibleBids(const utils::ProtoVec visible_bids) {
+void Request::setBranchReplicationReady(metadata::Branch * branch) {
+    if (utils::ASYNC_REPLICATION) {
+        std::unique_lock<std::mutex> lock(_mutex_replicated_bid);
+        branch->replicated.store(true);
+        _cond_replicated_bid.notify_all();
+    }
+}
+
+metadata::Branch * Request::_waitBranchRegistration(const std::string& bid) {
+    std::unique_lock<std::mutex> lock(_mutex_branches);
+    auto branch_it = _branches.find(bid);
+
+    // if we are dealing with async replication we wait until branch is registered
+    if (branch_it == _branches.end()) { 
+        if (utils::ASYNC_REPLICATION) {
+            auto start_time = std::chrono::steady_clock::now();
+            auto remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
+            while (branch_it == _branches.end()) {
+                _cond_new_branch.wait_for(lock, std::chrono::seconds(remaining_time));
+                remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
+                if (remaining_time <= std::chrono::seconds(0)) {
+                    // try one more time!
+                    branch_it = _branches.find(bid);
+                    if (branch_it != _branches.end()) {
+                        return branch_it->second;
+                    }
+                    return nullptr;
+                }
+                branch_it = _branches.find(bid);
+            }
+            return branch_it->second;
+        }
+        else {
+            return nullptr;
+        }
+    }
+    return branch_it->second;
+}
+
+metadata::Branch * Request::_waitBranchReplicationReady(const std::string& bid) {
+    // wait for creation
+    metadata::Branch * branch = _waitBranchRegistration(bid);
+    if (branch == nullptr) {
+        return nullptr;
+    }
+    
+    auto start_time = std::chrono::steady_clock::now();
+    auto remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
+    std::unique_lock<std::mutex> lock(_mutex_replicated_bid);
+    
+    // wait for actuall replication
+    while (branch->replicated.load() == false) {
+        _cond_replicated_bid.wait_for(lock, std::chrono::seconds(remaining_time));
+        if (remaining_time <= std::chrono::seconds(0)) {
+            return nullptr;
+        }
+        remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
+    }
+    return branch;
+}
+
+bool Request::waitBranchesReplicationReady(std::vector<std::string> visible_bids) {
     auto start_time = std::chrono::steady_clock::now();
     auto remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
 
-    
     for (const auto& bid: visible_bids) {
-        std::unique_lock<std::mutex> lock(_mutex_branches);
+        std::unique_lock<std::mutex> lock(_mutex_replicated_bid);
         auto branch_it = _branches.find(bid);
         
         // branches already exist
-        while (branch_it == _branches.end()) {
-            _cond_new_branch.wait_for(lock, std::chrono::seconds(remaining_time));
+        while (branch_it == _branches.end() || branch_it->second->replicated.load() == false) {
+            _cond_replicated_bid.wait_for(lock, std::chrono::seconds(remaining_time));
             if (remaining_time <= std::chrono::seconds(0)) {
                 return false;
             }
@@ -181,15 +242,19 @@ metadata::Request::AsyncZone * Request::_validateAsyncZone(const std::string& as
 //----------------------
 
 metadata::Branch * Request::registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service,  
-    const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service_bid) {
+    const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service_bid, bool replicated) {
+
+    //spdlog::debug("> register branch for {}:{} @ {}", service, tag, async_zone_id);
 
     std::string current_service = "";
 
     if (!current_service_bid.empty()) {
-        metadata::Branch * current_service_branch = _waitBranchRegistration(current_service_bid);
+        //spdlog::debug("> wait branch replication ready {}:{} @ {}", service, tag, async_zone_id);
+        metadata::Branch * current_service_branch = _waitBranchReplicationReady(current_service_bid);
         if (current_service_branch == nullptr) {
             return nullptr;
         }
+        //spdlog::debug("< wait branch replication ready {}:{} @ {}", service, tag, async_zone_id);
         current_service = current_service_branch->getService();
     }
 
@@ -208,64 +273,47 @@ metadata::Branch * Request::registerBranch(const std::string& async_zone_id, con
 
     // branch with specified regions
     if (num > 0) {
-        branch = new metadata::Branch(service, tag, async_zone_id, regions);
+        branch = new metadata::Branch(service, tag, async_zone_id, regions, replicated);
     }
 
     // no region specified - global region
     else {
         num = 1;
-        branch = new metadata::Branch(service, tag, async_zone_id);
+        branch = new metadata::Branch(service, tag, async_zone_id, replicated);
     }
 
+    //spdlog::debug("> insert async zone {}:{} @ {}", service, tag, async_zone_id);
     insertAsyncZone(async_zone_id);
+    //spdlog::debug("< insert async zone {}:{} @ {}", service, tag, async_zone_id);
 
     // error tracking branch (tag already exists!)
+    //spdlog::debug("> track {}:{} @ {}", service, tag, async_zone_id);
     if (!trackBranch(async_zone_id, service, regions, num, current_service, branch)) {
         spdlog::error("Error tracking branch with core bid '{}'", bid);
         delete branch;
+        //spdlog::debug("< track {}:{} @ {}", service, tag, async_zone_id);
         return nullptr;
     }
+    //spdlog::debug("< track {}:{} @ {}", service, tag, async_zone_id);
 
     lock.lock();
     _branches[bid] = branch;
+    
+    // notify threads waiting for replication ready
+    if (replicated) {
+        _cond_replicated_bid.notify_all();
+    }
     _cond_new_branch.notify_all();
     lock.unlock();
+
+    //spdlog::debug("< registered branch for {}:{} @ {}", service, tag, async_zone_id);
 
     return branch;
 }
 
-metadata::Branch * Request::_waitBranchRegistration(const std::string& bid) {
-    std::unique_lock<std::mutex> lock(_mutex_branches);
-    auto branch_it = _branches.find(bid);
-
-    // if we are dealing with async replication we wait until branch is registered
-    if (branch_it == _branches.end()) { 
-        if (utils::ASYNC_REPLICATION) {
-            auto start_time = std::chrono::steady_clock::now();
-            auto remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
-            while (branch_it == _branches.end()) {
-                _cond_new_branch.wait_for(lock, std::chrono::seconds(remaining_time));
-                remaining_time = _computeRemainingTime(utils::WAIT_REPLICA_TIMEOUT_S, start_time);
-                if (remaining_time <= std::chrono::seconds(0)) {
-                    // try one more time!
-                    branch_it = _branches.find(bid);
-                    if (branch_it != _branches.end()) {
-                        return branch_it->second;
-                    }
-                    return nullptr;
-                }
-                branch_it = _branches.find(bid);
-            }
-            return branch_it->second;
-        }
-        else {
-            return nullptr;
-        }
-    }
-    return branch_it->second;
-}
-
 int Request::closeBranch(const std::string& bid, const std::string& region) {
+    //spdlog::debug("> close branch for {} @ {}", bid, region);
+
     metadata::Branch * branch = _waitBranchRegistration(bid);
     if (branch == nullptr) {
         spdlog::error("branch '{}' not found", bid);
@@ -280,6 +328,7 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
         // abort: error in async_zones tbb map
         if (!untrackBranch(async_zone_id, service, region, globally_closed)) {
             branch->open(region);
+            spdlog::error("branch '{}' error untracking in async zone", bid);
             return -1;
         }
 
@@ -294,6 +343,7 @@ int Request::closeBranch(const std::string& bid, const std::string& region) {
     else {
         spdlog::error("Could not close branch with core bid '{}'", bid);
     }
+    //spdlog::debug("< close branch for {} @ {}", bid, region);
     return closed;
 }
 
@@ -760,7 +810,6 @@ int Request::wait(const std::string& async_zone_id, bool async, int timeout, con
         // services waiting on the current one (we give them priority)
         int offset_services = _numOpenedBranchesServiceLogs(current_service);
         int offset = async_zone->opened_branches.load() + offset_highest_async_zones + offset_services;
-        spdlog::debug("[WAIT: {}] waiting with total num opened = {}, offset = {} & {} & {}", _rid, _num_opened_branches.load(), async_zone->opened_branches.load(), offset_highest_async_zones, offset_services);
         if (_num_opened_branches.load() - offset != 0) {
             _cond_async_zones.wait_for(lock, std::chrono::seconds(remaining_time));
             inconsistency = 1;
@@ -771,19 +820,6 @@ int Request::wait(const std::string& async_zone_id, bool async, int timeout, con
             }
         }
         else {
-            std::unique_lock<std::shared_mutex> lock(_mutex_service_nodes);
-            auto it = _service_nodes.find("post-storage");
-            if (it == _service_nodes.end()) {
-                spdlog::debug("[BREAKING WAIT: {}] with total num = {}, offset = {} & {} & {}, INCONSISTENCY = {} NO SVC", _rid, _num_opened_branches.load(), async_zone->opened_branches.load(), offset_highest_async_zones, offset_services, inconsistency);
-                spdlog::debug("post-storage count = {}, compose-post count = {}, write-hometimeline count = {}", _service_nodes.count("post-storage"), _service_nodes.count("compose-post"), _service_nodes.count("write-home-timeline"));
-            }
-            else {
-                it->second->mutex.lock();
-                int n = it->second->opened_branches;
-                spdlog::debug("[BREAKING WAIT: {}] with total num = {}, offset = {} & {} & {}, INCONSISTENCY = {} , SVC = {}", _rid, _num_opened_branches.load(), async_zone->opened_branches.load(), offset_highest_async_zones, offset_services, inconsistency, n);
-                spdlog::debug("post-storage count = {}, compose-post count = {}, write-hometimeline count = {}", _service_nodes.count("post-storage"), _service_nodes.count("compose-post"), _service_nodes.count("write-home-timeline"));
-                it->second->mutex.unlock();
-            }
             break;
         }
     }

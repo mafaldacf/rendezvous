@@ -66,6 +66,9 @@ namespace metadata {
             } AsyncZone;
 
         private:
+            std::mutex _mutex_replicated_bid;
+            std::condition_variable _cond_replicated_bid;
+
             bool _closed;
             /* ----------- */
             /* async zones */
@@ -339,6 +342,16 @@ namespace metadata {
              * Partially delete request -- delete everything dynamically allocated except _service_nodes
              */
             void partialDelete();   
+
+            void setBranchReplicationReady(metadata::Branch * branch);
+
+            /**
+             * Check if bids are already visible
+             * 
+             * @param visible_bid Branch identifiers to be verified to be registered
+             * @return true if all bids are visible and false otherwise
+             */
+            metadata::Branch * _waitBranchReplicationReady(const std::string& visible_bid);
             
             /**
              * Check if bids are already visible
@@ -346,7 +359,7 @@ namespace metadata {
              * @param visible_bids Branch identifiers to be verified to be registered
              * @return true if all bids are visible and false otherwise
              */
-            bool visibleBids(const utils::ProtoVec visible_bids);
+            bool waitBranchesReplicationReady(std::vector<std::string> visible_bids);
 
             /**
              * Return timestamp of last modification
@@ -405,7 +418,7 @@ namespace metadata {
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
             metadata::Branch * registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service, 
-                const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service);
+                const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service_bid, bool replicated);
 
             /**
              * Remove a branch from the request
