@@ -10,8 +10,8 @@ SERVER_PORT_US=8002
 SSH_KEY_EU="~/.ssh/rendezvous-eu.pem"
 SSH_KEY_US="~/.ssh/rendezvous-us.pem"
 # dynamic for each instance
-HOSTNAME_EU="18.185.131.39"
-HOSTNAME_US="34.238.85.154"
+HOSTNAME_EU="18.153.73.84"
+HOSTNAME_US="52.90.115.7"
 
 # -----------------
 # Docker deployment
@@ -22,7 +22,7 @@ AWS_ACCOUNT_ID=851889773113
 usage() {
     echo "Usage:"
     echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rv-lib, monitor}"
-    echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql}, stop}"
+    echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql} [-ncc], stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
     echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
     exit 1
@@ -213,6 +213,7 @@ remote_start() {
     ssh_key=$2
     region=$3
     datastore=$4
+    ncc=$5
 
     cmd="cd rendezvous && ./rendezvous.sh local build"
     ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd
@@ -224,7 +225,7 @@ remote_start() {
 
     #datastore monitor only runs in the secondary region
     if [ $region != "eu" ]; then
-      cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore"
+      cmd="cd rendezvous/datastore-monitor && python3 main.py -r $region -d $datastore $ncc"
       ssh -o StrictHostKeyChecking=no -i "$ssh_key" "${EC2_USERNAME}@$hostname" $cmd >/dev/null 2>&1 &
       echo "Started datastore monitor process in '$region' instance @ $hostname"
     fi
@@ -377,11 +378,11 @@ elif [ "$#" -eq 2 ] && [ $1 = "remote" ] && [ $2 = "deploy" ]; then
 elif [ "$#" -eq 2 ] && [ $1 = "remote" ]  && [ $2 = "update" ]; then
   remote_update $HOSTNAME_EU $SSH_KEY_EU eu
   remote_update $HOSTNAME_US $SSH_KEY_US us
-elif [ "$#" -eq 3 ] && [ $1 = "remote" ]  && [ "$2" = "start" ]; then
+elif [ "$#" -ge 3 ] && [ $1 = "remote" ]  && [ $2 = "start" ]; then
   remote_start $HOSTNAME_EU $SSH_KEY_EU eu
   case "$3" in 
     "dynamo" | "s3" | "cache" | "mysql")
-      remote_start $HOSTNAME_US $SSH_KEY_US us $3
+      remote_start $HOSTNAME_US $SSH_KEY_US us $3 $4
       ;;
     *)
       exit_usage

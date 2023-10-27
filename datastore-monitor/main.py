@@ -51,15 +51,20 @@ def load_connections_config(datastore, region):
         rendezvous_address = info['rendezvous'][region]
         return info_datastore, rendezvous_address 
 
-def init_monitor(datastore, region):
+def init_monitor(datastore, region, no_consistency_checks):
     region = REGIONS_FULL_NAMES[region]
     client_config = load_client_config()
     info_datastore, rendezvous_address = load_connections_config(datastore, region)
     shim_layers = {
         '': SHIM_LAYERS[datastore](**info_datastore) # empty tag for testing purposes
     }
-    monitor = DatastoreMonitor(shim_layers, rendezvous_address, client_config['service'], region)
-    print(f'> Starting datastore monitor for {datastore} @ {region}')
+    monitor = DatastoreMonitor(shim_layers, rendezvous_address, client_config['service'], region, no_consistency_checks)
+
+    if no_consistency_checks:
+        print(f'> Starting datastore monitor for {datastore} @ {region} (no consistency checks)')
+    else:
+        print(f'> Starting datastore monitor for {datastore} @ {region}')
+
     monitor.monitor_branches()
 
 if __name__ == '__main__':
@@ -69,6 +74,9 @@ if __name__ == '__main__':
 
     region_group = parser.add_argument_group('Region')
     region_group.add_argument('-r', '--region', choices=REGIONS_FULL_NAMES.keys(), help='Specify the region', required=True)
+
+    # disable consistency checks
+    parser.add_argument('-ncc', '--no-consistency-checks', action='store_true', help="Disables consistency checks")
 
     args = vars(parser.parse_args())
     init_monitor(**args)

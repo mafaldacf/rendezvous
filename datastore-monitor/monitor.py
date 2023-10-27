@@ -6,7 +6,7 @@ from proto import rendezvous_pb2_grpc as rv
 import time
 
 class DatastoreMonitor:
-  def __init__(self, shim_layers, rendezvous_address, service, region):
+  def __init__(self, shim_layers, rendezvous_address, service, region, no_consistency_checks):
     self.running = True
     self.threads = []
     self.shim_layers = shim_layers
@@ -20,12 +20,20 @@ class DatastoreMonitor:
     # config values
     self.server_unavailable_sleep_time_s = 5
 
+    # consistency checks
+    self.consistency_checks = not no_consistency_checks
+
   def monitor_branches(self):
     lock = threading.Lock()
     cond = threading.Condition(lock=lock)
     bids = set()
     self.threads.append(threading.Thread(target=self._subscribe_branches, args=(bids, lock, cond)))
-    self.threads.append(threading.Thread(target=self._close_branches, args=(bids, lock, cond)))
+
+    if self.consistency_checks:
+      self.threads.append(threading.Thread(target=self._close_branches, args=(bids, lock, cond)))
+    else:
+      self.threads.append(threading.Thread(target=self._close_branches_no_consistency_checks, args=(bids, lock, cond)))
+
     for t in self.threads:
       t.start()
 
@@ -84,6 +92,35 @@ class DatastoreMonitor:
       for bid, tag in copy:
         try:
           if self.shim_layers[tag].find_metadata(bid):
+           #print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
+            self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
+            closed.append((bid, tag))
+          #else:
+           #print(f"[DEBUG] Bid not found {bid}")
+        except grpc.RpcError as e:
+          print(f"[ERROR] Failure closing branches: {e.details()}", flush=True)
+          if not self._handle_grpc_error(e.code(), e.details()):
+            closed.append((bid, tag)) # unexpected error occured and so we need to remove this (invalid) bid
+        except Exception as e:
+          print(f"[ERROR] Unexpected error while monitoring datastore: {e}", flush=True)
+          closed.append((bid, tag)) # unexpected error occured and so we need to remove this (invalid) bid
+
+      with lock:
+        for bid, tag in closed:
+          bids.remove((bid, tag))
+
+  def _close_branches_no_consistency_checks(self, bids, lock, cond):
+    while self.running:
+      with lock:
+        while len(bids) == 0 and self.running:
+         #print(f"[DEBUG] Closure: waiting for bids...", flush=True)
+          cond.wait()
+       #print(f"[DEBUG] Got {len(bids)} branches to close", flush=True)
+        copy = bids.copy()
+
+      closed = []
+      for bid, tag in copy:
+        try:
            #print(f"[DEBUG] Closing branch for bid = {bid}, service = {self.service}, region = {self.region}", flush=True)
             self.stub.CloseBranch(pb.CloseBranchMessage(bid=bid, region=self.region))
             closed.append((bid, tag))
