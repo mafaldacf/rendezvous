@@ -16,8 +16,9 @@ HOSTNAME_US="52.90.115.7"
 # -----------------
 # Docker deployment
 # -----------------
-DOCKER_REPOSITORY_USERNAME="mafaldacf"
+ECR_REPOSITORY_NAME="rendezvous"
 AWS_ACCOUNT_ID=851889773113
+AWS_REGION="eu-central-1"
 
 usage() {
     echo "Usage:"
@@ -255,9 +256,9 @@ remote_stop() {
 docker_build() {
   # Build and publish rendezvous docker image in AWS ECR
   docker build -t rendezvous .
-  aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com
-  docker tag rendezvous:latest ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
-  docker push 851889773113.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest
+  aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+  docker tag rendezvous:latest ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}:latest
+  docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}:latest
   echo ""
   echo done!
 }
@@ -287,11 +288,11 @@ docker_deploy() {
   echo "(3/4) Copied AWS credentials"
 
   # Pull rendezvous image
-  cmd="sudo docker login -u AWS -p $(aws ecr get-login-password --region eu-central-1) ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com"
+  cmd="sudo docker login -u AWS -p $(aws ecr get-login-password --region ${AWS_REGION}) ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
   ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
-  cmd="sudo docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest"
+  cmd="sudo docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/rendezvous:latest"
   ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
-  cmd="sudo docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.eu-central-1.amazonaws.com/rendezvous:latest rendezvous:latest"
+  cmd="sudo docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/rendezvous:latest rendezvous:latest"
   ssh -o StrictHostKeyChecking=no -i "${ssh_key}" "${EC2_USERNAME}@${hostname}" $cmd
   echo "(4/4) Pulled rendezvous docker image"
 
@@ -312,13 +313,14 @@ docker_start() {
     exit_usage
   fi
 
-  if [ $2 = "dynamo" ] || [ $2 = "s3" ] || [ $2 = "cache" ] || [ $2 = "mysql" ]; then
+  if [[ $2 == "dynamo" ]] || [[ $2 == "s3" ]] || [[ $2 == "cache" ]] || [[ $2 == "mysql" ]]; then
     db=${2}
   else
     exit_usage
   fi
 
   cmd="sudo docker-compose up -d --force-recreate metadata-server-${region} datastore-monitor-${db}-${region}"
+  echo ${cmd}
   ssh -o StrictHostKeyChecking=no -i $ssh_key ${EC2_USERNAME}@${hostname} $cmd
   echo "Rendezvous running @ ${hostname} (${1})"
 }
