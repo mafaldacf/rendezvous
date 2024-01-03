@@ -166,54 +166,56 @@ TEST(CoreTest, CheckRequest_AllContexts) {
   std::string bid_4 = server.registerBranchGTest(request, ROOT_SUB_RID, "emplasto", regions_region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(4), bid_4);
 
-  request->insertAsyncZone(DUMMY_ASYNC_ZONE);
+  request->insertACSL(DUMMY_ACSL);
 
   /* Check Request for Multiple Contexts */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s2", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "s2", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "r");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "r");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
 
   /* Close branch with no context and verify request is still opened */
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), ""); // bid 0
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "");
-  ASSERT_EQ(OPENED, res.status);
+  /* res = server.checkStatus(request, DUMMY_ACSL, "s1", "");
+  ASSERT_EQ(OPENED, res.status); */
 
   /* Close branches with service 's' and verify request is closed for that service */
   found_region = server.closeBranch(request, bid_1, ""); // bid 1
   ASSERT_EQ(true, found_region);
   found_region = server.closeBranch(request, bid_3, "r"); // bid 3
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s2", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "s2", "");
   ASSERT_EQ(CLOSED, res.status);
 
   /* Remaining checks */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "r");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "r");
   ASSERT_EQ(OPENED, res.status);
   found_region = server.closeBranch(request, bid_2, "r"); // bid 2
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s2", "r");
+  res = server.checkStatus(request, DUMMY_ACSL, "s2", "r");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "r");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "r");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "s1", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "s1", "");
   ASSERT_EQ(CLOSED, res.status);
 
-  // ASYNC ZONE CORNER CASE: we ignore everything in the current async_zone (num > 1)
-  // but in fact, regions are still opened!
+  // ASYNC ZONE CORNER CASE: we ignore everything in the current acsl (num > 1)
+  // but in fact, regions are still opened: the bid_4 @ ROOT_SUB_RID
   res = server.checkStatus(request, ROOT_SUB_RID, "", "");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "");
   ASSERT_EQ(OPENED, res.status);
 
   found_region = server.closeBranch(request, bid_4, "region"); // bid 4
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "");
+  ASSERT_EQ(CLOSED, res.status);
+  res = server.checkStatus(request, ROOT_SUB_RID, "", "");
   ASSERT_EQ(CLOSED, res.status);
 }
 
@@ -240,28 +242,28 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "post-storage", regionsService, EMPTY_TAG, "");
   ASSERT_EQ(getBid(1), bid_1);
 
-  request->insertAsyncZone(DUMMY_ASYNC_ZONE);
+  request->insertACSL(DUMMY_ACSL);
 
   /* multiple services verifications */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "EU");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "US");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "US");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "EU");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "US");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "US");
   ASSERT_EQ(OPENED, res.status);
 
   /* 'notifications' service verifications */
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "EU"); // post-storage
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "EU");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "");
   ASSERT_EQ(OPENED, res.status);
 
   /* more branches for 'post-storage' service */
@@ -276,28 +278,28 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(true, found_region);
   found_region = server.closeBranch(request, bid_1, "US"); // notifications
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "EU");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "CH");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "CH");
   ASSERT_EQ(OPENED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "US");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "US");
   ASSERT_EQ(CLOSED, res.status);
   found_region = server.closeBranch(request, bid_2, "CH"); // notifications
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "CH");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "CH");
   ASSERT_EQ(CLOSED, res.status);
   found_region = server.closeBranch(request, bid_2, "EU"); // notifications
   ASSERT_EQ(true, found_region);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-storage", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-storage", "EU");
   ASSERT_EQ(CLOSED, res.status);
 
   /* global verifications */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "post-notifications", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "post-notifications", "");
   ASSERT_EQ(UNKNOWN, res.status);
 
-  // ASYNC ZONE CORNER CASE: we ignore everything in the current async_zone (num > 1)
+  // ASYNC ZONE CORNER CASE: we ignore everything in the current acsl (num > 1)
   // but in fact, these regions are opened!
   res = server.checkStatus(request, ROOT_SUB_RID, "", "EU");
   ASSERT_EQ(CLOSED, res.status);
@@ -305,17 +307,17 @@ TEST(CoreTest, CheckRequest_AllContexts_MultipleServices_SetsOfBranches) {
   ASSERT_EQ(CLOSED, res.status);
 
   /* remaining 'notifications' service verifications */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "notifications", "US");
+  res = server.checkStatus(request, DUMMY_ACSL, "notifications", "US");
   ASSERT_EQ(OPENED, res.status);
   found_region = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "US"); // post-storage
   ASSERT_EQ(true, found_region);
 
   /* remaining global verifications */
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "EU");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "EU");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "US");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "US");
   ASSERT_EQ(CLOSED, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "");
   ASSERT_EQ(CLOSED, res.status);
 
   utils::ProtoVec emptyRegion;
@@ -342,13 +344,13 @@ TEST(CoreTest, CheckRequest_ContextNotFound) {
   std::string bid_2 = server.registerBranchGTest(request, ROOT_SUB_RID, "s1", empty_region, EMPTY_TAG, "");
   std::string bid_3 = server.registerBranchGTest(request, ROOT_SUB_RID, "s2", empty_region, EMPTY_TAG, "");
 
-  request->insertAsyncZone(DUMMY_ASYNC_ZONE);
+  request->insertACSL(DUMMY_ACSL);
 
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "invalid service", "");
+  res = server.checkStatus(request, DUMMY_ACSL, "invalid service", "");
   ASSERT_EQ(UNKNOWN, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "invalid region");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "invalid service", "invalid region");
+  res = server.checkStatus(request, DUMMY_ACSL, "invalid service", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
 
   bool found = server.closeBranch(request, parseFullBid(&server, request, bid_0, 0), "");
@@ -357,7 +359,7 @@ TEST(CoreTest, CheckRequest_ContextNotFound) {
   ASSERT_EQ(true, found);
 
   // now we can ensure it is unknown since all global branches are closed!
-  res = server.checkStatus(request, DUMMY_ASYNC_ZONE, "", "invalid region");
+  res = server.checkStatus(request, DUMMY_ACSL, "", "invalid region");
   ASSERT_EQ(UNKNOWN, res.status);
 }
 

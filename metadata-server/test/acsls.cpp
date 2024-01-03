@@ -6,10 +6,10 @@
 #include "utils.h"
 
 // ----------------
-// ASYNC ZONES TEST
+// ACSLs TEST
 // ----------------
 
-TEST(AsyncZonesTest, RidParsing) { 
+TEST(ACSLsTest, RidParsing) { 
   rendezvous::Server server(SID);
   std::string composed_id;
   std::pair<std::string, std::string> parsed_id;
@@ -44,10 +44,10 @@ TEST(AsyncZonesTest, RidParsing) {
 
   parsed_id = server.parseFullId("original_rid");
   ASSERT_EQ(parsed_id.first, "original_rid");
-  ASSERT_EQ(parsed_id.second, "r");
+  ASSERT_EQ(parsed_id.second, "");
 }
 
-TEST(AsyncZonesTest, RegisterWrongBranchId) { 
+TEST(ACSLsTest, RegisterWrongBranchId) { 
   rendezvous::Server server(SID);
   int closed;
 
@@ -72,36 +72,37 @@ TEST(AsyncZonesTest, RegisterWrongBranchId) {
 
   // close branch
   closed = server.closeBranch(request, getBid(0), "EU");
-  ASSERT_EQ(2, closed);
+  ASSERT_EQ(1, closed);
 
   // attempt to close branch again
-  /* closed = server.closeBranch(request, getBid(0), "EU");
-  ASSERT_EQ(0, closed); */
-}
+  closed = server.closeBranch(request, getBid(0), "EU");
+  ASSERT_EQ(0, closed);
+} 
 
-TEST(AsyncZonesTest, AddNextSubRids) { 
+
+TEST(ACSLsTest, AddNextSubRids) { 
   rendezvous::Server server(SID);
 
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_EQ(RID, request->getRid());
 
-  std::string sub_rid_0 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_0 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, sub_rid_0);
-  std::string sub_rid_1 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_1 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, sub_rid_1);
-  std::string sub_rid_2 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_2 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_2, sub_rid_2);
   // -----------------
-  std::string sub_rid_0_0 = server.addNextAsyncZone(request, SUB_RID_0);
+  std::string sub_rid_0_0 = server.addNextACSL(request, SUB_RID_0);
   ASSERT_EQ(SUB_RID_0_0, sub_rid_0_0);
-  std::string sub_rid_0_1 = server.addNextAsyncZone(request, SUB_RID_0);
+  std::string sub_rid_0_1 = server.addNextACSL(request, SUB_RID_0);
   ASSERT_EQ(SUB_RID_0_1, sub_rid_0_1);
   // -----------------
-  std::string sub_rid_0_0_0 = server.addNextAsyncZone(request, SUB_RID_0_0);
+  std::string sub_rid_0_0_0 = server.addNextACSL(request, SUB_RID_0_0);
   ASSERT_EQ(SUB_RID_0_0_0, sub_rid_0_0_0);
 }
 
-TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) { 
+TEST(ACSLsTest, SimpleRegisterAsyncAndClose) { 
   std::vector<std::thread> threads;
   rendezvous::Server server(SID);
   std::string bid;
@@ -119,14 +120,14 @@ TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) {
   ASSERT_TRUE(r);
 
   // register post-storage async branch from compose-post
-  std::string sub_rid_0 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_0 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, sub_rid_0);
   std::string bid_1 = server.genBid(request);
   r = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "", bid_1, false);
   ASSERT_TRUE(r);
 
   // register post-storage async branch for write post operation
-  std::string sub_rid_0_0 = server.addNextAsyncZone(request, SUB_RID_0);
+  std::string sub_rid_0_0 = server.addNextACSL(request, SUB_RID_0);
   ASSERT_EQ(SUB_RID_0_0, sub_rid_0_0);
   utils::ProtoVec regions_post_storage;
   regions_post_storage.Add("EU");
@@ -141,7 +142,7 @@ TEST(AsyncZonesTest, SimpleRegisterAsyncAndClose) {
 }
 
 
-TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) { 
+TEST(ACSLsTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) { 
   std::vector<std::thread> threads;
   rendezvous::Server server(SID);
   std::string bid;
@@ -159,14 +160,14 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   ASSERT_TRUE(r);
 
   // register post-storage async branch from compose-post
-  std::string sub_rid_0 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_0 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, sub_rid_0);
   std::string bid_1 = server.genBid(request);
   r = server.registerBranch(request, SUB_RID_0, "post-storage", regions_empty, "", "", bid_1, false);
   ASSERT_TRUE(r);
 
   // register post-storage async branch for write post operation
-  std::string sub_rid_0_0 = server.addNextAsyncZone(request, SUB_RID_0);
+  std::string sub_rid_0_0 = server.addNextACSL(request, SUB_RID_0);
   ASSERT_EQ(SUB_RID_0_0, sub_rid_0_0);
   utils::ProtoVec regions_post_storage;
   regions_post_storage.Add("EU");
@@ -176,14 +177,14 @@ TEST(AsyncZonesTest, PostAnalyticsNotificationTotalWaitIgnoreCompose) {
   ASSERT_TRUE(r);
 
   // register notifier async branch from compose-post
-  std::string sub_rid_1 = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string sub_rid_1 = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, sub_rid_1);
   std::string bid_3 = server.genBid(request);
   r = server.registerBranch(request, SUB_RID_1, "notifier", regions_empty, "", "", bid_3, false);
   ASSERT_TRUE(r);
 
   // register notifier async branch for write notification operation
-  std::string sub_rid_1_0 = server.addNextAsyncZone(request, SUB_RID_1);
+  std::string sub_rid_1_0 = server.addNextACSL(request, SUB_RID_1);
   ASSERT_EQ(SUB_RID_1_0, sub_rid_1_0);
   utils::ProtoVec regions_notifier;
   regions_notifier.Add("US");

@@ -26,17 +26,17 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& service = request->service();
   const std::string& tag = request->tag();
   const std::string& rid = request->rid();
-  const std::string& async_zone = request->async_zone();
+  const std::string& acsl_id = request->acsl();
   const std::string& core_bid = request->core_bid();
   const auto& regions = request->regions();
   bool monitor = request->monitor();
   int num = request->regions().size();
 
-  //spdlog::trace("> [REPLICATED RB: {}] register #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
+  //spdlog::trace("> [REPLICATED RB: {}] register #{} branches on service '{}' (monitor={}) for ids {}:{} @ acsl {}", rid, num, service, monitor, core_bid, rid, acsl_id);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
-    spdlog::critical("< [REPLICATED RB: {}] Error: invalid request for ids {}:{}:{}", rid, core_bid, rid, async_zone);
+    spdlog::critical("< [REPLICATED RB: {}] Error: invalid request for ids {}:{} @ acsl {}", rid, core_bid, rid, acsl_id);
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
   
@@ -47,16 +47,16 @@ grpc::Status ServerServiceImpl::RegisterBranch(grpc::ServerContext* context,
     //spdlog::debug("> [RECEIVED REPL RB: {}:{}:{}] sid: {}, version {}", rid, service, tag, replica_ctx.sid(), replica_ctx.version());
     version_registry->waitRemoteVersion(replica_ctx.sid(), replica_ctx.version()-1);
 
-    _server->registerBranch(rv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor);
+    _server->registerBranch(rv_request, acsl_id, service, regions, tag, request->context().current_service(), core_bid, monitor);
 
     version_registry->updateRemoteVersion(replica_ctx.sid(), replica_ctx.version());
     //spdlog::debug("> [APPLIED REPL RB: {}:{}:{}] sid: {}, version {}", rid, service, tag, replica_ctx.sid(), replica_ctx.version());
   }
   else {
-    _server->registerBranch(rv_request, async_zone, service, regions, tag, request->context().current_service(), core_bid, monitor, true);
+    _server->registerBranch(rv_request, acsl_id, service, regions, tag, request->context().current_service(), core_bid, monitor, true);
   }
 
-  //spdlog::trace("< [REPLICATED RB: {}] registered #{} branches on service '{}' (monitor={}) for ids {}:{}:{}", rid, num, service, monitor, core_bid, rid, async_zone);
+  //spdlog::trace("< [REPLICATED RB: {}] registered #{} branches on service '{}' (monitor={}) for ids {}:{} @ acsl {}", rid, num, service, monitor, core_bid, rid, acsl_id);
 
   return grpc::Status::OK;
 }
@@ -106,10 +106,10 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
   //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
-  const std::string& async_zone_id = request->async_zone();
+  const std::string& acsl_id = request->acsl();
   const std::string& target_service = request->target_service();
   
-  //spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
+  //spdlog::trace("> [BROADCASTED ADD WAIT] adding wait call for root rid '{}' on async zone '{}' to logs", rid, acsl_id);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
@@ -117,14 +117,14 @@ grpc::Status ServerServiceImpl::AddWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  metadata::Request::AsyncZone * async_zone = rv_request->_validateAsyncZone(async_zone_id);
-  if (async_zone == nullptr) {
-    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", async_zone_id);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
+  metadata::Request::ACSL * acsl = rv_request->_validateACSL(acsl_id);
+  if (acsl == nullptr) {
+    spdlog::critical("< [BROADCASTED ADD WAIT] Error: invalid async zone {}", acsl_id);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ACSL);
   }
 
   if (target_service.empty()) {
-    rv_request->_addToWaitLogs(async_zone);
+    rv_request->_addToWaitLogs(acsl);
   }
   else {
     metadata::Request::ServiceNode * service_node = rv_request->validateServiceNode(target_service);
@@ -143,11 +143,11 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
   //if (!_consistency_checks) return grpc::Status::OK;
 
   const std::string& rid = request->rid();
-  const std::string& async_zone_id = request->async_zone();
+  const std::string& acsl_id = request->acsl();
   const std::string& current_service = request->context().current_service();
   const std::string& target_service = request->target_service();
   
-  //spdlog::trace("> [BROADCASTED REMOVE WAIT] remove wait call for root rid '{}' on async zone '{}' to logs", rid, async_zone_id);
+  //spdlog::trace("> [BROADCASTED REMOVE WAIT] remove wait call for root rid '{}' on async zone '{}' to logs", rid, acsl_id);
 
   metadata::Request * rv_request = _server->getOrRegisterRequest(rid);
   if (rv_request == nullptr) {
@@ -155,14 +155,14 @@ grpc::Status ServerServiceImpl::RemoveWaitLog(grpc::ServerContext* context,
     return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_REQUEST);
   }
 
-  metadata::Request::AsyncZone * async_zone = rv_request->_validateAsyncZone(async_zone_id);
-  if (async_zone == nullptr) {
-    spdlog::critical("< [BROADCASTED REMOVE WAIT] Error: invalid async zone {}", async_zone_id);
-    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ASYNC_ZONE);
+  metadata::Request::ACSL * acsl = rv_request->_validateACSL(acsl_id);
+  if (acsl == nullptr) {
+    spdlog::critical("< [BROADCASTED REMOVE WAIT] Error: invalid async zone {}", acsl_id);
+    return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, utils::ERR_MSG_INVALID_ACSL);
   }
 
   if (target_service.empty()) {
-    rv_request->_removeFromWaitLogs(async_zone);
+    rv_request->_removeFromWaitLogs(acsl);
   }
   else {
     metadata::Request::ServiceNode * service_node = rv_request->validateServiceNode(target_service);

@@ -33,7 +33,7 @@ Server::Server(std::string sid, json settings)
     _subscribers = std::unordered_map<std::string, std::unordered_map<std::string, metadata::Subscriber*>>();
 }
 
-// testing purposes
+// for running GTest suit
 Server::Server(std::string sid)
     : _next_rid(0), _sid(sid), 
     _cleanup_requests_interval_m(30),
@@ -41,10 +41,10 @@ Server::Server(std::string sid)
     _cleanup_subscribers_interval_m(30),
     _cleanup_subscribers_validity_m(30),
     _subscribers_refresh_interval_s(60),
-    _wait_replica_timeout_s(60) {
+    _wait_replica_timeout_s(0) {
     
     utils::SIZE_SIDS = sid.size();
-    utils::WAIT_REPLICA_TIMEOUT_S = 60;
+    utils::WAIT_REPLICA_TIMEOUT_S = 0;
     utils::ASYNC_REPLICATION = false;
     utils::CONSISTENCY_CHECKS = true;
     utils::CONSISTENCY_CHECKS = false;
@@ -223,7 +223,7 @@ std::pair<std::string, std::string> Server::parseFullId(const std::string& full_
   // cannot happen when parsing branch identifiers
   else {
     primary_id = full_id;
-    secondary_id = utils::ROOT_ASYNC_ZONE_ID;
+    secondary_id = utils::ROOT_ACSL_ID;
   }
 
   return std::make_pair(primary_id, secondary_id);
@@ -240,8 +240,8 @@ std::string Server::composeFullId(const std::string& primary_id, const std::stri
 // Helpers
 //------------
 
-std::string Server::addNextAsyncZone(metadata::Request * request, const std::string& async_zone_id, bool gen_id) {
-  return request->addNextAsyncZone(_sid, async_zone_id, gen_id);
+std::string Server::addNextACSL(metadata::Request * request, const std::string& acsl_id, bool gen_id) {
+  return request->addNextACSL(_sid, acsl_id, gen_id);
 }
 
 metadata::Request * Server::getRequest(const std::string& rid) {
@@ -306,11 +306,11 @@ metadata::Request * Server::getOrRegisterRequest(std::string rid) {
 
 // helper for GTests
 std::string Server::registerBranchGTest(metadata::Request * request, 
-  const std::string& async_zone_id, const std::string& service, 
+  const std::string& acsl_id, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service) {
     
     std::string bid = genBid(request);
-    bool r = registerBranch(request, async_zone_id, service, regions, tag, current_service, bid, false);
+    bool r = registerBranch(request, acsl_id, service, regions, tag, current_service, bid, false);
     if (!r) return "";
     return bid;
 }
@@ -320,11 +320,11 @@ std::string Server::registerBranchGTest(metadata::Request * request,
 //----------------------
 
 metadata::Branch * Server::registerBranch(metadata::Request * request, 
-  const std::string& async_zone_id, const std::string& service, 
+  const std::string& acsl_id, const std::string& service, 
   const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service_bid, 
   const std::string& bid, bool monitor, bool replicated) {
 
-  metadata::Branch * branch = request->registerBranch(async_zone_id, bid, service, tag, regions, current_service_bid, replicated);
+  metadata::Branch * branch = request->registerBranch(acsl_id, bid, service, tag, regions, current_service_bid, replicated);
   // unexpected error
   if (!branch) {
     return branch;
@@ -365,7 +365,7 @@ int Server::closeBranch(metadata::Request * request, const std::string& bid, con
   return closed;
 }
 
-int Server::wait(metadata::Request * request, const std::string& async_zone_id, 
+int Server::wait(metadata::Request * request, const std::string& acsl_id, 
   const std::string& service, const::std::string& region, 
   std::string tag, bool async, int timeout, std::string current_service, bool wait_deps) {
 
@@ -374,13 +374,13 @@ int Server::wait(metadata::Request * request, const std::string& async_zone_id,
   const std::string& rid = request->getRid();
 
   if (!service.empty() && !region.empty())
-    result = request->waitServiceRegion(async_zone_id, service, region, tag, async, timeout, current_service, wait_deps);
+    result = request->waitServiceRegion(acsl_id, service, region, tag, async, timeout, current_service, wait_deps);
   else if (!service.empty())
-    result = request->waitService(async_zone_id, service, tag, async, timeout, current_service, wait_deps);
+    result = request->waitService(acsl_id, service, tag, async, timeout, current_service, wait_deps);
   else if (!region.empty())
-    result = request->waitRegion(async_zone_id, region, async, timeout, current_service);
+    result = request->waitRegion(acsl_id, region, async, timeout, current_service);
   else
-    result = request->wait(async_zone_id, async, timeout, current_service);
+    result = request->wait(acsl_id, async, timeout, current_service);
 
   // TODO: REMOVE THIS FOR FINAL RELEASE!
   //spdlog::debug("PREVENTED INCONSISTENCY? RESULT = {}", result);
@@ -390,25 +390,25 @@ int Server::wait(metadata::Request * request, const std::string& async_zone_id,
   return result;
 }
 
-utils::Status Server::checkStatus(metadata::Request * request, const std::string& async_zone_id, 
+utils::Status Server::checkStatus(metadata::Request * request, const std::string& acsl_id, 
   const std::string& service, const std::string& region, bool detailed) {
 
   if (!service.empty() && !region.empty())
-    return request->checkStatusServiceRegion(async_zone_id, service, region, detailed);
+    return request->checkStatusServiceRegion(acsl_id, service, region, detailed);
   else if (!service.empty())
-    return request->checkStatusService(async_zone_id, service, detailed);
+    return request->checkStatusService(acsl_id, service, detailed);
   else if (!region.empty())
-    return request->checkStatusRegion(async_zone_id, region);
+    return request->checkStatusRegion(acsl_id, region);
 
-  return request->checkStatus(async_zone_id);
+  return request->checkStatus(acsl_id);
 }
 
 utils::Dependencies Server::fetchDependencies(metadata::Request * request, const std::string& service, 
-  const std::string& async_zone_id) {
+  const std::string& acsl_id) {
 
   if (service.empty()) {
-    return request->fetchDependencies(utils::ROOT_SERVICE_NODE_ID, async_zone_id);
+    return request->fetchDependencies(utils::ROOT_SERVICE_NODE_ID, acsl_id);
   }
     
-  return request->fetchDependencies(service, async_zone_id);
+  return request->fetchDependencies(service, acsl_id);
 }

@@ -7,7 +7,8 @@ build/
 protos/rendezvous.proto
 datastore-monitor/__pycache__
 datastore-monitor/proto/__pycache__
-server-eval/proto/__pycache__
+server-eval/proto/**
+!server-eval/proto/.keep
 server-eval/plots/**
 server-eval/results/**
 server-eval/remote-csv-results/**

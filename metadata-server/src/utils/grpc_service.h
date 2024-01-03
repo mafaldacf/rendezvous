@@ -40,7 +40,7 @@ namespace utils {
     
     /* common gRPC custom error messages */
     const std::string ERR_MSG_INVALID_REQUEST = "Invalid request identifier";
-    const std::string ERR_MSG_INVALID_ASYNC_ZONE = "Invalid async zone identifier";
+    const std::string ERR_MSG_INVALID_ACSL = "Invalid async zone identifier";
     const std::string ERR_MSG_INVALID_REQUEST_SUB_RID = "Invalid request identifier (subrid does not exist)";
     const std::string ERR_MSG_REQUEST_ALREADY_EXISTS = "A request was already registered with the provided identifier";
     const std::string ERR_MSG_BRANCH_ALREADY_EXISTS = "A branch was already registered with the provided identifier";

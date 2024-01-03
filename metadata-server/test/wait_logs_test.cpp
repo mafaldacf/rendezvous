@@ -28,7 +28,7 @@ Wait calls on:
 3. (r:a1) cannot detect (r:a1:b1) as preceding
 3. (r:c1) need to detect (r:a1) as preceding
 4. (r:a1) cannot detect (r:c1) nor (r:c1-d1) as preceding
-5. (r:c1-d1) need to detect (r:a1:b1) as preceding EVEN IF IT WAS REGISTERED BEFORE!!!! 
+5. (r:c1:d1) need to detect (r:a1:b1) as preceding EVEN IF IT WAS REGISTERED BEFORE!!!! 
 ----------------------------------------------- */
 TEST(WaitLogsTest, PrecedingDetection) { 
   std::vector<std::thread> threads;
@@ -41,67 +41,59 @@ TEST(WaitLogsTest, PrecedingDetection) {
   ASSERT_EQ(RID, request->getRid());
 
   // register all async zones
-  std::string r_a1 = server.addNextAsyncZone(request, "r:a1", false);
+  std::string r_a1 = server.addNextACSL(request, "r:a1", false);
   ASSERT_EQ("r:a1", r_a1);
-  std::string r_c1 = server.addNextAsyncZone(request, "r:c1", false);
+  std::string r_c1 = server.addNextACSL(request, "r:c1", false);
   ASSERT_EQ("r:c1", r_c1);
-  std::string r_c1_d1 = server.addNextAsyncZone(request, "r:c1:d1", false);
+  std::string r_c1_d1 = server.addNextACSL(request, "r:c1:d1", false);
   ASSERT_EQ("r:c1:d1", r_c1_d1);
-  std::string r_a1_b1 = server.addNextAsyncZone(request, "r:a1:b1", false);
+  std::string r_a1_b1 = server.addNextACSL(request, "r:a1:b1", false);
   ASSERT_EQ("r:a1:b1", r_a1_b1);
-  std::string r_a1_b2 = server.addNextAsyncZone(request, "r:a1:b2", false);
+  std::string r_a1_b2 = server.addNextACSL(request, "r:a1:b2", false);
   ASSERT_EQ("r:a1:b2", r_a1_b2);
 
   // get root async zone
-  metadata::Request::AsyncZone * subrequest_r = request->_validateAsyncZone(ROOT_SUB_RID);
+  metadata::Request::ACSL * subrequest_r = request->_validateACSL(ROOT_SUB_RID);
   ASSERT_TRUE(subrequest_r != nullptr);
 
   // add to wait logs: async zone r:a1
-  metadata::Request::AsyncZone * subrequest_r_a1 = request->_validateAsyncZone(r_a1);
+  metadata::Request::ACSL * subrequest_r_a1 = request->_validateACSL(r_a1);
   ASSERT_TRUE(subrequest_r_a1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1);
 
   // add to wait logs: async zone r:c1
-  metadata::Request::AsyncZone * subrequest_r_c1 = request->_validateAsyncZone(r_c1);
+  metadata::Request::ACSL * subrequest_r_c1 = request->_validateACSL(r_c1);
   ASSERT_TRUE(subrequest_r_c1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1);
 
   // add to wait logs: async zone r:c1:d1
-  metadata::Request::AsyncZone * subrequest_r_c1_d1 = request->_validateAsyncZone(r_c1_d1);
+  metadata::Request::ACSL * subrequest_r_c1_d1 = request->_validateACSL(r_c1_d1);
   ASSERT_TRUE(subrequest_r_c1_d1 != nullptr);
   request->_addToWaitLogs(subrequest_r_c1_d1);
 
   // add to wait logs: async zone r:a1:b1
-  metadata::Request::AsyncZone * subrequest_r_a1_b1 = request->_validateAsyncZone(r_a1_b1);
+  metadata::Request::ACSL * subrequest_r_a1_b1 = request->_validateACSL(r_a1_b1);
   ASSERT_TRUE(subrequest_r_a1_b1 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b1);
 
   // add to wait logs: async zone r:a1:b2
-  metadata::Request::AsyncZone * subrequest_r_a1_b2 = request->_validateAsyncZone(r_a1_b2);
+  metadata::Request::ACSL * subrequest_r_a1_b2 = request->_validateACSL(r_a1_b2);
   ASSERT_TRUE(subrequest_r_a1_b2 != nullptr);
   request->_addToWaitLogs(subrequest_r_a1_b2);
 
-  // r:a1 is preceding of r:a1:b1 since it is its parent
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1, subrequest_r_a1_b1);
-  ASSERT_TRUE(is_preceding);
+  ASSERT_LT(subrequest_r_a1->acsl_id, subrequest_r_a1_b1->acsl_id);
+  ASSERT_LT(subrequest_r_a1->acsl_id, subrequest_r_a1_b2->acsl_id);
+  ASSERT_LT(subrequest_r_a1_b1->acsl_id, subrequest_r_a1_b2->acsl_id);
+  ASSERT_LT(subrequest_r->acsl_id, subrequest_r_c1->acsl_id);
+  ASSERT_LT(subrequest_r_a1_b1->acsl_id, subrequest_r_c1->acsl_id);
+  ASSERT_LT(subrequest_r_a1_b2->acsl_id, subrequest_r_c1->acsl_id);
 
-  // now we test the opposite
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b2, subrequest_r_a1);
-  ASSERT_FALSE(is_preceding);
-
-  // test preceeding between neighboors r:a1:b1 and r:a1:b2
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b1, subrequest_r_a1_b2);
-  ASSERT_TRUE(is_preceding);
-
-  // r:c1 is always after r:a1:b1 and r:a1:b2 even if it was registered after
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b1, subrequest_r_c1);
-  ASSERT_TRUE(is_preceding);
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r_a1_b2, subrequest_r_c1);
-  ASSERT_TRUE(is_preceding);
-
-  // r is always preceding of any other
-  is_preceding = request->_isPrecedingAsyncZone(subrequest_r, subrequest_r_c1);
-  ASSERT_TRUE(is_preceding);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r).size(), 5);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r_a1).size(), 4);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r_a1_b1).size(), 3);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r_a1_b2).size(), 2);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r_c1).size(), 1);
+  ASSERT_EQ(request->_getGreaterACSLs(subrequest_r_c1_d1).size(), 0);
 }
 // --------------
 
@@ -131,7 +123,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(getBid(0), bid_0);
 
   // register post-storage async branch from compose-post
-  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   std::string bid_1 = server.registerBranchGTest(request, SUB_RID_0, "post-storage", regions_empty, "", "");
   ASSERT_EQ(getBid(1), bid_1);
@@ -144,7 +136,7 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
   ASSERT_EQ(getBid(2), bid_2);
 
   // register notifier async branch from compose-post
-  next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  next_sub_rid = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_1, next_sub_rid);
   std::string bid_3 = server.registerBranchGTest(request, SUB_RID_1, "notifier", regions_empty, "", "");
   ASSERT_EQ(getBid(3), bid_3);
@@ -226,3 +218,4 @@ TEST(WaitLogsTest, SyncComposeAsyncPostAsyncNotifierDoubleWait) {
     }
   }
 }
+

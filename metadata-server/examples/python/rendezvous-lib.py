@@ -38,7 +38,7 @@ def next_async_context(context: pb.RequestContext) -> pb.RequestContext:
     new_context = pb.RequestContext()
     new_context.CopyFrom(context)
     
-    new_context.async_zone += ":" + str(context.num_sub_zones)
+    new_context.acsl += ":" + str(context.num_sub_zones)
     context.num_sub_zones += 1
     return new_context
 
@@ -48,7 +48,7 @@ def next_async_contexts(context: pb.RequestContext, num: int) -> List[pb.Request
     for i in range (context.num_sub_zones, context.num_sub_zones + num):
         new_context = pb.RequestContext()
         new_context.CopyFrom(context)
-        new_context.async_zone += ":" + str(i)
+        new_context.acsl += ":" + str(i)
         new_context.num_sub_zones = 0
         lst.append(new_context)
 

@@ -22,10 +22,10 @@ AWS_REGION="eu-central-1"
 
 usage() {
     echo "Usage:"
-    echo "> ./rendezvous.sh local clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rv-lib, monitor}"
+    echo "> ./rendezvous.sh local {clean, build [{--debug, --config, --tests, --py}], run {server <replica id> <config>, tests, client, rv-lib, monitor}}"
     echo "> ./rendezvous.sh remote {deploy, update, start {dynamo, s3, cache, mysql} [-ncc], stop}"
     echo "> ./rendezvous.sh docker {build, deploy, start {dynamo, s3, cache, mysql}, stop}"
-    echo "[INFO] Available server configs: remote.json, docker.json, local.json, single.json"
+    echo "[INFO] Available config files: remote.json, docker.json, local.json, single.json"
     exit 1
 }
 
@@ -107,6 +107,7 @@ local_build_py() {
   # clean
   rm metadata-server/examples/python/rendezvous/protos/rendezvous.proto
   rm datastore-monitor/proto/rendezvous.proto
+  rm server-eval/proto/rendezvous.proto
   echo done!
 }
 

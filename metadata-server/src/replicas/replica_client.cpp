@@ -68,7 +68,7 @@ void ReplicaClient::saveAsyncCall(AsyncRequestHelper &req_helper, grpc::ClientCo
     req_helper.nrpcs++;
 }
 
-void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
+void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string& acsl, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     const rendezvous_server::RequestContext& ctx_replica) {
@@ -81,7 +81,7 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
             rendezvous_server::RegisterBranchMessage request;
 
             request.set_rid(rid);
-            request.set_async_zone(async_zone);
+            request.set_acsl(acsl);
             request.set_core_bid(core_bid);
             request.set_service(service);
             request.set_tag(tag);
@@ -99,18 +99,18 @@ void ReplicaClient::_doRegisterBranch(const std::string& rid, const std::string&
         waitCompletionQueue("RB", req_helper);
     }
 
-void ReplicaClient::registerBranch(const std::string& rid, const std::string& async_zone, const std::string& core_bid,
+void ReplicaClient::registerBranch(const std::string& rid, const std::string& acsl, const std::string& core_bid,
     const std::string& service, const std::string& tag, 
     const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
     const rendezvous_server::RequestContext& ctx_replica) {
 
         if (utils::ASYNC_REPLICATION) {
-        std::thread([this, rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica]() {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica);
+        std::thread([this, rid, acsl, core_bid, service, tag, regions, monitor, ctx_replica]() {
+            _doRegisterBranch(rid, acsl, core_bid, service, tag, regions, monitor, ctx_replica);
         }).detach();
         }
         else {
-            _doRegisterBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica);
+            _doRegisterBranch(rid, acsl, core_bid, service, tag, regions, monitor, ctx_replica);
         }
 }
 
@@ -159,7 +159,7 @@ const rendezvous_server::RequestContext& ctx_replica) {
 }
 
 replicas::ReplicaClient::AsyncRequestHelper * ReplicaClient::addWaitLog(const std::string& rid, 
-    const std::string& async_zone, const std::string& target_service) {
+    const std::string& acsl, const std::string& target_service) {
 
     AsyncRequestHelper * req_helper = new AsyncRequestHelper{};
 
@@ -175,7 +175,7 @@ replicas::ReplicaClient::AsyncRequestHelper * ReplicaClient::addWaitLog(const st
 
         rendezvous_server::AddWaitLogMessage request;
         request.set_rid(rid);
-        request.set_async_zone(async_zone);
+        request.set_acsl(acsl);
         request.set_target_service(target_service);
 
         req_helper->rpcs.emplace_back(server->AsyncAddWaitLog(context, request, &req_helper->queue));
@@ -186,11 +186,11 @@ replicas::ReplicaClient::AsyncRequestHelper * ReplicaClient::addWaitLog(const st
     return req_helper;
 }
 
-void ReplicaClient::removeWaitLog(const std::string& rid, const std::string& async_zone, 
+void ReplicaClient::removeWaitLog(const std::string& rid, const std::string& acsl, 
     const std::string& target_service, 
     replicas::ReplicaClient::AsyncRequestHelper * add_wait_log_async_request_helper) {
 
-    std::thread([this, rid, async_zone, target_service, add_wait_log_async_request_helper]() {
+    std::thread([this, rid, acsl, target_service, add_wait_log_async_request_helper]() {
         // wait for previous requests for adding to wait log
         waitCompletionQueue("AWL", *add_wait_log_async_request_helper);
 
@@ -207,7 +207,7 @@ void ReplicaClient::removeWaitLog(const std::string& rid, const std::string& asy
 
             rendezvous_server::RemoveWaitLogMessage request;
             request.set_rid(rid);
-            request.set_async_zone(async_zone);
+            request.set_acsl(acsl);
             request.set_target_service(target_service);
 
             req_helper.rpcs.emplace_back(server->AsyncRemoveWaitLog(context, request, &req_helper.queue));

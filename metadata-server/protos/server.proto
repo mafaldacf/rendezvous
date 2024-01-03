@@ -30,7 +30,7 @@ message RegisterRequestMessage {
 /* Registers Branches */
 message RegisterBranchMessage {
   string rid = 1;
-  string async_zone = 2;
+  string acsl = 2;
   string core_bid = 3;
   string service = 4;
   string tag = 5;
@@ -50,7 +50,7 @@ message CloseBranchMessage {
 /* Register Wait */
 message AddWaitLogMessage {
   string rid = 1;
-  string async_zone = 2;
+  string acsl = 2;
   string target_service = 3;
   RequestContext context = 4;
 }
@@ -58,7 +58,7 @@ message AddWaitLogMessage {
 /* Remove Wait */
 message RemoveWaitLogMessage {
   string rid = 1;
-  string async_zone = 2;
+  string acsl = 2;
   string target_service = 3;
   RequestContext context = 4;
 }

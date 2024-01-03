@@ -75,12 +75,12 @@ TEST(ConcurrencyTest, WaitRequest_ForcedTimeout) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", regions, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  request->insertAsyncZone(DUMMY_ASYNC_ZONE);
+  request->insertACSL(DUMMY_ACSL);
 
-  status = server.wait(request, DUMMY_ASYNC_ZONE, "service", "region", EMPTY_TAG, "", 1);
+  status = server.wait(request, DUMMY_ACSL, "service", "region", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 
-  status = server.wait(request, DUMMY_ASYNC_ZONE, "service2", "", EMPTY_TAG, "", 1);
+  status = server.wait(request, DUMMY_ACSL, "service2", "", EMPTY_TAG, "", 1);
   ASSERT_EQ(TIMED_OUT, status);
 }
 
@@ -108,7 +108,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.2);
+  sleep(1);
   found_region = server.closeBranch(request, getBid(0), "EU"); // bid 0
   ASSERT_EQ(1, found_region);
   found_region = server.closeBranch(request, getBid(0), "US"); // bid 0
@@ -122,7 +122,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
   }
 
   // now we do the same for for an async branch
-  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  std::string next_sub_rid = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec regions_empty;
   std::string bid_1 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", regions_empty, "", "");
@@ -145,7 +145,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.2);
+  sleep(1);
 
   found_region = server.closeBranch(request, getBid(2), "AP");
   ASSERT_EQ(1, found_region);
@@ -168,7 +168,7 @@ TEST(ConcurrencyTest, SimpleWaitRequest) {
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
   });
 
-  sleep(0.2);
+  sleep(0.5);
 
   found_region = server.closeBranch(request, getBid(3), "");
   ASSERT_EQ(1, found_region);
@@ -199,7 +199,7 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "service", region, EMPTY_TAG, "");
   ASSERT_EQ(getBid(0), bid_0);
 
-  // we cannot wait for branches within the same async_zone_id
+  // we cannot wait for branches within the same acsl_id
   threads.emplace_back([&server, request] {
     int status = server.wait(request, ROOT_SUB_RID, "", "", "", false, 5);
     ASSERT_EQ(INCONSISTENCY_NOT_PREVENTED, status);
@@ -208,10 +208,10 @@ TEST(ConcurrencyTest, SimpleWaitRequestTwo) {
   sleep(1);
 
   // -----------------------------------------------------
-  // ASYNC ZONE
+  // ACSL
   // -----------------------------------------------------
-  // but we can wait if we are in an async zone
-  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  // but we can wait if we are in an acsl
+  std::string next_sub_rid = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   // this branch is ignored 
@@ -253,8 +253,8 @@ TEST(ConcurrencyTest, WaitRequest) {
   metadata::Request * request = server.getOrRegisterRequest(RID);
   ASSERT_EQ(RID, request->getRid());
 
-  // ASYNC ZONES:
-  std::string next_sub_rid = server.addNextAsyncZone(request, ROOT_SUB_RID);
+  // ACSLs
+  std::string next_sub_rid = server.addNextACSL(request, ROOT_SUB_RID);
   ASSERT_EQ(SUB_RID_0, next_sub_rid);
   utils::ProtoVec empty_region;
   std::string bid_0 = server.registerBranchGTest(request, ROOT_SUB_RID, "dummy-service", empty_region, EMPTY_TAG, "");

@@ -2,23 +2,23 @@
 
 using namespace metadata;
 
-Branch::Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions, bool replicated)
-    : _service(service), _tag(tag), _sub_rid(async_zone_id), _num_opened_regions(vector_regions.size()), replicated(replicated) {
+Branch::Branch(std::string service, std::string tag, std::string acsl_id, const utils::ProtoVec& vector_regions, bool replicated)
+    : _service(service), _tag(tag), _acsl_id(acsl_id), _num_opened_regions(vector_regions.size()), replicated(replicated) {
         _regions = std::unordered_map<std::string, int>();
         for (const auto& region : vector_regions) {
             _regions[region] = OPENED;
         }
     }
 
-Branch::Branch(std::string service, std::string tag, std::string async_zone_id, bool replicated)
-    : _service(service), _tag(tag), _sub_rid(async_zone_id), _num_opened_regions(1), replicated(replicated) {
+Branch::Branch(std::string service, std::string tag, std::string acsl_id, bool replicated)
+    : _service(service), _tag(tag), _acsl_id(acsl_id), _num_opened_regions(1), replicated(replicated) {
         _regions = std::unordered_map<std::string, int>();
 
         _regions[GLOBAL_REGION] = OPENED;
     }
 
-std::string Branch::getAsyncZoneId() {
-    return _sub_rid;
+std::string Branch::getACSLID() {
+    return _acsl_id;
 }
 
 std::string Branch::getTag() {

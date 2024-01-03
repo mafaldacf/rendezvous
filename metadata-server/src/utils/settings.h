@@ -13,15 +13,15 @@ namespace utils {
     /* ------------------------ */
     static int SIZE_SIDS = 1;
     static const char FULL_ID_DELIMITER = ':';
-    static std::string ROOT_ASYNC_ZONE_ID = "";
+    static std::string ROOT_ACSL_ID = "";
     static std::string ROOT_SERVICE_NODE_ID = "";
 
     /* -------------------------------- */
     /* parsed values from settings.json */
     /* -------------------------------- */
-    static bool ASYNC_REPLICATION = true;
-    static bool CONTEXT_VERSIONING = false;
-    static int WAIT_REPLICA_TIMEOUT_S = 60;
+    static bool ASYNC_REPLICATION;
+    static bool CONTEXT_VERSIONING;
+    static int WAIT_REPLICA_TIMEOUT_S;
     
     /* --------------------------- */
     /* parsed values from env vars */

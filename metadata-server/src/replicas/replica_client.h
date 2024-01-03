@@ -34,7 +34,7 @@ namespace replicas {
 
             /* Helpers */
             void _doRegisterRequest(const std::string& rid);
-            void _doRegisterBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
+            void _doRegisterBranch(const std::string& root_rid, const std::string& acsl, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous_server::RequestContext& ctx_replica);
@@ -65,14 +65,14 @@ namespace replicas {
              * Send register branches call to all replicas
              * 
              * @param root_rid The identifier of the root request
-             * @param async_zone The identifier of the async zone
+             * @param acsl The identifier of the async zone
              * @param core_bid The identifier of the set of branches (without rid)
              * @param service The service where the branches were registered
              * @param regions The regions where the branches were registered
              * @param monitor If enabled, we publish the branch for datastore monitor subscribers
              * @param ctx_replica Context targeted ot the replica
              */
-            void registerBranch(const std::string& root_rid, const std::string& async_zone, const std::string& core_bid, 
+            void registerBranch(const std::string& root_rid, const std::string& acsl, const std::string& core_bid, 
                 const std::string& service, const std::string& tag, 
                 const google::protobuf::RepeatedPtrField<std::string>& regions, bool monitor,
                 const rendezvous_server::RequestContext& ctx_replica);
@@ -92,21 +92,21 @@ namespace replicas {
              * Add wait call to log entry (asynchronous broadcast)
              * 
              * @param root_rid The identifier of the root request
-             * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param acsl The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
              * @return async request helper structure with all the context of the requests
              */
-            AsyncRequestHelper * addWaitLog(const std::string& root_rid, const std::string& async_zone, const std::string& target_service);
+            AsyncRequestHelper * addWaitLog(const std::string& root_rid, const std::string& acsl, const std::string& target_service);
 
             /**
              * Remove wait call from log entry (asynchronous broadcast)
              * 
              * @param root_rid The identifier of the root request
-             * @param async_zone The identifier of the asynchronous zone where the call is made
+             * @param acsl The identifier of the asynchronous zone where the call is made
              * @param target_service The optional target service for the wait call
              * @param add_wait_log_async_request_helper Async request helper from addWaitLog used to wait now to prevent removing before adding
              */
-            void removeWaitLog(const std::string& root_rid, const std::string& async_zone, 
+            void removeWaitLog(const std::string& root_rid, const std::string& acsl, 
                 const std::string& target_service, AsyncRequestHelper * add_wait_log_async_request_helper);
 
         };

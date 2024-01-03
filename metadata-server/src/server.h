@@ -120,7 +120,7 @@ namespace rendezvous {
 
             /**
              * Helper for parsing full id
-             * - (GENERIC)      full_rid       ->   <rid, async_zone_id>
+             * - (GENERIC)      full_rid       ->   <rid, acsl_id>
              * - (CLOSE BRANCH) composed_rid   ->   <full_rid, bid>
              * 
              * @param full_id The full id to be parsed 
@@ -130,7 +130,7 @@ namespace rendezvous {
 
             /**
              * Helper for composing full id
-             * - (GENERIC)      full_rid       ->   <rid, async_zone_id>
+             * - (GENERIC)      full_rid       ->   <rid, acsl_id>
              * - (CLOSE BRANCH) composed_rid   ->   <full_rid, bid>
              * 
              * @param primary_id The first identifier
@@ -143,11 +143,11 @@ namespace rendezvous {
              * Register a new sub request originating from an async branch within the current subrequest
              * 
              * @param request Current request ptr
-             * @param async_zone_id Current subrequest
-             * @param gen_id If disabled, the next async_zone_id is not generated
+             * @param acsl_id Current subrequest
+             * @param gen_id If disabled, the next acsl_id is not generated
              * @return new subrequest
             */
-            std::string addNextAsyncZone(metadata::Request * request, const std::string& async_zone_id, bool gen_id = true);
+            std::string addNextACSL(metadata::Request * request, const std::string& acsl_id, bool gen_id = true);
 
             /**
              * Returns the number of inconsistencies prevented so far
@@ -181,7 +181,7 @@ namespace rendezvous {
 
             // helper for GTest: it calls registerBranch method
             std::string registerBranchGTest(metadata::Request * request, 
-                const std::string& async_zone_id, const std::string& service, 
+                const std::string& acsl_id, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service_bid);
 
             /**
@@ -198,7 +198,7 @@ namespace rendezvous {
              * - The new identifier (core_bid) of the set of branches 
              * - Or empty if an error ocurred (branches already exist with bid)
              */
-            metadata::Branch * registerBranch(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
+            metadata::Branch * registerBranch(metadata::Request * request, const std::string& acsl_id, const std::string& service, 
                 const utils::ProtoVec& regions, const std::string& tag, const std::string& current_service, 
                 const std::string& bid, bool monitor, bool replicated = false);
 
@@ -220,7 +220,7 @@ namespace rendezvous {
              * Wait until request is closed for a given context (none, service, region or service and region)
              * 
              * @param request Request where the branch is registered
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param service The service context
              * @param region The region we are waiting for the service on
              * @param tag  The specified operation tag for this service
@@ -236,7 +236,7 @@ namespace rendezvous {
              * - (-3) if context (curr service) was not found
              * - (-4) if tag was not found
              */
-            int wait(metadata::Request * request, const std::string& async_zone_id, const std::string& service, 
+            int wait(metadata::Request * request, const std::string& acsl_id, const std::string& service, 
                 const::std::string& region, std::string tag = "", 
                 bool async = false, int timeout = 0, std::string current_service = "", bool wait_deps = false);
             
@@ -244,7 +244,7 @@ namespace rendezvous {
              * Check status of the request for a given context (none, service, region or service and region)
              * 
              * @param request Request where the branch is registered
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param service The service context
              * @param region The region context
              * @param detailed Enable detailed information (status for tagged branches and dependencies)
@@ -254,7 +254,7 @@ namespace rendezvous {
              * - 2 if request is UNKNOWN
              * - (-3) if context was not found
              */
-            utils::Status checkStatus(metadata::Request * request, const std::string &async_zone_id,
+            utils::Status checkStatus(metadata::Request * request, const std::string &acsl_id,
                 const std::string& service, const std::string& region, bool detailed = false);
 
             /**
@@ -262,14 +262,14 @@ namespace rendezvous {
              * 
              * @param request Request where the branch is registered
              * @param service The service context
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
              * - (-2) if service was not found
              * - (-3) if context was not found
              */
             utils::Dependencies fetchDependencies(metadata::Request * request, const std::string& service,
-                const std::string& async_zone_id);
+                const std::string& acsl_id);
             
             /**
              * Get number of inconsistencies prevented so far using the blocking methods

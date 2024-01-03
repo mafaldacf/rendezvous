@@ -39,7 +39,7 @@ namespace metadata {
             /* track all branching information of a service */
             typedef struct ServiceNodeStruct {
                 std::string name;
-                std::unordered_map<std::string, int> async_zone_opened_branches;
+                std::unordered_map<std::string, int> acsl_opened_branches;
                 int opened_global_region; // FIXME: CONVERT TO ATOMIC DUE TO ThE WAIT LOGS
                 int opened_branches;
                 int num_current_waits;
@@ -52,18 +52,18 @@ namespace metadata {
 
             } ServiceNode;
 
-            typedef struct AsyncZoneStruct {
-                std::string async_zone_id;
+            typedef struct ACSLStruct {
+                std::string acsl_id;
                 int i;
-                // protected by async_zones mutex
+                // protected by acsls mutex
                 int num_current_waits;
 
-                std::atomic<int> next_async_zone_index;
+                std::atomic<int> next_acsl_index;
                 std::atomic<int> opened_branches;
                 std::atomic<int> opened_global_region;
                 oneapi::tbb::concurrent_hash_map<std::string, int> opened_regions;
 
-            } AsyncZone;
+            } ACSL;
 
         private:
             std::mutex _mutex_replicated_bid;
@@ -71,13 +71,13 @@ namespace metadata {
 
             bool _closed;
             /* ----------- */
-            /* async zones */
+            /* acsls */
             /* ----------- */
-            // index for async_zones
-            std::atomic<int> async_zones_i;
-            // <async_zone_id, async_zone_ptr>
-            oneapi::tbb::concurrent_hash_map<std::string, AsyncZone*> _async_zones;
-            // <async_zone_id>
+            // index for acsls
+            std::atomic<int> acsls_i;
+            // <acsl_id, acsl_ptr>
+            oneapi::tbb::concurrent_hash_map<std::string, ACSL*> _acsls;
+            // <acsl_id>
             std::set<std::string> _wait_logs;
             std::unordered_map<std::string, std::unordered_set<ServiceNode*>> _service_wait_logs;
 
@@ -121,9 +121,9 @@ namespace metadata {
             std::condition_variable_any _cond_service_nodes;
             // service nodes -- wait with async option
             std::condition_variable_any _cond_new_service_nodes;
-            // async zones
-            std::shared_mutex _mutex_async_zones;
-            std::condition_variable_any _cond_async_zones;
+            // acsls
+            std::shared_mutex _mutex_acsls;
+            std::condition_variable_any _cond_acsls;
 
             /**
              * Wait for the branch's registration
@@ -137,23 +137,23 @@ namespace metadata {
              * Get all the following dependencies for the current service node
              * 
              * @param service_node Pointer for the current service node
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @return return vector of all following dependencies
             */
             std::vector<ServiceNode*> _getAllFollowingDependencies(ServiceNode * service_node, 
-                const std::string& async_zone_id);
+                const std::string& acsl_id);
 
             /**
              * Helper for wait logic in service
              * 
              * @param service_node Pointer for the current service node
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param timeout Timeout set by client
              * @param start_time Start time
              * @param remaining_time Remaining timeout
              * @return if inconsistency was prevented or not
             */
-            int _doWaitService(ServiceNode * service_node, const std::string& async_zone_id,
+            int _doWaitService(ServiceNode * service_node, const std::string& acsl_id,
                 int timeout, const std::chrono::steady_clock::time_point& start_time, 
                 std::chrono::seconds remaining_time);
 
@@ -162,13 +162,13 @@ namespace metadata {
              * 
              * @param service_node Pointer for the current service node
              * @param region Region to be waited for
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param timeout Timeout set by client
              * @param start_time Start time
              * @param remaining_time Remaining timeout
              * @return if inconsistency was prevented or not
             */
-            int _doWaitServiceRegion(ServiceNode * service_node, const std::string& region, const std::string& async_zone_id,
+            int _doWaitServiceRegion(ServiceNode * service_node, const std::string& region, const std::string& acsl_id,
                 int timeout, const std::chrono::steady_clock::time_point& start_time, 
                 std::chrono::seconds remaining_time);
 
@@ -178,7 +178,7 @@ namespace metadata {
              * @param service_node Pointer for the current service node
              * @param tag Tag to be waited for
              * @param region Region to be waited for (can be empty)
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param timeout Timeout set by client
              * @param start_time Start time
              * @param remaining_time Remaining timeout
@@ -257,61 +257,61 @@ namespace metadata {
         // public for testing purposes
         public:
             /**
-            * Verify that given async_zone_id exists
+            * Verify that given acsl_id exists
             * 
-            * @param async_zone_id The async zone id identifier
-            * @return return pointer to AsyncZone if found and nullptr otherwise
+            * @param acsl_id The acsl id identifier
+            * @return return pointer to ACSL if found and nullptr otherwise
             */
-            AsyncZone * _validateAsyncZone(const std::string& async_zone_id);
+            ACSL * _validateACSL(const std::string& acsl_id);
 
             /**
-             * Add current async zone to wait logs
+             * Add current acsl to wait logs
              * 
-             * @param async_zone The current async zone
+             * @param acsl The current acsl
             */
-            void _addToWaitLogs(AsyncZone* async_zone);
+            void _addToWaitLogs(ACSL* acsl);
 
             /**
-             * Remove current async zone from wait logs
+             * Remove current acsl from wait logs
              * 
-             * @param async_zone The current async zone
+             * @param acsl The current acsl
             */
-            void _removeFromWaitLogs(AsyncZone* subrequest);
+            void _removeFromWaitLogs(ACSL* subrequest);
 
             /**
-             * Check if first async zone precedes second async zone
+             * Check if first acsl precedes second acsl
              * 
-             * @param subrequest_1 Subrequest ptr for the first async zone
-             * @param subrequest_2 Subrequest ptr for the second async zone
-             * @return true if first async zone precedes second and false otherwise
+             * @param subrequest_1 Subrequest ptr for the first acsl
+             * @param subrequest_2 Subrequest ptr for the second acsl
+             * @return true if first acsl precedes second and false otherwise
             */
-            bool _isPrecedingAsyncZone(AsyncZone* subrequest_1, AsyncZone* subrequest_2);
+            bool _isPrecedingAsyncZone(ACSL* subrequest_1, ACSL* subrequest_2);
 
             /**
              * Get all preceding entires from wait logs, i.e., smaller sub_rids than the current one
              * (used to be ignored in the wait call)
              * 
-             * @param subrequest The current async zone id
+             * @param subrequest The current acsl id
              * @return vector of all preceding sub rids
             */
-            std::vector<std::string> _getHighestAsyncZones(AsyncZone* subrequest);
+            std::vector<std::string> _getGreaterACSLs(ACSL* subrequest);
 
             /**
-             * Get number of opened branches for all preceding async zone ids
+             * Get number of opened branches for all preceding acsl ids
              * 
-             * @param sub_rids Vector of all preceding async zone ids identifiers
+             * @param sub_rids Vector of all preceding acsl ids identifiers
              * @return number of opened branches
             */
-            int _numOpenedBranchesAsyncZones(const std::vector<std::string>& sub_rids);
+            int _numOpenedBranchesACSLs(const std::vector<std::string>& sub_rids);
 
             /**
-             * Get number of opened branches for all preceding async zone ids in current region and global region
+             * Get number of opened branches for all preceding acsl ids in current region and global region
              * 
-             * @param sub_rids Vector of all preceding async zone ids identifiers
+             * @param sub_rids Vector of all preceding acsl ids identifiers
              * @param region Targeted region
              * @return pair for number of opened branches with format: <global region, targeted region>
             */
-            std::pair<int, int> _numOpenedRegionsAsyncZones(
+            std::pair<int, int> _numOpenedRegionsACSLs(
                 const std::vector<std::string>& sub_rids, const std::string& region);
 
             /**
@@ -388,27 +388,27 @@ namespace metadata {
             std::string genId();
 
             /**
-             * Register a new async zone id originating from an async branch within the current subrequest with
-             * the folllowing format: <async_zone_id>:<sid>-<new_sub_rid>
+             * Register a new acsl id originating from an async branch within the current subrequest with
+             * the folllowing format: <acsl_id>:<sid>-<new_sub_rid>
              * 
              * @param sid The current server (replica) id
-             * @param async_zone_id Current subrequest
-             * @param gen_id If disabled, the next async_zone_id is not generated
+             * @param acsl_id Current subrequest
+             * @param gen_id If disabled, the next acsl_id is not generated
              * @return new subrequest
             */
-            std::string addNextAsyncZone(const std::string& sid, const std::string& async_zone_id, bool gen_id);
+            std::string addNextACSL(const std::string& sid, const std::string& acsl_id, bool gen_id);
 
             /**
-             * Inserts new async zone if it does not exist yet
+             * Inserts new acsl if it does not exist yet
              * 
-             * @param async_zone_id The identifier for th current async zone
+             * @param acsl_id The identifier for th current acsl
             */
-            void insertAsyncZone(const std::string& async_zone_id);
+            void insertACSL(const std::string& acsl_id);
 
             /**
              * Register a set of branches in the request
              * 
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param bid The identifier of the set of branches
              * @param service The service where the branches are being registered
              * @param tag The service tag
@@ -417,7 +417,7 @@ namespace metadata {
              * 
              * @param return branch if successfully registered and nullptr otherwise (if branches already exists)
              */
-            metadata::Branch * registerBranch(const std::string& async_zone_id, const std::string& bid, const std::string& service, 
+            metadata::Branch * registerBranch(const std::string& acsl_id, const std::string& bid, const std::string& service, 
                 const std::string& tag, const utils::ProtoVec& regions, const std::string& current_service_bid, bool replicated);
 
             /**
@@ -430,27 +430,27 @@ namespace metadata {
              * - 2 if all branches are closed for the request
              * - 1 if branch was closed
              * - 0 if branch was already closed before
-             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in async_zones tbb map
+             * - (-1) if encountered error from either (i) wrong bid, wrong region, or error in acsls tbb map
              */
             int closeBranch(const std::string& bid, const std::string& region);
 
             /**
              * Untrack (remove) branch according to its context (service, region or none) in the corresponding maps
              *
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param service The service context
              * @param region The region context
              * @param globally_closed Indicates if all regions are closed
              * 
              * @return true if successful and false otherwise
              */
-            bool untrackBranch(const std::string& async_zone_id, const std::string& service, 
+            bool untrackBranch(const std::string& acsl_id, const std::string& service, 
                 const std::string& region, bool globally_closed);
 
             /**
              * Track a set of branches (add) according to their context (service, region or none) in the corresponding maps
              *
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param service The service context
              * @param regions The regions for each branch
              * @param num The number of new branches
@@ -459,34 +459,34 @@ namespace metadata {
              * 
              * @return true if successful and false otherwise
              */
-            bool trackBranch(const std::string& async_zone_id, const std::string& service, const utils::ProtoVec& regions, 
+            bool trackBranch(const std::string& acsl_id, const std::string& service, const utils::ProtoVec& regions, 
                 int num, const std::string& parent, metadata::Branch * branch = nullptr);
 
             /**
              * Wait until request is closed
              * 
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param async_zone_id Current asynchronous zone
+             * @param acsl_id Current asynchronous zone
              *
              * @return Possible return values:
              * - 0 if call did not block, 
              * - 1 if inconsistency was prevented
              * - (-1) if timeout was reached
              * - (-3) current_service not found
-             * - (-4) if async_zone_id does not exist
+             * - (-4) if acsl_id does not exist
              */
-            int wait(const std::string& async_zone_id, bool async, int timeout, const std::string& current_service);
+            int wait(const std::string& acsl_id, bool async, int timeout, const std::string& current_service);
 
             /**
              * Wait until request is closed for a given context (region)
              *
-             * @param async_zone_id Current subrequest
+             * @param acsl_id Current subrequest
              * @param region The name of the region that defines the waiting context
              * @param async Force to wait for asynchronous creation of a single branch
              * @param timeout Timeout in seconds
-             * @param async_zone_id Current asynchronous zone
+             * @param acsl_id Current asynchronous zone
              *
              * @return Possible return values:
              * - 0 if call did not block, 
@@ -494,14 +494,14 @@ namespace metadata {
              * - (-1) if timeout was reached
              * - (-2) if context was not found
              * - (-3) current_service not found
-             * - (-4) if async_zone_id does not exist
+             * - (-4) if acsl_id does not exist
              */
-            int waitRegion(const std::string& async_zone_id, const std::string& region, bool async, int timeout, const std::string& current_service);
+            int waitRegion(const std::string& acsl_id, const std::string& region, bool async, int timeout, const std::string& current_service);
 
             /**
              * Wait until request is closed for a given context (service)
              *
-             * @param async_zone_id Current asynchronous zone
+             * @param acsl_id Current asynchronous zone
              * @param service The name of the service that defines the waiting context
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
              * @param async Force to wait for asynchronous creation of a single branch
@@ -516,7 +516,7 @@ namespace metadata {
              * - (-3) current_service not found
              * - (-2) if context was not found
              */
-            int waitService(const std::string& async_zone_id, 
+            int waitService(const std::string& acsl_id, 
                 const std::string& service, const std::string& tag, bool async, 
                 int timeout, const std::string& current_service, bool wait_deps);
 
@@ -524,7 +524,7 @@ namespace metadata {
             /**
              * Wait until request is closed for a given context (service and region)
              *
-             * @param async_zone_id Current asynchronous zone
+             * @param acsl_id Current asynchronous zone
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
              * @param tag Tag that specifies the service operation the client is waiting for (empty not specified in the request)
@@ -541,40 +541,40 @@ namespace metadata {
              * - (-3) current_service not found
              * - (-4) if tag was not found
              */
-            int waitServiceRegion(const std::string& async_zone_id, 
+            int waitServiceRegion(const std::string& acsl_id, 
                 const std::string& service, const std::string& region, 
                 const std::string& tag, bool async, int timeout,
                 const std::string& current_service, bool wait_deps);
 
             /**
              * Check status of request
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * 
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
-             * - (-3) if async_zone_id does not exist
+             * - (-3) if acsl_id does not exist
              */
-            Status checkStatus(const std::string& async_zone_id);
+            Status checkStatus(const std::string& acsl_id);
 
             /**
              * Check status of request for a given context (region)
              *
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param region The name of the region that defines the waiting context
              *
              * @return Possible return values:
              * - 0 if request is OPENED 
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
-             * - (-3) if async_zone_id does not exist
+             * - (-3) if acsl_id does not exist
              */
-            Status checkStatusRegion(const std::string& async_zone_id, const std::string& region);
+            Status checkStatusRegion(const std::string& acsl_id, const std::string& region);
 
             /**
              * Check status of request for a given context (service)
              *
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param service The name of the service that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
              *
@@ -583,13 +583,13 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusService(const std::string& async_zone_id, 
+            Status checkStatusService(const std::string& acsl_id, 
                 const std::string& service, bool detailed = false);
 
             /**
              * Check status of request for a given context (service and region)
              *
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param service The name of the service that defines the waiting context
              * @param region The name of the region that defines the waiting context
              * @param detailed Detailed description of status for all tagged branches
@@ -599,20 +599,20 @@ namespace metadata {
              * - 1 if request is CLOSED
              * - 2 if request is UNKNOWN
              */
-            Status checkStatusServiceRegion(const std::string& async_zone_id, 
+            Status checkStatusServiceRegion(const std::string& acsl_id, 
                 const std::string& service, const std::string& region, bool detailed = false);
 
             /**
              * Fetch dependencies in the call graph
              * 
-             * @param async_zone_id Current async zone id
+             * @param acsl_id Current acsl id
              * @param service The service context
              * @return Possible return values of Dependencies.res:
              * - 0 if OK
              * - (-2) if service was not found
-             * - (-3) if async_zone_id does not exist
+             * - (-3) if acsl_id does not exist
              */
-            utils::Dependencies fetchDependencies(const std::string& service, const std::string& async_zone_id);
+            utils::Dependencies fetchDependencies(const std::string& service, const std::string& acsl_id);
         };
     
 }

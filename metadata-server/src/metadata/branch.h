@@ -21,7 +21,7 @@ namespace metadata {
         private:
             const std::string _service;
             const std::string _tag;
-            const std::string _sub_rid;
+            const std::string _acsl_id;
 
             // region status with key: <region>, value: <status>
             std::unordered_map<std::string, int> _regions;
@@ -34,15 +34,15 @@ namespace metadata {
 
         public:
             std::atomic<bool> replicated;
-            Branch(std::string service, std::string tag, std::string async_zone_id, const utils::ProtoVec& vector_regions, bool replicated);
-            Branch(std::string service, std::string tag, std::string async_zone_id, bool replicated);
+            Branch(std::string service, std::string tag, std::string acsl_id, const utils::ProtoVec& vector_regions, bool replicated);
+            Branch(std::string service, std::string tag, std::string acsl_id, bool replicated);
 
             /**
-             * Get the branch's async_zone_id
+             * Get the branch's acsl_id
              * 
-             * @return async_zone_id
+             * @return acsl_id
              */
-            std::string getAsyncZoneId();
+            std::string getACSLID();
 
             /**
              * Get the branch's tag

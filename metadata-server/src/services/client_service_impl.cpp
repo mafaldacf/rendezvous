@@ -77,7 +77,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   const std::string& bid = request->bid();
   const std::string& service = request->service();
   const std::string& tag = request->tag();
-  const std::string& async_zone = request->async_zone().empty() ? utils::ROOT_ASYNC_ZONE_ID : request->async_zone();
+  const std::string& acsl_id = request->acsl().empty() ? utils::ROOT_ACSL_ID : request->acsl();
   bool monitor = request->monitor();
   int num = request->regions().size();
   const auto& regions = request->regions();
@@ -85,10 +85,10 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
   std::string current_service_bid = request->current_service_bid();
 
   if (bid.empty()) {
-    //spdlog::trace("> [RB: {}] register #{} branches on service '{}:{}' (monitor={}) (zone={})", rid, num, service, tag, monitor, async_zone);
+    //spdlog::trace("> [RB: {}] register #{} branches on service '{}:{}' @ acsl {} (monitor={})", rid, num, service, tag, acsl_id, monitor);
   }
   else {
-    //spdlog::trace("> [RB: {}] register #{} branches with bid '{}' on service '{}:{}' (monitor={}) (zone={})", rid, num, bid, service, tag, monitor, async_zone);
+    //spdlog::trace("> [RB: {}] register #{} branches with bid '{}' on service '{}:{}' @ acsl {} (monitor={})", rid, num, bid, service, tag, acsl_id, monitor);
   }
   
   if (service.empty()) {
@@ -114,7 +114,7 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
     current_service_bid = _server->parseFullId(current_service_bid).first;
   }
 
-  auto branch = _server->registerBranch(rv_request, async_zone, service, regions, tag, current_service_bid, core_bid, monitor);
+  auto branch = _server->registerBranch(rv_request, acsl_id, service, regions, tag, current_service_bid, core_bid, monitor);
 
   // could not create branch (tag already exists)
   if (!branch) {
@@ -136,11 +136,11 @@ grpc::Status ClientServiceImpl::RegisterBranch(grpc::ServerContext* context,
       ctx_replica.set_version(new_version);
     }
     //spdlog::debug("> [SENDING REPL RB: {}:{}:{}] sid: {}, version {}", rid, service, tag, ctx_replica.sid(), ctx_replica.version());
-    _replica_client.registerBranch(rid, async_zone, core_bid, service, tag, regions, monitor, ctx_replica);
+    _replica_client.registerBranch(rid, acsl_id, core_bid, service, tag, regions, monitor, ctx_replica);
 
   }
 
-  //spdlog::trace("< [RB: {}] registered branch with bid {} on service '{}:{}' and #{} regions (monitor={}) (zone={})", rid, core_bid, service, tag, num, monitor, async_zone);
+  //spdlog::trace("< [RB: {}] registered branch with bid {} on service '{}:{}' @ acsl {} and #{} regions (monitor={})", rid, core_bid, service, tag, acsl_id, num, monitor);
   return grpc::Status::OK;
 }
 
@@ -163,7 +163,7 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
 
   for (const auto& branch: branches) {
     const std::string& core_bid = _server->genBid(rv_request);
-    auto new_branch = _server->registerBranch(rv_request, branch.async_zone(), branch.service(), branch.regions(), branch.tag(), current_service_bid, core_bid, branch.monitor());
+    auto new_branch = _server->registerBranch(rv_request, branch.acsl(), branch.service(), branch.regions(), branch.tag(), current_service_bid, core_bid, branch.monitor());
 
     // could not create branch (tag already exists)
     if (!new_branch) {
@@ -184,7 +184,7 @@ grpc::Status ClientServiceImpl::RegisterBranches(grpc::ServerContext* context,
         ctx_replica.set_sid(sid);
         ctx_replica.set_version(new_version);
       }
-      _replica_client.registerBranch(rid, branch.async_zone(), core_bid, branch.service(), branch.tag(), branch.regions(), branch.monitor(), ctx_replica);
+      _replica_client.registerBranch(rid, branch.acsl(), core_bid, branch.service(), branch.tag(), branch.regions(), branch.monitor(), ctx_replica);
     }
   }
 
@@ -286,12 +286,12 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   const std::string& tag = request->tag();
   const std::string& region = request->region();
   bool wait_deps = request->wait_deps();
-  const std::string& async_zone = request->async_zone().empty() ? utils::ROOT_ASYNC_ZONE_ID : request->async_zone();
+  const std::string& acsl_id = request->acsl().empty() ? utils::ROOT_ACSL_ID : request->acsl();
   const std::string& current_service = request->current_service();
   //bool async = request->async();
   int timeout = request->timeout();
 
-  //spdlog::trace("> [WR: {}] wait call targeting service '{}' and region '{}' (zone={})", rid, service, region, async_zone);
+  //spdlog::trace("> [WR: {}] wait call targeting service '{}' and region '{}' @ acsl {}", rid, service, region, acsl_id);
 
   // validate parameters
   if (timeout < 0) {
@@ -316,11 +316,11 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   }
 
   int result;
-  replicas::ReplicaClient::AsyncRequestHelper * async_request_helper = _replica_client.addWaitLog(rid, async_zone, service);
+  replicas::ReplicaClient::AsyncRequestHelper * async_request_helper = _replica_client.addWaitLog(rid, acsl_id, service);
 
   // perform wait on a single service
   if (services.size() == 0) {
-    result = _server->wait(rv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
+    result = _server->wait(rv_request, acsl_id, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
     if (result == 1) {
       response->set_prevented_inconsistency(true);
     }
@@ -328,14 +328,14 @@ grpc::Status ClientServiceImpl::WaitRequest(grpc::ServerContext* context,
   // otherwise, perform wait on multiple provided services
   else {
     for (const auto& service: services) {
-      result = _server->wait(rv_request, async_zone, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
+      result = _server->wait(rv_request, acsl_id, service, region, tag, utils::ASYNC_REPLICATION, timeout, current_service, wait_deps);
       if (result < 0) {
         break;
       }
     }
   }
 
-  _replica_client.removeWaitLog(rid, async_zone, service, async_request_helper);
+  _replica_client.removeWaitLog(rid, acsl_id, service, async_request_helper);
 
   // parse errors
   if (result == -1) {
@@ -362,10 +362,10 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
   const std::string& rid = request->rid();
   const std::string& service = request->service();
   const std::string& region = request->region();
-  const std::string& async_zone = request->async_zone().empty() ? utils::ROOT_ASYNC_ZONE_ID : request->async_zone();
+  const std::string& acsl_id = request->acsl().empty() ? utils::ROOT_ACSL_ID : request->acsl();
   bool detailed = request->detailed();
 
-  //spdlog::trace("> [CS] query for request '{}' on service '{}' and region '{}' (async_zone={}, detailed={})", rid, service, region, async_zone, detailed);
+  //spdlog::trace("> [CS] query for request '{}' on service '{}' and region '{}' @ acsl {} (detailed={})", rid, service, region, acsl, detailed);
 
   // check if request exists
   metadata::Request * rv_request = _getRequest(rid);
@@ -378,7 +378,7 @@ grpc::Status ClientServiceImpl::CheckStatus(grpc::ServerContext* context,
     return grpc::Status::OK;
   }
 
-  const auto& result = _server->checkStatus(rv_request, async_zone, service, region, detailed);
+  const auto& result = _server->checkStatus(rv_request, acsl_id, service, region, detailed);
 
   // detailed information with status of all tagged branches
   if (detailed) {
@@ -410,7 +410,7 @@ grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context,
 
   const std::string& rid = request->rid();
   const std::string& service = request->service();
-  const std::string& async_zone = request->async_zone().empty() ? utils::ROOT_ASYNC_ZONE_ID : request->async_zone();
+  const std::string& acsl_id = request->acsl().empty() ? utils::ROOT_ACSL_ID : request->acsl();
 
   //spdlog::trace("> [FD] query for request '{}' on service '{}'", rid, service);
   
@@ -424,7 +424,7 @@ grpc::Status ClientServiceImpl::FetchDependencies(grpc::ServerContext* context,
     return grpc::Status::OK;
   }
 
-  const auto& result = _server->fetchDependencies(rv_request, service, async_zone);
+  const auto& result = _server->fetchDependencies(rv_request, service, acsl_id);
 
   if (result.res == INVALID_SERVICE) {
     spdlog::error("< [FD] Error: invalid service", rid);

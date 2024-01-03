@@ -9,8 +9,8 @@ from rendezvous.protos import rendezvous_pb2_grpc as rv
 channel = grpc.insecure_channel('localhost:8001')
 stub = rv.ClientServiceStub(channel)
 
-def f(stub, rid, bid, service, regions, async_zone, current_service_bid):
-    response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, bid=bid, service=service, regions=regions, async_zone=async_zone, current_service_bid=current_service_bid))
+def f(stub, rid, bid, service, regions, acsl, current_service_bid):
+    response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, bid=bid, service=service, regions=regions, acsl=acsl, current_service_bid=current_service_bid))
     print(f"[Register Branches] {response}")
 
 response = stub.RegisterRequest(pb.RegisterRequestMessage(rid="rid"))
@@ -40,9 +40,9 @@ def registerRequest(stub, rid):
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
 
-def registerBranch(stub, rid, service, regions, tag="", async_zone=""):
+def registerBranch(stub, rid, service, regions, tag="", acsl=""):
     try:
-        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, monitor=True, async_zone=async_zone))
+        response = stub.RegisterBranch(pb.RegisterBranchMessage(rid=rid, service=service, regions=regions, tag=tag, monitor=True, acsl=acsl))
         print(f"[Register Branches] {response}")
     except grpc.RpcError as e:
         print(f"[Error] {e.details()}")
@@ -126,9 +126,9 @@ def readInput(stubs):
                 regions.append(region)
 
                 
-            async_zone = args[-1]
-            print("ASYNC ZONE: ", async_zone)
-            ctx = registerBranch(stub, rid, service, regions, "", async_zone)
+            acsl = args[-1]
+            print("ASYNC ZONE: ", acsl)
+            ctx = registerBranch(stub, rid, service, regions, "", acsl)
 
         elif command == REGISTER_BRANCH_WITH_TAG and len(args) >= 3:
             rid = args[0]
@@ -162,8 +162,8 @@ def readInput(stubs):
             rid = args[0]
             service = args[1] if len(args) >= 2 else None
             region = args[2] if len(args) >= 3 else None
-            async_zone = args[3] if len(args) >= 4 else None
-            t = threading.Thread(target=wait, args=(stub, rid, service, region, async_zone))
+            acsl = args[3] if len(args) >= 4 else None
+            t = threading.Thread(target=wait, args=(stub, rid, service, region, acsl))
             t.start()
 
         elif command == CHECK_STATUS and len(args) >= 1 and len(args) <= 3:

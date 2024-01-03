@@ -28,7 +28,7 @@ message Empty {
 /* Metadata for server replication */
 message RequestContext {
   string current_service = 1;
-  string async_zone = 2;
+  string acsl = 2;
   int32 num_sub_zones = 3;
 }
 
@@ -58,7 +58,7 @@ message RegisterBranchMessage {
   string tag = 4;
   repeated string regions = 5;
   bool monitor = 6;
-  string async_zone = 7;
+  string acsl = 7;
   string current_service_bid = 8;
 }
 message RegisterBranchResponse {
@@ -72,7 +72,7 @@ message Branch {
   string service = 1;
   string tag = 2;
   repeated string regions = 3;
-  string async_zone = 4;
+  string acsl = 4;
   bool monitor = 5;
 }
 
@@ -111,7 +111,7 @@ message WaitRequestMessage {
   int32 timeout = 6;
   bool wait_deps = 7;
   string current_service = 8;
-  string async_zone = 9;
+  string acsl = 9;
 }
 message WaitRequestResponse {
   bool prevented_inconsistency = 1;
@@ -124,7 +124,7 @@ message CheckStatusMessage {
   string service = 2;
   string region = 3;
   bool detailed = 4;
-  string async_zone = 5;
+  string acsl = 5;
 }
 
 message CheckStatusResponse {
@@ -137,7 +137,7 @@ message CheckStatusResponse {
 message FetchDependenciesMessage {
   string rid = 1;
   string service = 2;
-  string async_zone = 3;
+  string acsl = 3;
 }
 
 message FetchDependenciesResponse {
