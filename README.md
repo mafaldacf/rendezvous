@@ -4,7 +4,21 @@ Master's Degree in Computer Science and Engineering
 
 Thesis 2022/2023
 
-# Rendezvous: Request Workflow Monitor for Microservice-based Web Applications
+# Rendezvous
+
+This work introduces **Rendezvous**, a system that offers correctness guarantees and prevents consistency violations in microservice applications, including *cross-service inconsistencies* defined by [Antipode](https://dl.acm.org/doi/10.1145/3600006.3613176) authors. The work stands out for capturing all service remote calls and database operations while leaving datastores unmodified, contrary to solutions like [FlightTracker](https://www.usenix.org/conference/osdi20/presentation/shi).
+
+The system is composed of a *metadata server* that stores the state of the request and services' actions, including writes to objects that are not immediately visible, especially in a cluster of multiple databases operating in multiple regions. It exposes an API for services to register new information at any point, which can be later queried to retrieve the set of dependencies and status that define the progress of the request or to enforce a consistent view over former actions.
+
+Rendezvous was capable of correcting all inconsistencies with an average latency overhead of 7%. The evaluation was performed in two benchmarks ([PostNotification](https://github.com/Antipode-SOSP23/antipode-post-notification/tree/rendezvous) and [DeathStarBench](https://github.com/Antipode-SOSP23/antipode-deathstarbench/tree/rendezvous)) that presented an average of 83% of inconsistencies.
+
+📄 [Request Workflow Monitor for Microservice-based Web Applications](https://fenix.tecnico.ulisboa.pt/cursos/meic-a/dissertacao/2535628432474134) (Instituto Superior Técnico, Masters Thesis)
+
+## Rendezvous @ FaaS
+
+The thesis also laid the foundation for a new iteration of **Rendezvous** tailored to cloud platforms (code available in the [`words23`](https://github.com/mafaldacf/rendezvous/tree/words23) branch), proposing a method for enhancing Function-as-a-Service (FaaS) platforms by transparently incorporating the framework into applications.
+
+📄 [Rendezvous: Where Serverless Functions Find Consistency](https://dl.acm.org/doi/10.1145/3605181.3626290) (WORDS '23)
 
 ## Rendezvous API Overview
 
@@ -23,7 +37,7 @@ Thesis 2022/2023
 
 **Datastore Monitor Shim API**
 
-- `find(m)` - lookup for injected metadata in a datastore and return acknowledgment to datastore monitor
+- `find(m)` - lookup for injected metadata in a datastore and return an acknowledgment to datastore monitor
 
 ## Requirements
 
